@@ -81,11 +81,11 @@ Markers: `[ ]` todo · `[x]` done, tests green · `[BLOCKED]` see BLOCKED.md
 
 ## Admin web
 
-- [ ] T040 | admin-web | Refine admin panel screens over the admin API | depends: T035
+- [x] T040 | admin-web | Refine admin panel screens over the admin API | depends: T035
 
 ## Verification
 
 - [x] T041 | ops | CI pipeline with coverage gates per CLAUDE.md §10 | depends: T001
 - [x] T042 | e2e | one happy path plus three failure paths: network drop, driver declines, no drivers | depends: T024,T026
-- [ ] T043 | perf | load test at 500 concurrent users against the matching and ride paths | depends: T024,T026
-- [ ] T044 | security | adversarial security audit against CLAUDE.md §12 with concrete attack cases | depends: T035,T032
+- [BLOCKED] T043 | perf | load test at 500 concurrent users against the matching and ride paths | depends: T024,T026
+- [x] T044 | security | adversarial security audit against CLAUDE.md §12 with concrete attack cases | depends: T035,T032

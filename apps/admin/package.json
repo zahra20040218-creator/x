@@ -1,0 +1,30 @@
+{
+  "name": "@rideapp/admin",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "lint": "eslint \"src/**/*.{ts,tsx}\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@refinedev/core": "4.57.10",
+    "@refinedev/react-router": "1.0.1",
+    "@refinedev/simple-rest": "5.0.10",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-router": "7.1.1"
+  },
+  "devDependencies": {
+    "@types/react": "18.3.18",
+    "@types/react-dom": "18.3.5",
+    "@vitejs/plugin-react": "4.3.4",
+    "typescript": "5.9.3",
+    "vite": "6.0.7",
+    "vitest": "3.2.4"
+  }
+}
