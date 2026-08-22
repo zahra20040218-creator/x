@@ -133,10 +133,23 @@ export class RideService {
     if (actor.type === 'ADMIN') return ride;
 
     const isRider = actor.type === 'RIDER' && ride.riderId === actor.id;
-    const isDriver = actor.type === 'DRIVER' && ride.driverId === actor.id;
-    if (!isRider && !isDriver) throw new NotFoundProblem('Ride');
+    const isAssignedDriver = actor.type === 'DRIVER' && ride.driverId === actor.id;
+    if (isRider || isAssignedDriver) return ride;
 
-    return ride;
+    // A driver holding a LIVE offer can read it too - they have to see the
+    // pickup and fare to decide whether to accept, and at that point the ride
+    // has no assigned driver yet. Scoped to a PENDING offer for this driver
+    // specifically, so a declined or superseded offer stops granting access.
+    if (actor.type === 'DRIVER' && actor.id) {
+      const offer = await this.db.query(
+        `SELECT 1 FROM ride_offers
+          WHERE ride_id = $1 AND driver_id = $2 AND status = 'PENDING' LIMIT 1`,
+        [rideId, actor.id],
+      );
+      if (offer.rowCount > 0) return ride;
+    }
+
+    throw new NotFoundProblem('Ride');
   }
 
   async listMyRides(

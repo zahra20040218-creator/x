@@ -61,6 +61,12 @@ export class FakeDatabase implements Database {
       'drivers',
       'platform_config',
       'idempotency_keys',
+      'users',
+      'riders',
+      'refresh_tokens',
+      'ratings',
+      'disputes',
+      'wallet_topups',
     ]) {
       this.tables.set(table, []);
     }
@@ -140,6 +146,259 @@ export class FakeDatabase implements Database {
     if (this.failOn) {
       const error = this.failOn(s);
       if (error) throw error;
+    }
+
+    // ---- idempotency (CLAUDE.md 5.2) ----
+    if (/^INSERT INTO idempotency_keys/i.test(s)) {
+      const [key, userId, endpoint, requestHash, , expiresAt] = params as [
+        string, string, string, string, Date, Date,
+      ];
+      const exists = this.rows('idempotency_keys').some(
+        (r) => r['key'] === key && r['user_id'] === userId && r['endpoint'] === endpoint,
+      );
+      // ON CONFLICT DO NOTHING: the primary key admits exactly one row, and the
+      // rowCount is how the caller learns whether it won the claim.
+      if (exists) return this.ok([], 0);
+      this.rows('idempotency_keys').push({
+        key, user_id: userId, endpoint, request_hash: requestHash,
+        response_status: null, response_body: null, expires_at: expiresAt,
+      });
+      return this.ok([], 1);
+    }
+    if (/^UPDATE idempotency_keys/i.test(s)) {
+      const [status, body, , userId, endpoint, key] = params as [
+        number, string, string | null, string, string, string,
+      ];
+      const row = this.rows('idempotency_keys').find(
+        (r) => r['key'] === key && r['user_id'] === userId && r['endpoint'] === endpoint,
+      );
+      if (row) {
+        row['response_status'] = status;
+        row['response_body'] = JSON.parse(body);
+      }
+      return this.ok([], row ? 1 : 0);
+    }
+    if (/^DELETE FROM idempotency_keys/i.test(s) && /RESPONSE_STATUS IS NULL/i.test(s)) {
+      const [userId, endpoint, key] = params as [string, string, string];
+      const rows = this.rows('idempotency_keys');
+      const index = rows.findIndex(
+        (r) =>
+          r['key'] === key && r['user_id'] === userId &&
+          r['endpoint'] === endpoint && r['response_status'] === null,
+      );
+      if (index === -1) return this.ok([], 0);
+      rows.splice(index, 1);
+      return this.ok([], 1);
+    }
+    if (/^SELECT request_hash, response_status, response_body/i.test(s)) {
+      const [userId, endpoint, key] = params as [string, string, string];
+      const row = this.rows('idempotency_keys').find(
+        (r) => r['key'] === key && r['user_id'] === userId && r['endpoint'] === endpoint,
+      );
+      return this.ok(row ? ([{ ...row }] as Row[]) : []);
+    }
+
+    // ---- platform config ----
+    if (/^UPDATE platform_config/i.test(s)) {
+      const [value, , , key] = params as [string, Date, string, string];
+      const row = this.rows('platform_config').find((r) => r['key'] === key);
+      if (row) row['value'] = value;
+      else this.rows('platform_config').push({ key, value });
+      return this.ok([], 1);
+    }
+
+    // ---- driver state ----
+    if (/^SELECT availability, is_suspended, vehicle_plate/i.test(s)) {
+      const found = this.rows('drivers').find((d) => d['user_id'] === params[0]);
+      return this.ok(found ? ([{ ...found }] as Row[]) : []);
+    }
+    if (/^SELECT 1 FROM rides/i.test(s)) {
+      const active = this.rows('rides').some(
+        (r) =>
+          r['driver_id'] === params[0] &&
+          ['ACCEPTED', 'DRIVER_ARRIVED', 'IN_PROGRESS'].includes(r['status'] as string),
+      );
+      return this.ok(active ? ([{ one: 1 }] as Row[]) : []);
+    }
+    if (/^SELECT 1 FROM ride_offers/i.test(s)) {
+      const found = this.rows('ride_offers').some(
+        (o) =>
+          o['ride_id'] === params[0] && o['driver_id'] === params[1] && o['status'] === 'PENDING',
+      );
+      return this.ok(found ? ([{ one: 1 }] as Row[]) : []);
+    }
+    if (/^SELECT 1 FROM drivers/i.test(s)) {
+      const found = this.rows('drivers').some((d) => d['user_id'] === params[0]);
+      return this.ok(found ? ([{ one: 1 }] as Row[]) : []);
+    }
+    if (/^UPDATE drivers SET availability = 'OFFLINE'/i.test(s)) {
+      const driver = this.rows('drivers').find((d) => d['user_id'] === params[0]);
+      if (driver) driver['availability'] = 'OFFLINE';
+      return this.ok([], driver ? 1 : 0);
+    }
+    // The availability ENDPOINT: "... AND availability <> 'ON_TRIP'".
+    // Distinguished from releaseDriver's "... AND availability = 'ON_TRIP'" by
+    // the operator alone - matching on the ON_TRIP text alone shadows the other
+    // and silently stops the driver being freed after a ride.
+    if (/^UPDATE drivers SET availability = 'ONLINE'/i.test(s) && /<> 'ON_TRIP'/i.test(s)) {
+      const driver = this.rows('drivers').find(
+        (d) => d['user_id'] === params[0] && d['availability'] !== 'ON_TRIP',
+      );
+      if (driver) driver['availability'] = 'ONLINE';
+      return this.ok([], driver ? 1 : 0);
+    }
+
+    // ---- offers / payments lookups ----
+    if (/^SELECT id, distance_m, expires_at FROM ride_offers/i.test(s)) {
+      const found = this.rows('ride_offers').find(
+        (o) =>
+          o['ride_id'] === params[0] && o['driver_id'] === params[1] && o['status'] === 'PENDING',
+      );
+      if (!found) return this.ok([]);
+      return this.ok([
+        { id: 'offer-1', distance_m: found['distance_m'], expires_at: found['expires_at'] },
+      ] as Row[]);
+    }
+    if (/^SELECT id, status, amount_iqd, confirmed_at FROM payments/i.test(s)) {
+      const found = this.rows('payments').find((p) => p['ride_id'] === params[0]);
+      if (!found) return this.ok([]);
+      return this.ok([
+        {
+          id: 'payment-1', status: found['status'],
+          amount_iqd: found['amount_iqd'], confirmed_at: found['confirmed_at'],
+        },
+      ] as Row[]);
+    }
+
+    // ---- counterparty joins ----
+    if (/^SELECT u\.id, u\.display_name, d\.rating_sum/i.test(s)) {
+      const user = this.rows('users').find((u) => u['id'] === params[0]);
+      const driver = this.rows('drivers').find((d) => d['user_id'] === params[0]);
+      if (!user || !driver) return this.ok([]);
+      return this.ok([
+        {
+          id: user['id'], display_name: user['display_name'],
+          rating_sum: driver['rating_sum'] ?? '0', rating_count: driver['rating_count'] ?? '0',
+          vehicle_plate: driver['vehicle_plate'], vehicle_model: driver['vehicle_model'],
+          vehicle_color: driver['vehicle_color'],
+        },
+      ] as Row[]);
+    }
+    if (/^SELECT u\.id, u\.display_name, r\.rating_sum/i.test(s)) {
+      const user = this.rows('users').find((u) => u['id'] === params[0]);
+      if (!user) return this.ok([]);
+      return this.ok([
+        {
+          id: user['id'], display_name: user['display_name'],
+          rating_sum: '0', rating_count: '0',
+        },
+      ] as Row[]);
+    }
+
+    // ---- ratings ----
+    if (/^INSERT INTO ratings/i.test(s)) {
+      const [rideId, raterId] = params as [string, string];
+      const exists = this.rows('ratings').some(
+        (r) => r['ride_id'] === rideId && r['rater_id'] === raterId,
+      );
+      if (exists) return this.ok([], 0);
+      this.rows('ratings').push({
+        ride_id: rideId, rater_id: raterId, ratee_id: params[2],
+        score: params[3], comment: params[4],
+      });
+      return this.ok([{ id: randomUUID(), created_at: new Date() }] as Row[], 1);
+    }
+    if (/^UPDATE (drivers|riders) SET rating_sum/i.test(s)) {
+      const table = /UPDATE drivers/i.test(s) ? 'drivers' : 'riders';
+      const row = this.rows(table).find((r) => r['user_id'] === params[1]);
+      if (row) {
+        row['rating_sum'] = String(Number(row['rating_sum'] ?? 0) + Number(params[0]));
+        row['rating_count'] = String(Number(row['rating_count'] ?? 0) + 1);
+      }
+      return this.ok([], row ? 1 : 0);
+    }
+
+    // ---- disputes ----
+    if (/^INSERT INTO disputes/i.test(s)) {
+      const id = randomUUID();
+      this.rows('disputes').push({
+        id, ride_id: params[0], opened_by: params[1], status: 'OPEN',
+        reason_code: params[2], description: params[3],
+        resolution: null, created_at: new Date(), resolved_at: null,
+      });
+      return this.ok([{ id, created_at: new Date() }] as Row[], 1);
+    }
+
+    // ---- wallet top-ups ----
+    if (/^INSERT INTO wallet_topups/i.test(s)) {
+      this.rows('wallet_topups').push({
+        driver_id: params[0], admin_id: params[1], amount_iqd: params[2],
+        transaction_id: params[3], reference: params[4],
+      });
+      return this.ok([], 1);
+    }
+
+    // ---- users / auth ----
+    if (/^SELECT id, role, display_name, phone_e164, is_active FROM users WHERE id = \$1/i.test(s)) {
+      const found = this.rows('users').find((u) => u['id'] === params[0]);
+      return this.ok(found ? ([{ ...found }] as Row[]) : []);
+    }
+    if (/^SELECT id, role, display_name, phone_e164, is_active FROM users WHERE phone_e164/i.test(s)) {
+      const found = this.rows('users').find(
+        (u) => u['phone_e164'] === params[0] && u['role'] === params[1],
+      );
+      return this.ok(found ? ([{ ...found }] as Row[]) : []);
+    }
+    if (/^INSERT INTO users/i.test(s)) {
+      const row: FakeRow = {
+        id: randomUUID(),
+        role: 'RIDER',
+        phone_e164: params[0],
+        display_name: params[1],
+        firebase_uid: params[2],
+        is_active: true,
+      };
+      this.rows('users').push(row);
+      return this.ok([{ ...row }] as Row[], 1);
+    }
+    if (/^UPDATE users SET firebase_uid/i.test(s)) {
+      const user = this.rows('users').find((u) => u['id'] === params[1]);
+      if (user) user['firebase_uid'] = params[0];
+      return this.ok([], user ? 1 : 0);
+    }
+    if (/^INSERT INTO riders/i.test(s)) {
+      this.rows('riders').push({ user_id: params[0] });
+      return this.ok([], 1);
+    }
+
+    // ---- refresh tokens ----
+    if (/^INSERT INTO refresh_tokens/i.test(s)) {
+      this.rows('refresh_tokens').push({
+        user_id: params[0], token_hash: params[1], expires_at: params[2], revoked_at: null,
+      });
+      return this.ok([], 1);
+    }
+    if (/^UPDATE refresh_tokens SET revoked_at = \$1 WHERE token_hash/i.test(s)) {
+      const now = params[0] as Date;
+      const row = this.rows('refresh_tokens').find(
+        (t) =>
+          t['token_hash'] === params[1] &&
+          t['revoked_at'] === null &&
+          (t['expires_at'] as Date) > now,
+      );
+      if (!row) return this.ok([], 0);
+      row['revoked_at'] = now;
+      return this.ok([{ user_id: row['user_id'] }] as Row[], 1);
+    }
+    if (/^UPDATE refresh_tokens SET revoked_at = \$1 WHERE user_id/i.test(s)) {
+      let n = 0;
+      for (const t of this.rows('refresh_tokens')) {
+        if (t['user_id'] === params[1] && t['revoked_at'] === null) {
+          t['revoked_at'] = params[0];
+          n++;
+        }
+      }
+      return this.ok([], n);
     }
 
     if (/^SELECT key, value FROM platform_config/i.test(s)) {

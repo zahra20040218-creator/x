@@ -21,8 +21,8 @@ Markers: `[ ]` todo · `[x]` done, tests green · `[BLOCKED]` see BLOCKED.md
 
 ## API core
 
-- [ ] T007 | api-core | Zod-validated env config loader; pino logger with request_id and PII redaction | depends: T001
-- [ ] T008 | api-core | RFC 9457 problem+json exception filter and Zod validation pipe | depends: T007
+- [x] T007 | api-core | Zod-validated env config loader; pino logger with request_id and PII redaction | depends: T001
+- [x] T008 | api-core | RFC 9457 problem+json exception filter and Zod validation pipe | depends: T007
 - [BLOCKED] T009 | api-core | PgBouncer-safe pg pool wrapper with hard cap and transaction helper | depends: T002,T007
 - [x] T010 | api-core | Redis port, ioredis adapter, in-memory adapter, shared conformance suite | depends: T007
 - [x] T011 | money | IQD whole-integer value type and guards; no float on any money path | depends: T001
@@ -35,19 +35,19 @@ Markers: `[ ]` todo · `[x]` done, tests green · `[BLOCKED]` see BLOCKED.md
 
 ## Auth
 
-- [ ] T015 | auth | Firebase ID token verifier port plus a deterministic fake for tests | depends: T007
+- [x] T015 | auth | Firebase ID token verifier port plus a deterministic fake for tests | depends: T007
 - [x] T016 | auth | phone normalisation 07XXXXXXXXX to +9647XXXXXXXXX with E.164 validation | depends: T001
-- [ ] T017 | auth | POST /auth/otp/verify, JWT issue, refresh rotation, logout | depends: T015,T016,T009
-- [ ] T018 | auth | JWT guard, role guard, and ride-ownership guard | depends: T017
+- [x] T017 | auth | POST /auth/otp/verify, JWT issue, refresh rotation, logout | depends: T015,T016,T009
+- [x] T018 | auth | JWT guard, role guard, and ride-ownership guard | depends: T017
 
 ## Ride lifecycle
 
 - [x] T019 | rides | RideStateMachine: transition table, actor guards, ride_events append, 409 on invalid | depends: T004,T009
 - [x] T020 | rides | idempotency layer: key to stored response, 24h TTL, body-mismatch 409 | depends: T006,T009
-- [ ] T021 | rides | POST /rides, GET /rides/me, GET /rides/{id} with per-caller visibility | depends: T019,T020,T014,T018
-- [ ] T025 | rides | arrived, start, and cancel endpoints through the state machine | depends: T019,T018
-- [ ] T026 | rides | complete: fare settlement, payment row, and ledger entries in one DB transaction | depends: T012,T014,T019
-- [ ] T033 | rides | rating endpoint, one per rater per ride | depends: T026
+- [x] T021 | rides | POST /rides, GET /rides/me, GET /rides/{id} with per-caller visibility | depends: T019,T020,T014,T018
+- [x] T025 | rides | arrived, start, and cancel endpoints through the state machine | depends: T019,T018
+- [x] T026 | rides | complete: fare settlement, payment row, and ledger entries in one DB transaction | depends: T012,T014,T019
+- [x] T033 | rides | rating endpoint, one per rater per ride | depends: T026
 
 ## Matching
 
@@ -62,15 +62,15 @@ Markers: `[ ]` todo · `[x]` done, tests green · `[BLOCKED]` see BLOCKED.md
 
 ## Async and realtime
 
-- [ ] T029 | queue | BullMQ setup, FCM push worker, maps worker; no synchronous external call in a handler | depends: T010,T007
-- [ ] T030 | location | POST /driver/location accepts a batch and writes to Redis only | depends: T022
+- [x] T029 | queue | BullMQ setup, FCM push worker, maps worker; no synchronous external call in a handler | depends: T010,T007
+- [x] T030 | location | POST /driver/location accepts a batch and writes to Redis only | depends: T022
 - [ ] T031 | location | 30s batch flush job from Redis to Postgres history | depends: T030,T009
-- [ ] T032 | realtime | WebSocket gateway with token-derived channels only, no client-named channel | depends: T018,T019
+- [x] T032 | realtime | WebSocket gateway with token-derived channels only, no client-named channel | depends: T018,T019
 
 ## Admin
 
-- [ ] T034 | admin | admin authentication and driver CRUD | depends: T018
-- [ ] T035 | admin | ride list and detail, disputes, fare config, wallet top-up with idempotency | depends: T034,T012,T013
+- [x] T034 | admin | admin authentication and driver CRUD | depends: T018
+- [x] T035 | admin | ride list and detail, disputes, fare config, wallet top-up with idempotency | depends: T034,T012,T013
 
 ## Flutter
 
@@ -86,6 +86,6 @@ Markers: `[ ]` todo · `[x]` done, tests green · `[BLOCKED]` see BLOCKED.md
 ## Verification
 
 - [x] T041 | ops | CI pipeline with coverage gates per CLAUDE.md §10 | depends: T001
-- [ ] T042 | e2e | one happy path plus three failure paths: network drop, driver declines, no drivers | depends: T024,T026
+- [x] T042 | e2e | one happy path plus three failure paths: network drop, driver declines, no drivers | depends: T024,T026
 - [ ] T043 | perf | load test at 500 concurrent users against the matching and ride paths | depends: T024,T026
 - [ ] T044 | security | adversarial security audit against CLAUDE.md §12 with concrete attack cases | depends: T035,T032
