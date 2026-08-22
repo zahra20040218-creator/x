@@ -1,0 +1,37 @@
+name: rideapp_core
+description: >
+  Shared Flutter code for the rider and driver apps - models, API client and
+  design system. CLAUDE.md §1: duplicated widget code between the two apps is a
+  defect, so anything both apps need lives here.
+version: 1.0.0
+publish_to: none
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # HTTP with an interceptor chain - needed for the auth-refresh and
+  # idempotency-key behaviour in api_client.dart.
+  dio: ^5.7.0
+
+  # Secure token storage. Refresh tokens must not sit in SharedPreferences,
+  # which is world-readable on a rooted device.
+  flutter_secure_storage: ^9.2.2
+
+  intl: ^0.19.0
+  uuid: ^4.5.1
+  equatable: ^2.0.5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  very_good_analysis: ^6.0.0
+
+flutter:
+  uses-material-design: true
