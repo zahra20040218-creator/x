@@ -64,7 +64,7 @@ Markers: `[ ]` todo · `[x]` done, tests green · `[BLOCKED]` see BLOCKED.md
 
 - [x] T029 | queue | BullMQ setup, FCM push worker, maps worker; no synchronous external call in a handler | depends: T010,T007
 - [x] T030 | location | POST /driver/location accepts a batch and writes to Redis only | depends: T022
-- [ ] T031 | location | 30s batch flush job from Redis to Postgres history | depends: T030,T009
+- [BLOCKED] T031 | location | 30s batch flush job from Redis to Postgres history | depends: T030,T009
 - [x] T032 | realtime | WebSocket gateway with token-derived channels only, no client-named channel | depends: T018,T019
 
 ## Admin
@@ -74,10 +74,10 @@ Markers: `[ ]` todo · `[x]` done, tests green · `[BLOCKED]` see BLOCKED.md
 
 ## Flutter
 
-- [ ] T036 | flutter-core | packages/core: models, API client, design system, IQD and RTL formatting | depends: T021
-- [ ] T037 | flutter-rider | rider app: auth, map, estimate, request, live track, complete, rate | depends: T036
-- [ ] T038 | flutter-driver | driver app: online toggle, offer sheet, accept, navigation deep-link, complete | depends: T036
-- [ ] T039 | flutter-driver | background location: foreground service, Doze exemption flow, offline buffer, flush | depends: T038
+- [BLOCKED] T036 | flutter-core | packages/core: models, API client, design system, IQD and RTL formatting | depends: T021
+- [BLOCKED] T037 | flutter-rider | rider app: auth, map, estimate, request, live track, complete, rate | depends: T036
+- [BLOCKED] T038 | flutter-driver | driver app: online toggle, offer sheet, accept, navigation deep-link, complete | depends: T036
+- [BLOCKED] T039 | flutter-driver | background location: foreground service, Doze exemption flow, offline buffer, flush | depends: T038
 
 ## Admin web
 

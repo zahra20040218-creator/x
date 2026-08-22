@@ -1,0 +1,47 @@
+name: rideapp_driver
+description: Driver app. Android only in v1 (CLAUDE.md §2 - no iOS builds).
+version: 1.0.0
+publish_to: none
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  rideapp_core:
+    path: ../../packages/core
+
+  firebase_core: ^3.8.0
+  firebase_auth: ^5.3.3
+  firebase_messaging: ^15.1.5
+
+  # CLAUDE.md §5.3 - the location service must run as a FOREGROUND SERVICE with
+  # a persistent notification. flutter_background_geolocation is the paid
+  # alternative; this combination is what the app is built on:
+  #   flutter_foreground_task  - the Android foreground service + notification
+  #   geolocator               - the position stream and permission flow
+  flutter_foreground_task: ^8.10.4
+  geolocator: ^13.0.2
+  permission_handler: ^11.3.1
+
+  # Battery optimisation exemption (CLAUDE.md §5.3). Without it Android Doze
+  # stops the service minutes after the screen goes off.
+  android_intent_plus: ^5.2.0
+
+  google_maps_flutter: ^2.9.0
+  url_launcher: ^6.3.1
+  path_provider: ^2.1.5
+  uuid: ^4.5.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  very_good_analysis: ^6.0.0
+
+flutter:
+  uses-material-design: true

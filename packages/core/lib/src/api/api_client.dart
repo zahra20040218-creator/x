@@ -173,6 +173,13 @@ class ApiClient {
   /// One key per user intent, not per attempt.
   static String newIdempotencyKey() => _uuid.v4();
 
+  /// The current access token, for the realtime handshake.
+  ///
+  /// The WebSocket cannot carry an Authorization header, so the token goes in
+  /// the first frame instead. Exposed here rather than letting screens reach
+  /// into the token store directly, so storage stays a single concern.
+  Future<String?> currentAccessToken() => _tokens.accessToken();
+
   Future<List<Ride>> myRides({int limit = 20, RideStatus? status}) async {
     final json = await _send<Map<String, dynamic>>(
       'GET',
