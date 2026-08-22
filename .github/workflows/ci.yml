@@ -1,0 +1,144 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: API — test, lint, typecheck
+    runs-on: ubuntu-latest
+
+    # These services are the whole point of this job.
+    #
+    # The unit suite runs against an in-memory Redis so it works on a laptop
+    # without Docker. That is a convenience with a cost: the fake is unverified.
+    # `redis-conformance` runs the IDENTICAL assertions against the real thing,
+    # and it SKIPS when TEST_REDIS_URL is unset. So if this workflow ever stops
+    # setting TEST_REDIS_URL, the suite still goes green and the concurrency
+    # guarantees quietly stop being verified anywhere.
+    #
+    # If you are editing this file: do not remove these services without
+    # removing the skip-guard in test/integration/*.test.ts first, so that the
+    # loss is loud instead of silent.
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: rideapp
+          POSTGRES_PASSWORD: rideapp
+          POSTGRES_DB: rideapp_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U rideapp -d rideapp_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+
+      redis:
+        image: redis:7.4-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+
+    env:
+      TEST_DATABASE_URL: postgresql://rideapp:rideapp@localhost:5432/rideapp_test
+      DATABASE_MIGRATION_URL: postgresql://rideapp:rideapp@localhost:5432/rideapp_test
+      TEST_REDIS_URL: redis://localhost:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck (tsc --noEmit, strict)
+        run: pnpm --filter @rideapp/api typecheck
+
+      - name: Lint
+        run: pnpm --filter @rideapp/api lint
+
+      - name: Migrations run clean UP on a fresh database
+        run: pnpm --filter @rideapp/api migrate:up
+
+      # CLAUDE.md §11 Definition of Done: "Migrations run cleanly up and down on
+      # a fresh DB." Down-then-up again proves the down migrations are real and
+      # not just files that exist.
+      - name: Migrations run clean DOWN and back UP
+        run: |
+          pnpm --filter @rideapp/api migrate:down 4
+          pnpm --filter @rideapp/api migrate:up
+
+      - name: Unit tests with coverage gates
+        run: pnpm --filter @rideapp/api test
+
+      - name: Integration tests (real Postgres + real Redis)
+        run: pnpm --filter @rideapp/api test:integration
+
+      # A green integration run that actually skipped everything is worse than a
+      # red one, because it reads as verification. This step fails the build if
+      # the conformance suite did not really execute.
+      - name: Assert the real-Redis conformance suite did NOT skip
+        run: |
+          OUT=$(pnpm --filter @rideapp/api test:integration 2>&1)
+          echo "$OUT"
+          if echo "$OUT" | grep -qE "IoRedisAdapter \(real Redis\)"; then
+            echo "OK: real-Redis conformance executed."
+          else
+            echo "FAIL: the real-Redis conformance suite did not run."
+            echo "The in-memory Redis is therefore unverified, and every"
+            echo "concurrency guarantee in this repo rests on it. Refusing to pass."
+            exit 1
+          fi
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+          if-no-files-found: ignore
+
+  # Present and deliberately failing-open, because no Flutter code exists yet.
+  # It is here so that the day apps/rider gains a pubspec.yaml, CI covers it
+  # rather than someone remembering to add a job.
+  flutter:
+    name: Flutter — analyze and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect Flutter packages
+        id: detect
+        run: |
+          if ls packages/core/pubspec.yaml apps/rider/pubspec.yaml apps/driver/pubspec.yaml >/dev/null 2>&1; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No Flutter packages yet — see BLOCKED.md (T036-T039)."
+          fi
+
+      - uses: subosito/flutter-action@v2
+        if: steps.detect.outputs.found == 'true'
+        with:
+          channel: stable
+
+      - name: Analyze and test
+        if: steps.detect.outputs.found == 'true'
+        run: |
+          for dir in packages/core apps/rider apps/driver; do
+            [ -f "$dir/pubspec.yaml" ] || continue
+            (cd "$dir" && flutter pub get && flutter analyze && flutter test)
+          done

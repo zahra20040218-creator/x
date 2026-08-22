@@ -12,38 +12,38 @@ Markers: `[ ]` todo · `[x]` done, tests green · `[BLOCKED]` see BLOCKED.md
 
 ## Foundation
 
-- [ ] T001 | infra | pnpm workspace, TS strict base config, eslint, vitest harness | depends: -
-- [ ] T002 | infra | forward-only SQL migration runner with up/down and a fresh-DB test | depends: T001
-- [ ] T003 | db | migration 0001: enums, users, drivers, riders, platform_config seed | depends: T002
-- [ ] T004 | db | migration 0002: rides, ride_events, ride_offers, all §3.4 indexes | depends: T003
-- [ ] T005 | db | migration 0003: ledger_entries, append-only triggers, balance trigger, wallet view | depends: T003
-- [ ] T006 | db | migration 0004: payments, idempotency_keys, location history, ratings, topups, disputes, refresh_tokens | depends: T004,T005
+- [x] T001 | infra | pnpm workspace, TS strict base config, eslint, vitest harness | depends: -
+- [BLOCKED] T002 | infra | forward-only SQL migration runner with up/down and a fresh-DB test | depends: T001
+- [BLOCKED] T003 | db | migration 0001: enums, users, drivers, riders, platform_config seed | depends: T002
+- [BLOCKED] T004 | db | migration 0002: rides, ride_events, ride_offers, all §3.4 indexes | depends: T003
+- [BLOCKED] T005 | db | migration 0003: ledger_entries, append-only triggers, balance trigger, wallet view | depends: T003
+- [BLOCKED] T006 | db | migration 0004: payments, idempotency_keys, location history, ratings, topups, disputes, refresh_tokens | depends: T004,T005
 
 ## API core
 
 - [ ] T007 | api-core | Zod-validated env config loader; pino logger with request_id and PII redaction | depends: T001
 - [ ] T008 | api-core | RFC 9457 problem+json exception filter and Zod validation pipe | depends: T007
-- [ ] T009 | api-core | PgBouncer-safe pg pool wrapper with hard cap and transaction helper | depends: T002,T007
-- [ ] T010 | api-core | Redis port, ioredis adapter, in-memory adapter, shared conformance suite | depends: T007
-- [ ] T011 | money | IQD whole-integer value type and guards; no float on any money path | depends: T001
+- [BLOCKED] T009 | api-core | PgBouncer-safe pg pool wrapper with hard cap and transaction helper | depends: T002,T007
+- [x] T010 | api-core | Redis port, ioredis adapter, in-memory adapter, shared conformance suite | depends: T007
+- [x] T011 | money | IQD whole-integer value type and guards; no float on any money path | depends: T001
 
 ## Money
 
-- [ ] T012 | ledger | LedgerService: balanced transaction writer, append-only, derived wallet balance | depends: T005,T009,T011
+- [x] T012 | ledger | LedgerService: balanced transaction writer, append-only, derived wallet balance | depends: T005,T009,T011
 - [ ] T013 | config | PlatformConfigService with cache; commission_bps default 0, changeable without deploy | depends: T009
-- [ ] T014 | fare | FareCalculator as a pure function over whole IQD with round-up-to-multiple | depends: T011,T013
+- [x] T014 | fare | FareCalculator as a pure function over whole IQD with round-up-to-multiple | depends: T011,T013
 
 ## Auth
 
 - [ ] T015 | auth | Firebase ID token verifier port plus a deterministic fake for tests | depends: T007
-- [ ] T016 | auth | phone normalisation 07XXXXXXXXX to +9647XXXXXXXXX with E.164 validation | depends: T001
+- [x] T016 | auth | phone normalisation 07XXXXXXXXX to +9647XXXXXXXXX with E.164 validation | depends: T001
 - [ ] T017 | auth | POST /auth/otp/verify, JWT issue, refresh rotation, logout | depends: T015,T016,T009
 - [ ] T018 | auth | JWT guard, role guard, and ride-ownership guard | depends: T017
 
 ## Ride lifecycle
 
-- [ ] T019 | rides | RideStateMachine: transition table, actor guards, ride_events append, 409 on invalid | depends: T004,T009
-- [ ] T020 | rides | idempotency layer: key to stored response, 24h TTL, body-mismatch 409 | depends: T006,T009
+- [x] T019 | rides | RideStateMachine: transition table, actor guards, ride_events append, 409 on invalid | depends: T004,T009
+- [x] T020 | rides | idempotency layer: key to stored response, 24h TTL, body-mismatch 409 | depends: T006,T009
 - [ ] T021 | rides | POST /rides, GET /rides/me, GET /rides/{id} with per-caller visibility | depends: T019,T020,T014,T018
 - [ ] T025 | rides | arrived, start, and cancel endpoints through the state machine | depends: T019,T018
 - [ ] T026 | rides | complete: fare settlement, payment row, and ledger entries in one DB transaction | depends: T012,T014,T019
@@ -52,7 +52,7 @@ Markers: `[ ]` todo · `[x]` done, tests green · `[BLOCKED]` see BLOCKED.md
 ## Matching
 
 - [ ] T022 | matching | Redis driver presence: GEOADD/GEOSEARCH, TTL heartbeat, online/offline | depends: T010,T018
-- [ ] T023 | matching | atomic claim SET NX PX 30000 and the accept endpoint; exactly one winner | depends: T019,T022
+- [x] T023 | matching | atomic claim SET NX PX 30000 and the accept endpoint; exactly one winner | depends: T019,T022
 - [ ] T024 | matching | offer worker: nearest candidate, timeout, EXPIRED to REQUESTED, NO_DRIVERS_FOUND | depends: T023
 
 ## Payments
@@ -85,7 +85,7 @@ Markers: `[ ]` todo · `[x]` done, tests green · `[BLOCKED]` see BLOCKED.md
 
 ## Verification
 
-- [ ] T041 | ops | CI pipeline with coverage gates per CLAUDE.md §10 | depends: T001
+- [x] T041 | ops | CI pipeline with coverage gates per CLAUDE.md §10 | depends: T001
 - [ ] T042 | e2e | one happy path plus three failure paths: network drop, driver declines, no drivers | depends: T024,T026
 - [ ] T043 | perf | load test at 500 concurrent users against the matching and ride paths | depends: T024,T026
 - [ ] T044 | security | adversarial security audit against CLAUDE.md §12 with concrete attack cases | depends: T035,T032

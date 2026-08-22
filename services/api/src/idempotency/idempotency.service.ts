@@ -174,9 +174,18 @@ export class IdempotencyService {
   /** Delete expired keys. Run from the scheduled maintenance job. */
   async purgeExpired(q: Queryable, limit = 1_000): Promise<number> {
     const result = await q.query(
+      // The match MUST be on the full primary key (user_id, endpoint, key).
+      //
+      // Matching on `key` alone deletes every row sharing that key text. Keys
+      // are client-generated per user, so two riders can hold the same key
+      // string at once; purging one rider's EXPIRED key would then delete
+      // another rider's LIVE key, and their next retry would create a second
+      // ride. That is precisely the duplicate-dispatch CLAUDE.md §5.2 exists to
+      // prevent, arriving through the cleanup job instead of the request path.
       `DELETE FROM idempotency_keys
-        WHERE key IN (
-          SELECT key FROM idempotency_keys
+        WHERE (user_id, endpoint, key) IN (
+          SELECT user_id, endpoint, key
+            FROM idempotency_keys
            WHERE expires_at < $1
            LIMIT $2
         )`,

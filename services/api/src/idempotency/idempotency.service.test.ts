@@ -80,10 +80,25 @@ class FakeKeyStore implements Queryable {
 
     if (normalised.startsWith('DELETE FROM IDEMPOTENCY_KEYS')) {
       const [now, limit] = params as [Date, number];
+
+      // Deliberately models the WHERE clause the service actually issues,
+      // rather than "delete the expired rows". A fake that just does the right
+      // thing regardless of the SQL cannot catch a wrong WHERE clause - and a
+      // wrong WHERE clause here is exactly how one rider's cleanup deletes
+      // another rider's live key.
+      const matchesByKeyOnly = /WHERE KEY IN/.test(normalised);
+      const expired = [...this.rows.values()]
+        .filter((r) => r.expiresAt < now)
+        .slice(0, limit);
+
       let deleted = 0;
       for (const [id, row] of [...this.rows]) {
-        if (deleted >= limit) break;
-        if (row.expiresAt < now) {
+        const hit = matchesByKeyOnly
+          ? expired.some((e) => e.key === row.key)
+          : expired.some(
+              (e) => e.key === row.key && e.userId === row.userId && e.endpoint === row.endpoint,
+            );
+        if (hit) {
           this.rows.delete(id);
           deleted++;
         }
@@ -403,6 +418,50 @@ describe('IdempotencyService', () => {
 
       expect(await service.purgeExpired(store)).toBe(1);
       expect(store.rows.size).toBe(1);
+    });
+
+    // Regression test for a P1 found in the adversarial pass (DEFECTS.md D-1).
+    //
+    // Keys are client-generated, so two riders can hold the same key TEXT at
+    // the same time - a UUID collision is not needed, a client that seeds its
+    // generator badly is enough. The purge matched on `key` alone, so rider A's
+    // expired key deleted rider B's LIVE key, and B's next retry created a
+    // second ride: the exact duplicate dispatch CLAUDE.md §5.2 forbids, arriving
+    // through the cleanup job rather than the request path.
+    it('purging one rider expired key does not delete another rider live key', async () => {
+      // Rider A creates a ride with key "shared", which then expires.
+      await service.run(
+        store, { userId: USER, endpoint: ENDPOINT, key: 'shared', body: RIDE_BODY },
+        async () => ({ status: 201, value: { id: 'ride-a' } }),
+      );
+
+      clock.advanceSeconds(86_400 + 1);
+
+      // Rider B creates a ride with the SAME key text. Theirs is live.
+      await service.run(
+        store, { userId: OTHER_USER, endpoint: ENDPOINT, key: 'shared', body: RIDE_BODY },
+        async () => ({ status: 201, value: { id: 'ride-b' } }),
+      );
+
+      expect(await service.purgeExpired(store)).toBe(1);
+
+      // B's key must survive...
+      expect(store.rows.size).toBe(1);
+
+      // ...and, the part that actually matters: B's retry must still replay
+      // rather than creating a second ride.
+      let created = 0;
+      const retry = await service.run(
+        store, { userId: OTHER_USER, endpoint: ENDPOINT, key: 'shared', body: RIDE_BODY },
+        async () => {
+          created++;
+          return { status: 201, value: { id: 'ride-b-DUPLICATE' } };
+        },
+      );
+
+      expect(created).toBe(0);
+      expect(retry.fresh).toBe(false);
+      expect(retry.value).toEqual({ id: 'ride-b' });
     });
 
     it('honours the limit so one sweep cannot lock the table', async () => {
