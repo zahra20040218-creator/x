@@ -1,0 +1,16 @@
+BOOTSTRAP_DONE
+IN_PROGRESS
+
+NOT ALL_TASKS_RESOLVED.
+
+AGENT_LOOP_PROMPT.md says to write ALL_TASKS_RESOLVED only when EVERY task is
+[x] or [BLOCKED]. 28 of 44 tasks are still [ ] - not blocked, simply not built.
+Writing the completion marker here would tell run.sh to stop and would tell the
+owner the work is finished. It is not.
+
+  [x]       10
+  [BLOCKED]  6   (no Docker / no Postgres / no Flutter - see BLOCKED.md)
+  [ ]       28
+
+Read FINAL_REPORT.md first, then VERIFY.md.
+If the two disagree, VERIFY.md is correct.
