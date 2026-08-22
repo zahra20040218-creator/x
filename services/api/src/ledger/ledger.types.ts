@@ -37,7 +37,10 @@ export interface LedgerEntry extends LedgerCommand {
 
 /** Signed value of one entry: CREDIT is positive, DEBIT is negative. */
 export function signedValue(command: LedgerCommand): number {
-  return command.direction === 'CREDIT' ? command.amountIqd : -command.amountIqd;
+  // The widening to `number` is explicit because IqdAmount is branded as
+  // non-negative; negating it produces a plain number, not another IqdAmount.
+  const amount: number = command.amountIqd;
+  return command.direction === 'CREDIT' ? amount : -amount;
 }
 
 /** The double-entry invariant, as a function. */

@@ -34,7 +34,9 @@
     "zod": "4.1.13"
   },
   "devDependencies": {
+    "@eslint/js": "9.38.0",
     "@nestjs/testing": "11.1.6",
+    "@swc/core": "1.13.5",
     "@types/express": "5.0.3",
     "@types/node": "24.9.2",
     "@types/pg": "8.15.6",
@@ -45,8 +47,8 @@
     "eslint": "9.38.0",
     "supertest": "7.1.4",
     "typescript": "5.9.3",
+    "typescript-eslint": "8.46.2",
     "unplugin-swc": "1.5.7",
-    "@swc/core": "1.13.5",
     "vitest": "3.2.4"
   }
 }

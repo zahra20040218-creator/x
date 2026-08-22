@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   addIqd,
+  assertBpsPrecisionInvariant,
   applyBps,
   formatIqd,
   InvalidMoneyError,
@@ -237,6 +238,26 @@ describe('parseSignedIqdFromDb()', () => {
   it('rejects decimals and junk', () => {
     expect(() => parseSignedIqdFromDb('-3000.5')).toThrow(/not an integer string/);
     expect(() => parseSignedIqdFromDb(Symbol('x'))).toThrow(InvalidMoneyError);
+  });
+
+  it('rejects a bigint beyond the safe range in either direction', () => {
+    expect(() => parseSignedIqdFromDb(9_007_199_254_740_993n)).toThrow(/safe integer range/);
+    expect(() => parseSignedIqdFromDb(-9_007_199_254_740_993n)).toThrow(/safe integer range/);
+  });
+});
+
+describe('assertBpsPrecisionInvariant()', () => {
+  // The invariant applyBps relies on. It holds at the shipped MAX_IQD, and the
+  // point of this test is to show what happens when it stops holding - so that
+  // raising MAX_IQD carelessly fails loudly at boot rather than silently
+  // corrupting commission months later.
+  it('passes at the shipped MAX_IQD', () => {
+    expect(() => assertBpsPrecisionInvariant(MAX_IQD)).not.toThrow();
+  });
+
+  it('throws once MAX_IQD is raised past the exact-integer point', () => {
+    expect(() => assertBpsPrecisionInvariant(Number.MAX_SAFE_INTEGER)).toThrow(/too large/);
+    expect(() => assertBpsPrecisionInvariant(1e15)).toThrow(/MAX_IQD \* 10000/);
   });
 });
 

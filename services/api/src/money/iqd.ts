@@ -62,12 +62,19 @@ export const MAX_IQD = 100_000_000_000;
  * the safe point, the process fails at boot with this message rather than
  * producing quietly wrong commission months later.
  */
-if (MAX_IQD * 10_000 > Number.MAX_SAFE_INTEGER) {
-  throw new Error(
-    `MAX_IQD (${MAX_IQD}) is too large: MAX_IQD * 10000 must stay within ` +
-      `Number.MAX_SAFE_INTEGER for applyBps() to be exact.`,
-  );
+export function assertBpsPrecisionInvariant(maxIqd: number): void {
+  if (maxIqd * 10_000 > Number.MAX_SAFE_INTEGER) {
+    throw new Error(
+      `MAX_IQD (${maxIqd}) is too large: MAX_IQD * 10000 must stay within ` +
+        `Number.MAX_SAFE_INTEGER for applyBps() to be exact.`,
+    );
+  }
 }
+
+// Checked once, at import. Exported as a function rather than written inline so
+// that the failing branch is reachable from a test - an invariant nobody can
+// demonstrate breaking is an invariant nobody has checked.
+assertBpsPrecisionInvariant(MAX_IQD);
 
 function assertUsableNumber(value: unknown): asserts value is number {
   if (typeof value !== 'number') throw new InvalidMoneyError(value, 'not a number');

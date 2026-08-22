@@ -183,6 +183,105 @@ describe('RideClaimService', () => {
     });
   });
 
+  // The window between our failed SET and our follow-up GET. If the holder's
+  // claim lapses inside it, the ride is genuinely free and this driver should
+  // get it rather than being told they lost a race to nobody.
+  describe('the expiry race between SET and GET', () => {
+    it('acquires on the retry when the previous claim lapsed in the gap', async () => {
+      const racyRedis = new InMemoryRedis(clock);
+      const original = racyRedis.setIfAbsent.bind(racyRedis);
+      let calls = 0;
+
+      // First SET fails because DRIVER_A holds it; the clock then jumps past
+      // the TTL, so the follow-up GET sees an empty key and the retry wins.
+      racyRedis.setIfAbsent = async (key, value, ttl) => {
+        const result = await original(key, value, ttl);
+        if (++calls === 1) clock.advance(TTL_MS + 1);
+        return result;
+      };
+
+      const racyClaims = new RideClaimService(racyRedis, TTL_MS);
+      await original(RedisKeys.rideClaim(RIDE), DRIVER_A, TTL_MS);
+
+      const result = await racyClaims.claim(RIDE, DRIVER_B);
+
+      expect(result.acquired).toBe(true);
+      expect(result.heldBy).toBe(DRIVER_B);
+    });
+
+    it('reports the new holder when another driver wins the retry', async () => {
+      const racyRedis = new InMemoryRedis(clock);
+      const original = racyRedis.setIfAbsent.bind(racyRedis);
+      let calls = 0;
+
+      racyRedis.setIfAbsent = async (key, value, ttl) => {
+        calls++;
+        if (calls === 1) {
+          // Lose to A, then A's claim lapses...
+          const result = await original(key, value, ttl);
+          clock.advance(TTL_MS + 1);
+          return result;
+        }
+        if (calls === 2) {
+          // ...but DRIVER_C takes it before our retry lands.
+          await original(key, DRIVER_C, TTL_MS);
+          return false;
+        }
+        return original(key, value, ttl);
+      };
+
+      const racyClaims = new RideClaimService(racyRedis, TTL_MS);
+      await original(RedisKeys.rideClaim(RIDE), DRIVER_A, TTL_MS);
+
+      const result = await racyClaims.claim(RIDE, DRIVER_B);
+
+      expect(result.acquired).toBe(false);
+      expect(result.heldBy).toBe(DRIVER_C);
+    });
+  });
+
+  // The service takes an optional logger. Exercising it here keeps the logging
+  // branches covered and, more usefully, proves no log line carries PII.
+  describe('logging', () => {
+    function recordingLogger() {
+      const lines: Array<{ level: string; payload: Record<string, unknown> }> = [];
+      const record = (level: string) => (payload: Record<string, unknown>) => {
+        lines.push({ level, payload });
+      };
+      return {
+        lines,
+        logger: { info: record('info'), warn: record('warn') } as never,
+      };
+    }
+
+    it('logs a lost claim without leaking the driver identity', async () => {
+      const { lines, logger } = recordingLogger();
+      const logged = new RideClaimService(redis, TTL_MS, logger);
+
+      await logged.claimOrThrow(RIDE, DRIVER_A);
+      await expect(logged.claimOrThrow(RIDE, DRIVER_B)).rejects.toThrow();
+
+      expect(lines).toHaveLength(1);
+      expect(lines[0]!.payload['event']).toBe('ride.claim_lost');
+      expect(JSON.stringify(lines[0]!.payload)).not.toContain('+964');
+    });
+
+    it('logs the rollback when the accept transaction fails', async () => {
+      const { lines, logger } = recordingLogger();
+      const logged = new RideClaimService(redis, TTL_MS, logger);
+
+      await expect(
+        logged.withClaim(RIDE, DRIVER_A, async () => {
+          throw new Error('db down');
+        }),
+      ).rejects.toThrow('db down');
+
+      const rollback = lines.find((l) => l.payload['event'] === 'ride.claim_rolled_back');
+      expect(rollback).toBeDefined();
+      expect(rollback!.payload['released']).toBe(true);
+    });
+  });
+
   describe('claimOrThrow', () => {
     it('is silent for the winner and 409 for the loser', async () => {
       await expect(claims.claimOrThrow(RIDE, DRIVER_A)).resolves.toBeUndefined();

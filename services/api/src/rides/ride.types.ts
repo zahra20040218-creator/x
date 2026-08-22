@@ -55,8 +55,16 @@ export function isTerminal(status: RideStatus): boolean {
 
 export interface Actor {
   type: ActorType;
-  /** Absent only for SYSTEM. */
-  id?: string;
+  /**
+   * Absent only for SYSTEM.
+   *
+   * Explicitly `| undefined` rather than a bare optional: under
+   * `exactOptionalPropertyTypes` those differ, and callers legitimately build
+   * an actor as `{ type, id: maybeUndefined }`. Forcing every such call site to
+   * conditionally spread the property would add noise without adding safety -
+   * the machine already rejects an actor with no id wherever one is required.
+   */
+  id?: string | undefined;
 }
 
 /** The minimum a transition needs to know about the ride it is moving. */

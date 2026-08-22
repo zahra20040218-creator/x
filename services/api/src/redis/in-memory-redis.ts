@@ -1,3 +1,16 @@
+/*
+ * eslint-disable @typescript-eslint/require-await
+ *
+ * Every method here is `async` with no `await`, and that is the point rather
+ * than an oversight. `require-await` exists to catch a function that was marked
+ * async by accident; this class deliberately implements an async interface with
+ * synchronous bodies, because running to completion with no suspension point is
+ * exactly what reproduces Redis's single-threaded atomicity. Adding an `await`
+ * to satisfy the rule would insert a microtask boundary into every
+ * read-modify-write and destroy the guarantee the double-accept tests rely on.
+ */
+/* eslint-disable @typescript-eslint/require-await */
+
 import type { Clock } from '../common/clock.js';
 import { SystemClock } from '../common/clock.js';
 import type { GeoHit, LatLng, RedisPort, Unsubscribe } from './redis.port.js';
