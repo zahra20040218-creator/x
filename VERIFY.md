@@ -63,10 +63,7 @@ Consequences, stated plainly:
 ## 5. `git status --short`
 
 ```
- M VERIFY.md
- M services/api/src/matching/matching.service.ts
- M services/api/test/fakes/fake-database.ts
- M services/api/test/unit/matching.service.test.ts
+(clean - working tree matches HEAD)
 ```
 
 ## 6. TASKS.md counts
