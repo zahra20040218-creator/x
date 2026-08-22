@@ -226,6 +226,13 @@ export class FakeDatabase implements Database {
       return this.ok(rows as Row[]);
     }
 
+    if (/^SELECT driver_id FROM ride_offers/i.test(s)) {
+      const found = this.rows('ride_offers').find(
+        (o) => o['ride_id'] === params[0] && o['status'] === 'PENDING',
+      );
+      return this.ok(found ? ([{ driver_id: found['driver_id'] }] as Row[]) : []);
+    }
+
     if (/^SELECT DISTINCT ride_id FROM ride_offers/i.test(s)) {
       const now = params[0] as Date;
       const limit = params[1] as number;

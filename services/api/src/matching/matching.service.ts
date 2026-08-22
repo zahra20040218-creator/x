@@ -144,8 +144,18 @@ export class MatchingService {
       return { outcome: 'NOT_DISPATCHABLE', candidatesConsidered: 0 };
     }
 
-    if (ride.driverId) {
-      await this.redis.del(RedisKeys.driverCurrentOffer(ride.driverId));
+    // NOT `ride.driverId` - a ride in OFFERED has no driver assigned yet
+    // (driver_id is set on accept). Reading it here would always be null, and
+    // the offeree's outstanding-offer key would never be cleared on this path;
+    // it only got cleared incidentally by clearOfferState when the pool ran
+    // out. The offeree is on the PENDING offer row.
+    const offeree = await this.db.query<{ driver_id: string }>(
+      `SELECT driver_id FROM ride_offers WHERE ride_id = $1 AND status = 'PENDING' LIMIT 1`,
+      [rideId],
+    );
+    const offeredDriverId = offeree.rows[0]?.driver_id;
+    if (offeredDriverId) {
+      await this.redis.del(RedisKeys.driverCurrentOffer(offeredDriverId));
     }
 
     const candidatesRemain = await this.hasFurtherCandidates(rideId, ride.pickupLat, ride.pickupLng);

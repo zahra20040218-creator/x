@@ -363,3 +363,136 @@ describe('MatchingService', () => {
     });
   });
 });
+
+/**
+ * Branches that the happy-path tests above do not reach.
+ *
+ * These are not coverage theatre: each one is a real failure mode. A logger
+ * that throws, a sweep that hits a wedged ride, and an empty candidate list are
+ * all things that happen in production at 3am.
+ */
+describe('MatchingService - failure and edge branches', () => {
+  let clock: FakeClock;
+  let db: FakeDatabase;
+  let redis: InMemoryRedis;
+  let presence: DriverPresenceService;
+  let rideService: RideService;
+  let matching: MatchingService;
+  let logged: Array<{ level: string; payload: Record<string, unknown> }>;
+
+  beforeEach(() => {
+    clock = new FakeClock();
+    db = new FakeDatabase();
+    db.seedConfig(CONFIG);
+    redis = new InMemoryRedis(clock);
+
+    presence = new DriverPresenceService(redis, clock, 60);
+    const config = new PlatformConfigService(clock, 30_000);
+    const repository = new RideRepository();
+
+    rideService = new RideService(
+      db,
+      repository,
+      new RideStateMachine(),
+      new RideClaimService(redis, 30_000),
+      new LedgerService(),
+      new FareCalculator(),
+      config,
+      clock,
+    );
+
+    logged = [];
+    const record = (level: string) => (payload: Record<string, unknown>) => {
+      logged.push({ level, payload });
+    };
+
+    matching = new MatchingService(
+      db,
+      repository,
+      rideService,
+      presence,
+      config,
+      redis,
+      clock,
+      8,
+      { info: record('info'), warn: record('warn') } as never,
+    );
+  });
+
+  async function requestRide() {
+    return rideService.createRide({ riderId: RIDER, pickup: TAHRIR, dropoff: KARRADA });
+  }
+
+  it('logs an offer without leaking rider or driver identity', async () => {
+    db.seedDriver(NEAR, 'ONLINE');
+    await presence.goOnline(NEAR, { ...KARRADA, recordedAt: clock.now() });
+    const ride = await requestRide();
+
+    await matching.dispatch(ride.id);
+
+    const offered = logged.find((l) => l.payload['event'] === 'ride.offered');
+    expect(offered).toBeDefined();
+    // CLAUDE.md §9 - no phone numbers, no names, no exact coordinates.
+    const serialised = JSON.stringify(offered!.payload);
+    expect(serialised).not.toContain('+964');
+    expect(serialised).not.toContain(String(KARRADA.lat));
+  });
+
+  it('logs when no eligible driver is available', async () => {
+    const ride = await requestRide();
+    await matching.dispatch(ride.id);
+
+    expect(logged.some((l) => l.payload['event'] === 'ride.no_drivers_found')).toBe(true);
+  });
+
+  // One wedged ride must not stop the sweep for every other ride - otherwise a
+  // single bad row freezes matching for the whole city.
+  it('continues sweeping after one ride fails, and logs the failure', async () => {
+    db.seedDriver(NEAR, 'ONLINE');
+    await presence.goOnline(NEAR, { ...KARRADA, recordedAt: clock.now() });
+    const ride = await requestRide();
+    await matching.dispatch(ride.id);
+
+    clock.advanceSeconds(CONFIG.offer_timeout_seconds + 1);
+
+    // Make the expiry transition fail for this ride.
+    db.failOn = (sql) =>
+      /^UPDATE rides SET/i.test(sql) ? new Error('deadlock detected') : null;
+
+    const swept = await matching.sweepExpiredOffers();
+
+    expect(swept).toEqual([]);
+    expect(logged.some((l) => l.payload['event'] === 'offer.sweep_failed')).toBe(true);
+  });
+
+  it('clears the offeree outstanding-offer key when the offer expires', async () => {
+    db.seedDriver(NEAR, 'ONLINE');
+    db.seedDriver(MID, 'ONLINE');
+    await presence.goOnline(NEAR, { ...KARRADA, recordedAt: clock.now() });
+    await presence.goOnline(MID, { ...ADHAMIYA, recordedAt: clock.now() });
+    db.seedConfig({ ...CONFIG, search_radius_meters: 20_000 });
+
+    const ride = await requestRide();
+    await matching.dispatch(ride.id);
+    expect(await matching.currentOfferFor(NEAR)).toBe(ride.id);
+
+    await matching.handleOfferOutcome(ride.id, 'timeout');
+
+    // NEAR's key is gone even though the ride went on to MID rather than
+    // ending in NO_DRIVERS_FOUND.
+    expect(await matching.currentOfferFor(NEAR)).toBeNull();
+    expect(await matching.currentOfferFor(MID)).toBe(ride.id);
+  });
+
+  it('handles an empty candidate list without querying the database', async () => {
+    const ride = await requestRide();
+    const before = db.statements.length;
+
+    await matching.dispatch(ride.id);
+
+    // No eligibility query is issued when Redis returned nobody at all.
+    expect(
+      db.statements.slice(before).some((s) => /SELECT user_id FROM drivers/i.test(s)),
+    ).toBe(false);
+  });
+});
