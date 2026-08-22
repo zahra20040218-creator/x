@@ -30,7 +30,7 @@ Markers: `[ ]` todo · `[x]` done, tests green · `[BLOCKED]` see BLOCKED.md
 ## Money
 
 - [x] T012 | ledger | LedgerService: balanced transaction writer, append-only, derived wallet balance | depends: T005,T009,T011
-- [ ] T013 | config | PlatformConfigService with cache; commission_bps default 0, changeable without deploy | depends: T009
+- [x] T013 | config | PlatformConfigService with cache; commission_bps default 0, changeable without deploy | depends: T009
 - [x] T014 | fare | FareCalculator as a pure function over whole IQD with round-up-to-multiple | depends: T011,T013
 
 ## Auth
