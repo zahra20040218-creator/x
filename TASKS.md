@@ -57,8 +57,8 @@ Markers: `[ ]` todo · `[x]` done, tests green · `[BLOCKED]` see BLOCKED.md
 
 ## Payments
 
-- [ ] T027 | payments | PaymentProvider interface, CashProvider implemented, GatewayProvider stub | depends: T012
-- [ ] T028 | payments | webhook pure function (payload, signature) to LedgerCommand[], unit-tested, thin HTTP wrapper | depends: T027
+- [x] T027 | payments | PaymentProvider interface, CashProvider implemented, GatewayProvider stub | depends: T012
+- [x] T028 | payments | webhook pure function (payload, signature) to LedgerCommand[], unit-tested, thin HTTP wrapper | depends: T027
 
 ## Async and realtime
 
