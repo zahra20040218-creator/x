@@ -4,13 +4,16 @@ IN_PROGRESS
 NOT ALL_TASKS_RESOLVED.
 
 AGENT_LOOP_PROMPT.md says to write ALL_TASKS_RESOLVED only when EVERY task is
-[x] or [BLOCKED]. 28 of 44 tasks are still [ ] - not blocked, simply not built.
+[x] or [BLOCKED]. 23 of 44 tasks are still [ ] - not blocked, simply not built.
 Writing the completion marker here would tell run.sh to stop and would tell the
 owner the work is finished. It is not.
 
-  [x]       10
+  [x]       15
   [BLOCKED]  6   (no Docker / no Postgres / no Flutter - see BLOCKED.md)
-  [ ]       28
+  [ ]       23
+
+  524 unit tests passing, 0 failing, 0 skipped-to-pass.
+  tsc --noEmit clean. eslint clean. All per-file 95% coverage gates pass.
 
 Read FINAL_REPORT.md first, then VERIFY.md.
 If the two disagree, VERIFY.md is correct.
