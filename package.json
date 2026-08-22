@@ -1,0 +1,34 @@
+{
+  "name": "rideapp",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@10.32.1",
+  "description": "Ride-hailing platform for Baghdad. See CLAUDE.md for the binding project constitution.",
+  "scripts": {
+    "install:all": "pnpm install",
+    "test": "pnpm -r test",
+    "test:unit": "pnpm --filter @rideapp/api test:unit",
+    "test:integration": "pnpm --filter @rideapp/api test:integration",
+    "test:e2e": "pnpm --filter @rideapp/api test:e2e",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "coverage": "pnpm --filter @rideapp/api coverage",
+    "migrate:up": "pnpm --filter @rideapp/api migrate:up",
+    "migrate:down": "pnpm --filter @rideapp/api migrate:down",
+    "verify": "node scripts/verify.mjs"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@nestjs/core",
+      "@swc/core",
+      "esbuild",
+      "msgpackr-extract"
+    ]
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
