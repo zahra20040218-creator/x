@@ -51,9 +51,9 @@ Markers: `[ ]` todo · `[x]` done, tests green · `[BLOCKED]` see BLOCKED.md
 
 ## Matching
 
-- [ ] T022 | matching | Redis driver presence: GEOADD/GEOSEARCH, TTL heartbeat, online/offline | depends: T010,T018
+- [x] T022 | matching | Redis driver presence: GEOADD/GEOSEARCH, TTL heartbeat, online/offline | depends: T010,T018
 - [x] T023 | matching | atomic claim SET NX PX 30000 and the accept endpoint; exactly one winner | depends: T019,T022
-- [ ] T024 | matching | offer worker: nearest candidate, timeout, EXPIRED to REQUESTED, NO_DRIVERS_FOUND | depends: T023
+- [x] T024 | matching | offer worker: nearest candidate, timeout, EXPIRED to REQUESTED, NO_DRIVERS_FOUND | depends: T023
 
 ## Payments
 

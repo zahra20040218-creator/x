@@ -213,6 +213,63 @@ export class FakeDatabase implements Database {
       return this.ok([], driver ? 1 : 0);
     }
 
+    if (/^SELECT user_id FROM drivers/i.test(s)) {
+      const ids = params[0] as unknown as string[];
+      const rows = this.rows('drivers')
+        .filter(
+          (d) =>
+            ids.includes(d['user_id'] as string) &&
+            d['availability'] === 'ONLINE' &&
+            d['is_suspended'] !== true,
+        )
+        .map((d) => ({ user_id: d['user_id'] }));
+      return this.ok(rows as Row[]);
+    }
+
+    if (/^SELECT DISTINCT ride_id FROM ride_offers/i.test(s)) {
+      const now = params[0] as Date;
+      const limit = params[1] as number;
+      const seen = new Set<string>();
+      for (const o of this.rows('ride_offers')) {
+        if (o['status'] === 'PENDING' && (o['expires_at'] as Date) < now) {
+          seen.add(o['ride_id'] as string);
+        }
+      }
+      const rows = [...seen].slice(0, limit).map((ride_id) => ({ ride_id }));
+      return this.ok(rows as Row[]);
+    }
+
+    if (/^INSERT INTO ride_offers/i.test(s)) {
+      const [ride_id, driver_id, distance_m, expires_at] = params as [
+        string, string, number, Date,
+      ];
+      const existing = this.rows('ride_offers').find(
+        (o) => o['ride_id'] === ride_id && o['driver_id'] === driver_id,
+      );
+      if (existing) {
+        existing['status'] = 'PENDING';
+        existing['expires_at'] = expires_at;
+        existing['responded_at'] = null;
+      } else {
+        this.rows('ride_offers').push({
+          ride_id, driver_id, status: 'PENDING', distance_m, expires_at, responded_at: null,
+        });
+      }
+      return this.ok([], 1);
+    }
+
+    if (/^UPDATE ride_offers SET status = 'TIMED_OUT'/i.test(s)) {
+      let n = 0;
+      for (const o of this.rows('ride_offers')) {
+        if (o['ride_id'] === params[0] && o['status'] === 'PENDING') {
+          o['status'] = 'TIMED_OUT';
+          o['responded_at'] = new Date();
+          n++;
+        }
+      }
+      return this.ok([], n);
+    }
+
     if (/^UPDATE ride_offers/i.test(s)) {
       for (const offer of this.rows('ride_offers')) {
         if (offer['ride_id'] === params[0] && offer['status'] === 'PENDING') {

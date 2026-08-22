@@ -91,8 +91,24 @@ export class InMemoryRedis implements RedisPort {
 
   async del(key: string): Promise<number> {
     this.assertOpen();
-    const existed = this.isLive(key);
+    // Real Redis DEL removes a key of ANY type. An earlier version of this
+    // method only touched `strings`, so `del` on a hash silently did nothing -
+    // taking a driver offline left their last-known location readable. That is
+    // exactly the fake-vs-real divergence the conformance suite exists to
+    // catch, so DEL-on-every-type is asserted there too.
+    const existed =
+      this.isLive(key) ||
+      this.geo.has(key) ||
+      this.zsets.has(key) ||
+      this.hashes.has(key) ||
+      this.lists.has(key);
+
     this.strings.delete(key);
+    this.geo.delete(key);
+    this.zsets.delete(key);
+    this.hashes.delete(key);
+    this.lists.delete(key);
+
     return existed ? 1 : 0;
   }
 

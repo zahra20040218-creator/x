@@ -140,6 +140,47 @@ export function runRedisConformance(
       });
     });
 
+    // Regression cover for a real fake-vs-real divergence: DEL removes a key of
+    // ANY type, not just a string. Taking a driver offline deletes their
+    // last-known-location HASH, and a DEL that only handled strings left that
+    // hash readable after they went offline.
+    describe('del across every key type', () => {
+      it('deletes a string key', async () => {
+        await redis.setIfAbsent('k', 'v', 30_000);
+        expect(await redis.del('k')).toBe(1);
+        expect(await redis.get('k')).toBeNull();
+      });
+
+      it('deletes a hash key', async () => {
+        const key = RedisKeys.driverLocation(DRIVER_A);
+        await redis.hSet(key, 'lat', '33.3');
+        expect(await redis.del(key)).toBe(1);
+        expect(await redis.hGetAll(key)).toEqual({});
+      });
+
+      it('deletes a list key', async () => {
+        await redis.rPush('list', 'a', 'b');
+        expect(await redis.del('list')).toBe(1);
+        expect(await redis.lLen('list')).toBe(0);
+      });
+
+      it('deletes a sorted set key', async () => {
+        await redis.zAdd('zset', DRIVER_A, 1);
+        expect(await redis.del('zset')).toBe(1);
+        expect(await redis.zScore('zset', DRIVER_A)).toBeNull();
+      });
+
+      it('deletes a geo key', async () => {
+        await redis.geoAdd('geo', DRIVER_A, TAHRIR_SQUARE);
+        expect(await redis.del('geo')).toBe(1);
+        expect(await redis.geoPosition('geo', DRIVER_A)).toBeNull();
+      });
+
+      it('reports 0 for a key that does not exist', async () => {
+        expect(await redis.del('never-existed')).toBe(0);
+      });
+    });
+
     describe('pttl', () => {
       it('reports -2 for a missing key and a positive remainder for a live one', async () => {
         expect(await redis.pttl('missing')).toBe(-2);
