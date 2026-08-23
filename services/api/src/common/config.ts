@@ -43,6 +43,25 @@ export const ConfigSchema = z.object({
 
   IDEMPOTENCY_TTL_SECONDS: intFromEnv(60, 604_800).default(86_400),
 
+  /**
+   * Divides a route's Redis rate limit to produce the per-instance limit used
+   * while Redis is unreachable. SET THIS TO YOUR INSTANCE COUNT.
+   *
+   * The fallback counter lives in process memory, so N instances each permit
+   * this many. Leaving it at 1 with 4 instances means the effective limit
+   * during an outage is 4x what you intended.
+   */
+  RATE_LIMIT_LOCAL_DIVISOR: intFromEnv(1, 64).default(4),
+
+  /**
+   * How long the limiter waits for Redis before treating it as unavailable.
+   *
+   * Small on purpose. ioredis queues commands while disconnected rather than
+   * rejecting them, so without this a hung Redis would add its full latency to
+   * every request on the hot path.
+   */
+  RATE_LIMIT_REDIS_TIMEOUT_MS: intFromEnv(5, 5_000).default(50),
+
   GATEWAY_WEBHOOK_SECRET: z.string().min(16).optional(),
 
   /**

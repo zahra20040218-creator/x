@@ -18,6 +18,7 @@ import type { Response } from 'express';
 import { AUDIT_ACTIONS, AuditService } from '../audit/audit.service.js';
 import type { AuthenticatedUser } from '../auth/auth.service.js';
 import { normalizeIraqiPhone, InvalidPhoneNumberError } from '../auth/phone.js';
+import { TokenService } from '../auth/token.service.js';
 import { ConflictProblem, NotFoundProblem, ValidationProblem } from '../common/problem.js';
 import { DATABASE, isUniqueViolationOn, type Database } from '../db/db.port.js';
 import { IdempotencyService } from '../idempotency/idempotency.service.js';
@@ -58,6 +59,7 @@ export class AdminController {
     private readonly rides: RideRepository,
     private readonly idempotency: IdempotencyService,
     private readonly audit: AuditService,
+    private readonly tokens: TokenService,
   ) {}
 
   // -------------------------------------------------------------------------
@@ -97,6 +99,7 @@ export class AdminController {
   }
 
   @Post('drivers')
+  @RateLimit({ limit: 30, windowSeconds: 60, by: 'user', tier: 'CRITICAL' })
   @HttpCode(201)
   async createDriver(
     @CurrentUser() admin: AuthenticatedUser,
@@ -191,6 +194,8 @@ export class AdminController {
   }
 
   @Patch('drivers/:driverId')
+  // Suspension and reinstatement live here.
+  @RateLimit({ limit: 60, windowSeconds: 60, by: 'user', tier: 'CRITICAL' })
   async updateDriver(
     @CurrentUser() admin: AuthenticatedUser,
     @Param('driverId') driverId: string,
@@ -226,6 +231,20 @@ export class AdminController {
             WHERE user_id = $${params.length}`,
           params as never,
         );
+      }
+
+      // Suspension is a security-sensitive change, so it invalidates the
+      // driver's sessions in the same transaction. Without this, suspending a
+      // driver for fraud left every device they were signed in on holding a
+      // working token until it expired.
+      //
+      // Note what this deliberately does NOT do: it does not set
+      // `users.is_active = false`. Suspension bars a driver from taking rides;
+      // it does not bar them from signing in to see that they are suspended
+      // and contact support. Forcing re-authentication is the intended
+      // strength - preventing it is a different, heavier action.
+      if (body.isSuspended === true) {
+        await this.tokens.revokeAllForUser(tx, id);
       }
 
       // Suspension gets its own verb. "Who suspended this driver, and when"
@@ -266,7 +285,7 @@ export class AdminController {
   @Post('drivers/:driverId/wallet/topup')
   // Money movement. An operator tops up a handful of wallets a day; anything
   // faster is a stuck script or a compromised admin session.
-  @RateLimit({ limit: 30, windowSeconds: 60, by: 'user' })
+  @RateLimit({ limit: 30, windowSeconds: 60, by: 'user', tier: 'CRITICAL' })
   async topUp(
     @CurrentUser() admin: AuthenticatedUser,
     @Param('driverId') driverId: string,
@@ -460,6 +479,8 @@ export class AdminController {
    * in the same transaction as the resolution so the two cannot disagree.
    */
   @Post('disputes/:disputeId/resolve')
+  // Resolution can issue a refund, so it can move money.
+  @RateLimit({ limit: 60, windowSeconds: 60, by: 'user', tier: 'CRITICAL' })
   @HttpCode(200)
   async resolveDispute(
     @CurrentUser() admin: AuthenticatedUser,
@@ -538,6 +559,8 @@ export class AdminController {
   }
 
   @Put('config')
+  // Changes the commission rate and the fare table.
+  @RateLimit({ limit: 30, windowSeconds: 60, by: 'user', tier: 'CRITICAL' })
   async updateConfig(
     @CurrentUser() admin: AuthenticatedUser,
     @Body(zodBody(UpdateConfigSchema)) body: Partial<Record<ConfigKey, number>>,

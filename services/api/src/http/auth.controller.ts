@@ -22,7 +22,7 @@ export class AuthController {
   // Unauthenticated by necessity, and every call costs a real Firebase
   // verification - unbounded it is both a bill and an enumeration oracle.
   // 10/minute per IP is far above any honest sign-in and far below abuse.
-  @RateLimit({ limit: 10, windowSeconds: 60, by: 'ip' })
+  @RateLimit({ limit: 10, windowSeconds: 60, by: 'ip', tier: 'CRITICAL' })
   @HttpCode(200)
   async verifyOtp(
     @Body(zodBody(VerifyOtpSchema))
@@ -46,7 +46,7 @@ export class AuthController {
   @Public()
   // Refresh rotates, so an honest client refreshes about once an hour. A flood
   // here is either a broken client retry loop or someone brute-forcing tokens.
-  @RateLimit({ limit: 30, windowSeconds: 60, by: 'ip' })
+  @RateLimit({ limit: 30, windowSeconds: 60, by: 'ip', tier: 'CRITICAL' })
   @HttpCode(200)
   async refresh(@Body(zodBody(RefreshSchema)) body: { refreshToken: string }) {
     const session = await this.auth.refresh(body.refreshToken);

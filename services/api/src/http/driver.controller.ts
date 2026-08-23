@@ -91,7 +91,7 @@ export class DriverController {
   // after a long dead zone flushes a large backlog in several batches, and
   // throttling that would discard exactly the data CLAUDE.md 5.3 preserves.
   // Set well above the honest ceiling; this is an abuse guard, not a shaper.
-  @RateLimit({ limit: 120, windowSeconds: 60, by: 'user' })
+  @RateLimit({ limit: 120, windowSeconds: 60, by: 'user', tier: 'OPERATIONAL' })
   @HttpCode(202)
   async reportLocation(
     @CurrentUser() user: AuthenticatedUser,
@@ -117,6 +117,8 @@ export class DriverController {
    * depend solely on FCM arriving.
    */
   @Get('driver/offers/current')
+  // The driver app polls this every few seconds while online.
+  @RateLimit({ limit: 60, windowSeconds: 60, by: 'user', tier: 'OPERATIONAL' })
   async currentOffer(
     @CurrentUser() user: AuthenticatedUser,
     @CurrentActor() actor: Actor,
@@ -160,7 +162,7 @@ export class DriverController {
   @Post('rides/:rideId/accept')
   // A driver racing for a ride may legitimately tap more than once. The Redis
   // claim decides the winner; this only stops a scripted flood.
-  @RateLimit({ limit: 60, windowSeconds: 60, by: 'user' })
+  @RateLimit({ limit: 60, windowSeconds: 60, by: 'user', tier: 'STANDARD' })
   @HttpCode(200)
   async accept(@CurrentUser() user: AuthenticatedUser, @Param('rideId') rideId: string) {
     const ride = await this.rides.acceptRide(requireUuid(rideId), user.id);
@@ -192,6 +194,10 @@ export class DriverController {
   }
 
   @Post('rides/:rideId/complete')
+  // CRITICAL, not STANDARD: completion settles the fare and writes
+  // ledger entries. Anything that moves money degrades rather than
+  // fails open when Redis is unreachable.
+  @RateLimit({ limit: 60, windowSeconds: 60, by: 'user', tier: 'CRITICAL' })
   @HttpCode(200)
   async complete(
     @CurrentActor() actor: Actor,

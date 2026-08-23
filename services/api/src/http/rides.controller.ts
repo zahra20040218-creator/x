@@ -55,7 +55,7 @@ export class RidesController {
   @Post('fare/estimate')
   // Cheap but not free: it reads config and does trigonometry. A rider
   // dragging a pin fires several per second, so the limit sits above that.
-  @RateLimit({ limit: 60, windowSeconds: 60, by: 'user' })
+  @RateLimit({ limit: 60, windowSeconds: 60, by: 'user', tier: 'STANDARD' })
   @HttpCode(200)
   async estimate(@Body(zodBody(FareEstimateSchema)) body: { pickup: LatLng; dropoff: LatLng }) {
     const tariff = await this.config.tariff(this.db);
@@ -82,7 +82,7 @@ export class RidesController {
   // same Idempotency-Key on a dropped response, and a tight limit here would
   // punish exactly the behaviour the constitution mandates. The idempotency
   // layer - not this limit - is what stops duplicate rides.
-  @RateLimit({ limit: 20, windowSeconds: 60, by: 'user' })
+  @RateLimit({ limit: 20, windowSeconds: 60, by: 'user', tier: 'STANDARD' })
   async create(
     @CurrentUser() user: AuthenticatedUser,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
@@ -139,6 +139,9 @@ export class RidesController {
   }
 
   @Get('rides/:rideId')
+  // Polled by the rider for the whole of a ride. OPERATIONAL: refusing it
+  // during a Redis outage would blank the tracking screen mid-ride.
+  @RateLimit({ limit: 120, windowSeconds: 60, by: 'user', tier: 'OPERATIONAL' })
   async getOne(@CurrentActor() actor: Actor, @Param('rideId') rideId: string) {
     const id = UuidSchema.safeParse(rideId);
     // A malformed id is answered 404 rather than 422, for the same reason a

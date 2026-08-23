@@ -94,7 +94,7 @@ export class AuthService {
 
   async refresh(refreshToken: string): Promise<AuthSession> {
     return this.db.transaction(async (tx) => {
-      const userId = await this.tokens.consumeRefreshToken(tx, refreshToken);
+      const { userId, sessionId } = await this.tokens.consumeRefreshToken(tx, refreshToken);
 
       const result = await tx.query<UserRow>(
         `SELECT id, role, display_name, phone_e164, is_active FROM users WHERE id = $1`,
@@ -105,21 +105,62 @@ export class AuthService {
         throw new UnauthorizedProblem('Account is no longer active.');
       }
 
-      return this.sessionFor(tx, user);
+      // Same session, new tokens. Rotating must not invalidate the access
+      // token being issued alongside the new refresh token.
+      return this.sessionFor(tx, user, sessionId);
     });
   }
 
+  /**
+   * Log out everywhere.
+   *
+   * Semantics are unchanged - this always revoked every refresh token for the
+   * user - but the EFFECT is not. Before migration 0006 the caller's access
+   * token kept working until it expired, up to an hour later. Now the guard
+   * checks that the token's session is still live, so this takes effect on
+   * the very next request, on every device.
+   */
   async logout(userId: string): Promise<void> {
     await this.tokens.revokeAllForUser(this.db, userId);
   }
 
-  async loadUser(userId: string): Promise<AuthenticatedUser> {
+  /**
+   * Invalidate every session for a user after a security-sensitive change.
+   *
+   * Deliberately NOT the same thing as deactivating the account: this forces
+   * re-authentication, it does not prevent it. `users.is_active = false` is
+   * what prevents it.
+   */
+  async revokeSessions(q: Queryable, userId: string): Promise<number> {
+    return this.tokens.revokeAllForUser(q, userId);
+  }
+
+  /**
+   * Resolve the caller for an access token.
+   *
+   * Two independent liveness checks, both on every request:
+   *
+   *  - the ACCOUNT is active (`users.is_active`) - already the case before
+   *    migration 0006, which is why suspending an account always took effect
+   *    immediately and why the audit finding S-3 was too broadly worded;
+   *  - the SESSION is live - new, and what makes logout and targeted
+   *    revocation actually work.
+   */
+  async loadUser(userId: string, sessionId: string): Promise<AuthenticatedUser> {
     const result = await this.db.query<UserRow>(
       `SELECT id, role, display_name, phone_e164, is_active FROM users WHERE id = $1`,
       [userId],
     );
     const user = result.rows[0];
     if (!user || !user.is_active) throw new UnauthorizedProblem('Account is no longer active.');
+
+    if (!(await this.tokens.isSessionLive(this.db, sessionId))) {
+      // Same message as every other auth failure. Distinguishing "revoked"
+      // from "expired" tells a token holder which of the two happened, which
+      // is information they have not earned.
+      throw new UnauthorizedProblem('Invalid or expired token.');
+    }
+
     return toAuthenticatedUser(user);
   }
 
@@ -163,8 +204,12 @@ export class AuthService {
     return user;
   }
 
-  private async sessionFor(q: Queryable, user: UserRow): Promise<AuthSession> {
-    const pair = await this.tokens.issuePair(q, user.id, user.role);
+  private async sessionFor(
+    q: Queryable,
+    user: UserRow,
+    sessionId?: string,
+  ): Promise<AuthSession> {
+    const pair = await this.tokens.issuePair(q, user.id, user.role, sessionId);
     return { ...pair, user: toAuthenticatedUser(user) };
   }
 }

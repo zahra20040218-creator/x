@@ -592,13 +592,14 @@ describe('API end to end', () => {
       });
       firebase.register('admin-token', { uid: 'fb-admin', phoneNumber: '+9647700000005' });
 
-      // ADMIN cannot be obtained through /auth/otp/verify by design, so the
-      // token is minted directly - which is what a real admin console session
-      // would hold.
+      // Migration 0006: a minted token is no longer enough on its own - it
+      // must belong to a LIVE session. That is the whole point of the change,
+      // so the test creates a real session rather than working around it.
       const tokens = app.get(
         (await import('../../src/auth/token.service.js')).TokenService,
       );
-      return tokens.issueAccessToken('admin-1', 'ADMIN');
+      const pair = await tokens.issuePair(db, 'admin-1', 'ADMIN');
+      return pair.accessToken;
     }
 
     it('tops up a wallet, and a replay does not double-credit', async () => {
@@ -823,18 +824,55 @@ describe('rate limiting', () => {
       .expect(200);
   });
 
-  // Fail OPEN: a limiter outage must not become an API outage.
-  it('allows requests when Redis is unreachable', async () => {
+  // Phase 5. This test used to assert the opposite - that OTP verification
+  // was allowed through unmetered whenever Redis was down. That was the
+  // finding (S-7), not the desired behaviour, so the assertion is inverted
+  // here rather than the policy being bent to keep it green.
+  it('does NOT let OTP verification become unlimited when Redis dies', async () => {
     await redis.close();
+    const body = { firebaseIdToken: 'rider-token', role: 'RIDER' };
 
-    await http
+    // The endpoint keeps working, degraded: ceil(10 / 4) per instance.
+    for (let i = 0; i < 3; i++) {
+      const response = await http.post('/v1/auth/otp/verify').send(body);
+      expect(response.status).not.toBe(429);
+    }
+
+    // And then it stops. Without the fallback this would be unmetered.
+    await http.post('/v1/auth/otp/verify').send(body).expect(429);
+  });
+
+  // The other half of the trade: an operational endpoint must NOT start
+  // failing because the limiter lost Redis.
+  it('keeps an operational endpoint open when Redis dies', async () => {
+    const { body: session } = await http
       .post('/v1/auth/otp/verify')
       .send({ firebaseIdToken: 'rider-token', role: 'RIDER' })
-      // 200 would need a working DB path too; what matters is that it is NOT
-      // 429 - the limiter did not reject it.
-      .expect((response) => {
-        expect(response.status).not.toBe(429);
-      });
+      .expect(200);
+
+    await redis.close();
+
+    // Ride status polling is OPERATIONAL. 404 is fine - the ride does not
+    // exist. 429 is not: that would blank a tracking screen mid-ride.
+    for (let i = 0; i < 40; i++) {
+      const response = await http
+        .get('/v1/rides/00000000-0000-4000-8000-000000000000')
+        .set('Authorization', `Bearer ${session.accessToken}`);
+      expect(response.status).not.toBe(429);
+    }
+  });
+
+  // A 429 on a liveness probe makes the load balancer eject a healthy
+  // instance - the limiter causing the outage it exists to prevent.
+  it('never rate limits the health endpoints', async () => {
+    for (let i = 0; i < 400; i++) {
+      await http.get('/v1/health').expect(200);
+    }
+  });
+
+  it('still serves health when Redis is gone', async () => {
+    await redis.close();
+    await http.get('/v1/health').expect(200);
   });
 });
 
@@ -893,7 +931,7 @@ describe('admin audit log', () => {
     const tokens = app.get(
       (await import('../../src/auth/token.service.js')).TokenService,
     );
-    adminToken = await tokens.issueAccessToken('admin-1', 'ADMIN');
+    adminToken = (await tokens.issuePair(db, 'admin-1', 'ADMIN')).accessToken;
   });
 
   afterEach(async () => {
@@ -1035,5 +1073,261 @@ describe('admin audit log', () => {
       .expect(403);
 
     expect(db.rows('audit_log')).toHaveLength(0);
+  });
+});
+
+
+/**
+ * Session revocation — Phase 6, security audit S-3.
+ *
+ * S-3 said "an admin token cannot be revoked short of rotating JWT_SECRET".
+ * Half of that was already false: AuthGuard reloads the user on every request,
+ * so deactivating an account always took effect immediately. The half that was
+ * true is the one tested here — logging out did not invalidate the access
+ * token the caller was holding, so for up to an hour "log me out" logged
+ * nobody out.
+ *
+ * Asserted over HTTP, because the claim is about what a token can still DO.
+ */
+describe('session revocation', () => {
+  let app: NestExpressApplication;
+  let db: FakeDatabase;
+  let redis: InMemoryRedis;
+  let clock: FakeClock;
+  let firebase: FakeFirebaseVerifier;
+  let http: request.Agent;
+
+  beforeEach(async () => {
+    clock = new FakeClock();
+    db = new FakeDatabase();
+    redis = new InMemoryRedis(clock);
+    firebase = new FakeFirebaseVerifier();
+
+    db.seedConfig({
+      commission_bps: 0, fare_base_iqd: 2_000, fare_per_km_iqd: 500,
+      fare_per_minute_iqd: 50, fare_minimum_iqd: 3_000, fare_rounding_iqd: 250,
+      offer_timeout_seconds: 15, search_radius_meters: 5_000,
+    });
+    firebase.register('rider-token', { uid: 'fb-rider', phoneNumber: RIDER_PHONE });
+    firebase.register('other-token', { uid: 'fb-other', phoneNumber: SECOND_DRIVER_PHONE });
+
+    const config = ConfigSchema.parse({
+      NODE_ENV: 'test',
+      DATABASE_URL: 'postgresql://x:y@pgbouncer:6432/db',
+      REDIS_URL: 'redis://localhost:6379',
+      FIREBASE_PROJECT_ID: 'test-project',
+      JWT_SECRET: 'a-test-secret-that-is-long-enough-32',
+    });
+
+    app = await NestFactory.create<NestExpressApplication>(
+      AppModule.forRoot({ config, database: db, redis, firebase, clock }),
+      { logger: false, bodyParser: false, abortOnError: false },
+    );
+    app.use(express.json({ limit: '256kb' }));
+    app.setGlobalPrefix('v1');
+    app.useGlobalFilters(new ProblemFilter());
+    app.useGlobalGuards(app.get(AuthGuard), app.get(RateLimitGuard));
+
+    await app.init();
+    http = request(app.getHttpServer());
+  });
+
+  afterEach(async () => {
+    await app.close();
+  });
+
+  async function signIn(token = 'rider-token'): Promise<{ access: string; refresh: string }> {
+    const { body } = await http
+      .post('/v1/auth/otp/verify')
+      .send({ firebaseIdToken: token, role: 'RIDER' })
+      .expect(200);
+    return { access: body.accessToken, refresh: body.refreshToken };
+  }
+
+  const as = (token: string) => ({ Authorization: `Bearer ${token}` });
+
+  // THE regression. Before migration 0006 this returned 200.
+  it('logout invalidates the access token immediately, not in an hour', async () => {
+    const { access } = await signIn();
+    await http.get('/v1/me').set(as(access)).expect(200);
+
+    await http.post('/v1/auth/logout').set(as(access)).expect(204);
+
+    // Same token, one request later.
+    await http.get('/v1/me').set(as(access)).expect(401);
+  });
+
+  it('stays revoked as time passes rather than merely expiring', async () => {
+    const { access } = await signIn();
+    await http.post('/v1/auth/logout').set(as(access)).expect(204);
+
+    clock.advanceSeconds(30);
+    await http.get('/v1/me').set(as(access)).expect(401);
+  });
+
+  it('does not reveal that a session was revoked rather than expired', async () => {
+    const { access } = await signIn();
+    await http.post('/v1/auth/logout').set(as(access)).expect(204);
+
+    const revoked = await http.get('/v1/me').set(as(access)).expect(401);
+    const garbage = await http.get('/v1/me').set(as('not.a.jwt')).expect(401);
+
+    // Telling a token holder WHICH failure occurred is information they have
+    // not earned.
+    expect(revoked.body.detail).toBe(garbage.body.detail);
+  });
+
+  it('revokes every device, not just the one that called logout', async () => {
+    const phone = await signIn();
+    const laptop = await signIn();
+    expect(phone.access).not.toBe(laptop.access);
+
+    await http.post('/v1/auth/logout').set(as(phone.access)).expect(204);
+
+    await http.get('/v1/me').set(as(laptop.access)).expect(401);
+  });
+
+  it('leaves other users signed in', async () => {
+    const mine = await signIn('rider-token');
+    const theirs = await signIn('other-token');
+
+    await http.post('/v1/auth/logout').set(as(mine.access)).expect(204);
+
+    await http.get('/v1/me').set(as(theirs.access)).expect(200);
+  });
+
+  // Rotation must NOT invalidate the access token issued alongside it. This is
+  // why the session id is carried forward instead of a new one being minted:
+  // a row-per-session model would log the caller out every time they
+  // refreshed, which is worse than the bug being fixed.
+  it('survives refresh rotation', async () => {
+    const first = await signIn();
+
+    const { body: rotated } = await http
+      .post('/v1/auth/refresh')
+      .send({ refreshToken: first.refresh })
+      .expect(200);
+
+    await http.get('/v1/me').set(as(rotated.accessToken)).expect(200);
+    // The token issued before the rotation also still works - same session.
+    await http.get('/v1/me').set(as(first.access)).expect(200);
+  });
+
+  it('logout after a rotation still kills the whole session', async () => {
+    const first = await signIn();
+    const { body: rotated } = await http
+      .post('/v1/auth/refresh')
+      .send({ refreshToken: first.refresh })
+      .expect(200);
+
+    await http.post('/v1/auth/logout').set(as(rotated.accessToken)).expect(204);
+
+    await http.get('/v1/me').set(as(rotated.accessToken)).expect(401);
+    await http.get('/v1/me').set(as(first.access)).expect(401);
+  });
+
+  // Account deactivation already worked before this change; asserted so that
+  // it cannot regress while the session machinery is being edited.
+  it('deactivating the account cuts a live session off', async () => {
+    const { access } = await signIn();
+    await http.get('/v1/me').set(as(access)).expect(200);
+
+    const user = db.rows('users').find((u) => u['phone_e164'] === RIDER_PHONE)!;
+    user['is_active'] = false;
+
+    await http.get('/v1/me').set(as(access)).expect(401);
+  });
+
+  // The admin PATCH route validates its path param as a UUID.
+  const DRIVER_9 = '00000000-0000-4000-8000-000000000009';
+  const DRIVER_8 = '00000000-0000-4000-8000-000000000008';
+
+  // "Credential/session invalidation after a security-sensitive change."
+  // Suspending a driver for fraud used to leave every device they were signed
+  // in on holding a working token until it expired.
+  it('admin suspension cuts the driver off on every device', async () => {
+    const tokens = app.get(
+      (await import('../../src/auth/token.service.js')).TokenService,
+    );
+
+    db.rows('users').push({
+      id: 'admin-9', role: 'ADMIN', phone_e164: '+9647700000005',
+      display_name: 'مدير', is_active: true,
+    });
+    db.rows('users').push({
+      id: DRIVER_9, role: 'DRIVER', phone_e164: DRIVER_PHONE,
+      display_name: 'سائق', is_active: true,
+    });
+    db.rows('drivers').push({
+      user_id: DRIVER_9, availability: 'OFFLINE', is_suspended: false,
+      vehicle_plate: '99999', vehicle_model: 'Corolla', vehicle_color: 'أبيض',
+      rating_sum: 0, rating_count: 0, suspended_reason: null,
+    });
+
+    const admin = (await tokens.issuePair(db, 'admin-9', 'ADMIN')).accessToken;
+    const phone = (await tokens.issuePair(db, DRIVER_9, 'DRIVER')).accessToken;
+    const tablet = (await tokens.issuePair(db, DRIVER_9, 'DRIVER')).accessToken;
+
+    await http.get('/v1/me').set(as(phone)).expect(200);
+    await http.get('/v1/me').set(as(tablet)).expect(200);
+
+    await http
+      .patch(`/v1/admin/drivers/${DRIVER_9}`)
+      .set(as(admin))
+      .send({ isSuspended: true, suspendedReason: 'fraud' })
+      .expect(200);
+
+    await http.get('/v1/me').set(as(phone)).expect(401);
+    await http.get('/v1/me').set(as(tablet)).expect(401);
+
+    // The account itself is NOT deactivated - they can sign in again and see
+    // that they are suspended. Suspension bars rides, not sign-in.
+    const driver = db.rows('users').find((u) => u['id'] === DRIVER_9)!;
+    expect(driver['is_active']).toBe(true);
+  });
+
+  it('lifting a suspension does not revoke sessions', async () => {
+    const tokens = app.get(
+      (await import('../../src/auth/token.service.js')).TokenService,
+    );
+    db.rows('users').push({
+      id: 'admin-8', role: 'ADMIN', phone_e164: '+9647700000005',
+      display_name: 'مدير', is_active: true,
+    });
+    db.rows('users').push({
+      id: DRIVER_8, role: 'DRIVER', phone_e164: DRIVER_PHONE,
+      display_name: 'سائق', is_active: true,
+    });
+    db.rows('drivers').push({
+      user_id: DRIVER_8, availability: 'OFFLINE', is_suspended: true,
+      vehicle_plate: '88888', vehicle_model: 'Corolla', vehicle_color: 'أبيض',
+      rating_sum: 0, rating_count: 0, suspended_reason: 'fraud',
+    });
+
+    const admin = (await tokens.issuePair(db, 'admin-8', 'ADMIN')).accessToken;
+    const driverToken = (await tokens.issuePair(db, DRIVER_8, 'DRIVER')).accessToken;
+
+    await http
+      .patch(`/v1/admin/drivers/${DRIVER_8}`)
+      .set(as(admin))
+      .send({ isSuspended: false })
+      .expect(200);
+
+    // Reinstatement is not a security-sensitive change against the driver, so
+    // it must not sign them out.
+    await http.get('/v1/me').set(as(driverToken)).expect(200);
+  });
+
+  // A real, signed, unexpired token for a REAL active user, whose only defect
+  // is that its session was revoked. Anything less than this passes for the
+  // wrong reason - an unknown subject would 401 on the user lookup alone.
+  it('refuses a validly signed token whose session is gone', async () => {
+    const { access } = await signIn();
+    await http.get('/v1/me').set(as(access)).expect(200);
+
+    // Revoke the session directly, without going through logout.
+    for (const row of db.rows('refresh_tokens')) row['revoked_at'] = clock.now();
+
+    await http.get('/v1/me').set(as(access)).expect(401);
   });
 });

@@ -487,8 +487,24 @@ export class FakeDatabase implements Database {
     if (/^INSERT INTO refresh_tokens/i.test(s)) {
       this.rows('refresh_tokens').push({
         user_id: params[0], token_hash: params[1], expires_at: params[2], revoked_at: null,
+        session_id: params[3],
       });
       return this.ok([], 1);
+    }
+    // Migration 0006. Placed inside the refresh-token block deliberately: a
+    // generic `SELECT ... FROM refresh_tokens` handler added above this one
+    // would shadow it, and the session check silently returning "live" for
+    // everything is exactly the kind of fake-only pass this suite exists to
+    // prevent.
+    if (/^SELECT TRUE AS ok\s+FROM refresh_tokens/i.test(s)) {
+      const now = params[1] as Date;
+      const live = this.rows('refresh_tokens').some(
+        (t) =>
+          t['session_id'] === params[0] &&
+          t['revoked_at'] === null &&
+          (t['expires_at'] as Date) > now,
+      );
+      return this.ok(live ? ([{ ok: true }] as Row[]) : []);
     }
     if (/^UPDATE refresh_tokens SET revoked_at = \$1 WHERE token_hash/i.test(s)) {
       const now = params[0] as Date;
@@ -500,7 +516,7 @@ export class FakeDatabase implements Database {
       );
       if (!row) return this.ok([], 0);
       row['revoked_at'] = now;
-      return this.ok([{ user_id: row['user_id'] }] as Row[], 1);
+      return this.ok([{ user_id: row['user_id'], session_id: row['session_id'] }] as Row[], 1);
     }
     if (/^UPDATE refresh_tokens SET revoked_at = \$1 WHERE user_id/i.test(s)) {
       let n = 0;

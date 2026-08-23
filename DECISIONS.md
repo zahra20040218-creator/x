@@ -196,3 +196,54 @@ is red for environmental reasons trains people to ignore red.
 **The cost, stated plainly:** if CI does not set those variables, these tests
 never run anywhere and their absence is silent. The CI workflow must set them.
 Until CI exists (T041), **they have run nowhere.**
+
+---
+
+### D-013 — Stack: KEEP the existing repository stack (OWNER DECISION, 2026-08-23)
+
+**Chose:** Flutter (rider + driver) · NestJS (API) · Refine/React (admin) · raw
+`pg` with hand-written SQL. **No migration.**
+
+**Who decided:** the owner, explicitly. This was `BLOCKER-1`, recorded as
+*BLOCKED — OWNER DECISION REQUIRED*. It is now **decided and closed.**
+
+**What this settles:** the original product brief named Kotlin/Compose, Next.js,
+and Prisma/TypeORM. The repository is authoritative instead. The conflict is
+**documented, not acted on** — no Dart file is deleted, no Kotlin module is
+created, and `CLAUDE.md` §1 is left exactly as written.
+
+**What it does NOT settle:** the mobile apps still have never been compiled.
+Keeping Flutter removes the *architectural* blocker; the *environment* blocker
+(no Flutter SDK, BLOCKER-4) is untouched. Nothing moves to `DONE` because of
+this decision.
+
+---
+
+### D-014 — Scope: conflicting features stay PENDING (OWNER DECISION, 2026-08-23)
+
+**Chose:** KYC, driver approval, surge, zones, and promotions are marked
+**SCOPE DECISION PENDING**. Not built, not deleted, not scaffolded.
+
+**Why:** the brief §15–16 require them; `CLAUDE.md` §2 lists all five as OUT OF
+SCOPE and §12.7 forbids scaffolding them "for later". Building them would
+violate the constitution; deleting the requirement would hide the brief.
+
+**Explicitly NOT done:** `CLAUDE.md` was not edited to make the conflict
+disappear, and no placeholder module was created to make the matrix look
+complete.
+
+---
+
+### D-015 — Rate limiting: risk-tiered failure policy, not one global policy
+
+**Chose:** the failure behaviour when Redis is unreachable is now a property of
+the **endpoint**, not of the limiter. Three tiers — see `docs/RATE_LIMIT_POLICY.md`.
+
+**Why the previous single policy was wrong:** blanket fail-open meant that a
+Redis outage removed *all* protection from OTP verification, which costs real
+money per call and is an enumeration oracle. Blanket fail-closed is equally
+wrong — it converts a Redis blip into "nobody can request a ride", which is a
+larger incident than unthrottled OTP.
+
+**Neither extreme was adopted.** The critical tier degrades to a stricter
+in-process limiter rather than failing open or shut.

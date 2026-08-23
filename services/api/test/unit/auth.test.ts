@@ -1,3 +1,4 @@
+import { SignJWT } from 'jose';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { AuthService } from '../../src/auth/auth.service.js';
@@ -8,6 +9,16 @@ import { ForbiddenProblem, UnauthorizedProblem } from '../../src/common/problem.
 import { FakeDatabase } from '../fakes/fake-database.js';
 
 const SECRET = 'a-test-secret-that-is-long-enough-32';
+
+/** A fixed session id, for tests that only care about the token itself. */
+const SESSION = '00000000-0000-4000-8000-00000000cafe';
+
+/** Read the `sid` claim without verifying - test helper only. */
+function sessionIdOf(accessToken: string): string {
+  const payload = accessToken.split('.')[1]!;
+  const decoded: unknown = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+  return (decoded as { sid: string }).sid;
+}
 const RIDER_PHONE = '+9647700000001';
 const DRIVER_PHONE = '+9647700000002';
 
@@ -29,7 +40,7 @@ describe('TokenService', () => {
 
   describe('access tokens', () => {
     it('round-trips subject and role', async () => {
-      const token = await tokens.issueAccessToken('user-1', 'DRIVER');
+      const token = await tokens.issueAccessToken('user-1', 'DRIVER', SESSION);
       const claims = await tokens.verifyAccessToken(token);
 
       expect(claims.sub).toBe('user-1');
@@ -37,14 +48,14 @@ describe('TokenService', () => {
     });
 
     it('rejects a token after it expires', async () => {
-      const token = await tokens.issueAccessToken('user-1', 'RIDER');
+      const token = await tokens.issueAccessToken('user-1', 'RIDER', SESSION);
       clock.advanceSeconds(3_601);
 
       await expect(tokens.verifyAccessToken(token)).rejects.toThrow(UnauthorizedProblem);
     });
 
     it('accepts a token right up to expiry', async () => {
-      const token = await tokens.issueAccessToken('user-1', 'RIDER');
+      const token = await tokens.issueAccessToken('user-1', 'RIDER', SESSION);
       clock.advanceSeconds(3_500);
 
       await expect(tokens.verifyAccessToken(token)).resolves.toBeDefined();
@@ -53,13 +64,13 @@ describe('TokenService', () => {
     // The whole point of signing.
     it('rejects a token signed with a different secret', async () => {
       const attacker = new TokenService('a-different-secret-also-long-enough', clock, 3_600, 60);
-      const forged = await attacker.issueAccessToken('user-1', 'ADMIN');
+      const forged = await attacker.issueAccessToken('user-1', 'ADMIN', SESSION);
 
       await expect(tokens.verifyAccessToken(forged)).rejects.toThrow(UnauthorizedProblem);
     });
 
     it('rejects a tampered token', async () => {
-      const token = await tokens.issueAccessToken('user-1', 'RIDER');
+      const token = await tokens.issueAccessToken('user-1', 'RIDER', SESSION);
       const [header, payload, signature] = token.split('.');
       const tampered = `${header}.${payload}.${signature!.slice(0, -2)}xy`;
 
@@ -70,14 +81,40 @@ describe('TokenService', () => {
       await expect(tokens.verifyAccessToken(token)).rejects.toThrow(UnauthorizedProblem);
     });
 
+    // Migration 0006 fails CLOSED on tokens that predate it. A token with no
+    // `sid` cannot be tied to a revocable session, so honouring it would
+    // preserve exactly the hole the migration closes - one unrevocable token
+    // class, valid until expiry, invisible to logout.
+    it('refuses a correctly signed token that carries no session claim', async () => {
+      const legacy = await new SignJWT({ role: 'ADMIN' })
+        .setProtectedHeader({ alg: 'HS256' })
+        .setSubject('admin-1')
+        .setIssuedAt(Math.floor(clock.nowMs() / 1_000))
+        .setExpirationTime(Math.floor(clock.nowMs() / 1_000) + 3_600)
+        .setIssuer('rideapp')
+        .setAudience('rideapp-clients')
+        .sign(new TextEncoder().encode(SECRET));
+
+      // The signature is valid and it has not expired. It is refused purely
+      // for the missing claim.
+      await expect(tokens.verifyAccessToken(legacy)).rejects.toThrow(UnauthorizedProblem);
+    });
+
+    it('issues tokens that carry the session they belong to', async () => {
+      const token = await tokens.issueAccessToken('user-1', 'RIDER', SESSION);
+      const claims = await tokens.verifyAccessToken(token);
+
+      expect(claims.sid).toBe(SESSION);
+    });
+
     // Distinguishing "expired" from "bad signature" tells an attacker which
     // half of a forged token was wrong.
     it('gives the same message for expired and forged tokens', async () => {
-      const expired = await tokens.issueAccessToken('user-1', 'RIDER');
+      const expired = await tokens.issueAccessToken('user-1', 'RIDER', SESSION);
       clock.advanceSeconds(3_601);
 
       const attacker = new TokenService('a-different-secret-also-long-enough', clock, 3_600, 60);
-      const forged = await attacker.issueAccessToken('user-1', 'ADMIN');
+      const forged = await attacker.issueAccessToken('user-1', 'ADMIN', SESSION);
 
       const expiredError = await tokens.verifyAccessToken(expired).catch((e: Error) => e.message);
       const forgedError = await tokens.verifyAccessToken(forged).catch((e: Error) => e.message);
@@ -90,7 +127,10 @@ describe('TokenService', () => {
     it('issues a pair and consumes the refresh token once', async () => {
       const pair = await tokens.issuePair(db, 'user-1', 'RIDER');
 
-      expect(await tokens.consumeRefreshToken(db, pair.refreshToken)).toBe('user-1');
+      const consumed = await tokens.consumeRefreshToken(db, pair.refreshToken);
+      expect(consumed.userId).toBe('user-1');
+      // The session travels with the token so that rotation can continue it.
+      expect(consumed.sessionId).toEqual(expect.any(String));
     });
 
     // Rotation: a replayed token affects zero rows and is rejected. That guard
@@ -150,7 +190,9 @@ describe('TokenService', () => {
 
       await tokens.revokeAllForUser(db, 'user-2');
 
-      await expect(tokens.consumeRefreshToken(db, mine.refreshToken)).resolves.toBe('user-1');
+      await expect(tokens.consumeRefreshToken(db, mine.refreshToken)).resolves.toMatchObject({
+        userId: 'user-1',
+      });
     });
   });
 });
@@ -322,12 +364,12 @@ describe('AuthService', () => {
     it('returns the caller own profile including their own phone', async () => {
       const session = await auth.verifyOtp({ firebaseIdToken: 'rider-token', role: 'RIDER' });
 
-      const user = await auth.loadUser(session.user.id);
+      const user = await auth.loadUser(session.user.id, sessionIdOf(session.accessToken));
       expect(user.phone).toBe(RIDER_PHONE);
     });
 
     it('rejects an unknown user', async () => {
-      await expect(auth.loadUser('nobody')).rejects.toThrow(UnauthorizedProblem);
+      await expect(auth.loadUser('nobody', SESSION)).rejects.toThrow(UnauthorizedProblem);
     });
   });
 });

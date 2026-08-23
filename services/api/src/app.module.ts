@@ -174,7 +174,10 @@ export class AppModule {
         {
           provide: RateLimitGuard,
           useFactory: (reflector: Reflector) =>
-            new RateLimitGuard(redis, clock, reflector, logger),
+            new RateLimitGuard(redis, clock, reflector, logger, {
+              localDivisor: config.RATE_LIMIT_LOCAL_DIVISOR,
+              redisTimeoutMs: config.RATE_LIMIT_REDIS_TIMEOUT_MS,
+            }),
           inject: [Reflector],
         },
 

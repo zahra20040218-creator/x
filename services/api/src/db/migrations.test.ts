@@ -85,6 +85,7 @@ describe('the real migration set', () => {
       '0003_ledger',
       '0004_operations',
       '0005_audit_log',
+      '0006_sessions',
     ]);
   });
 

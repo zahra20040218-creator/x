@@ -19,6 +19,7 @@ import { processWebhook } from '../payments/webhook.js';
 import { REDIS, type RedisPort } from '../redis/redis.port.js';
 import { RideRepository } from '../rides/ride.repository.js';
 import { CurrentUser, Public } from './auth.guard.js';
+import { NoRateLimit, RateLimit } from './rate-limit.js';
 import { OpenDisputeSchema } from './schemas.js';
 import { zodBody } from './zod.pipe.js';
 
@@ -35,6 +36,7 @@ export class OpsController {
   /** Liveness. Deliberately touches nothing — it answers "is the process up". */
   @Get('health')
   @Public()
+  @NoRateLimit()
   health() {
     return { status: 'ok' as const };
   }
@@ -42,6 +44,7 @@ export class OpsController {
   /** Readiness. Checks Postgres (through PgBouncer) and Redis. */
   @Get('health/ready')
   @Public()
+  @NoRateLimit()
   async ready(@Res({ passthrough: true }) response: Response) {
     const [postgres, redis] = await Promise.all([this.db.ping(), this.redis.ping()]);
     const ok = postgres && redis;
@@ -108,6 +111,10 @@ export class OpsController {
    */
   @Post('payments/webhook/:provider')
   @Public()
+  // Unauthenticated by necessity and it writes the ledger. The signature
+  // check is the real control; this bounds how often an attacker may
+  // make us perform one.
+  @RateLimit({ limit: 120, windowSeconds: 60, by: 'ip', tier: 'CRITICAL' })
   @HttpCode(204)
   webhook(
     @Param('provider') provider: string,

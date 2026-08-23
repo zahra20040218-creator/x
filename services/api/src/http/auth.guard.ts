@@ -71,8 +71,9 @@ export class AuthGuard implements CanActivate {
 
     // Loaded from the database rather than trusted from the token: a
     // deactivated or suspended account must stop working immediately, not when
-    // its access token happens to expire an hour later.
-    const user = await this.auth.loadUser(claims.sub);
+    // its access token happens to expire an hour later. The session id is
+    // checked in the same call, so a revoked session dies just as fast.
+    const user = await this.auth.loadUser(claims.sub, claims.sid);
     request.user = user;
 
     const required = this.reflector.getAllAndOverride<UserRole[]>(REQUIRED_ROLES, [
