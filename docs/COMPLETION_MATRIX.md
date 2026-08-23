@@ -8,7 +8,7 @@ Every requirement, its status, and the command that proves it.
 **and passing** · typecheck clean · lint clean · **and I ran the command
 myself**. Anything I could not execute here is `BLOCKED`, never `DONE`.
 
-**Last verified:** 2026-08-23 (second pass) · **643 backend + 11 admin tests, 0 skipped.**
+**Last verified:** 2026-08-23 (third pass) · **683 backend + 11 admin tests, 0 skipped.**
 
 ---
 
@@ -73,7 +73,11 @@ curl -s http://localhost:4123/v1/health/ready  # degraded, PG+Redis fail  503
 | Role-based authorization | **DONE** | rider→403 on driver and admin routes | `api.e2e.test.ts` | `npx vitest run` | pass |
 | **Row-level / IDOR protection** | **DONE** | other rider's ride → **404 not 403**; list filters on token id | `api.e2e.test.ts` | `npx vitest run` | pass |
 | DTO validation on every endpoint | **DONE** | Zod at every boundary; RFC 9457 with field paths | `api.e2e.test.ts` | `npx vitest run` | pass |
-| **Rate limiting** | **PARTIAL** | Redis fixed-window; 11th OTP → 429; per-user not per-IP; spoofed XFF ignored | `api.e2e.test.ts` | `npx vitest run` | 6 pass · **fails open, so INACTIVE without Redis** |
+| **Rate limiting** | **PARTIAL** | Redis fixed-window; risk-tiered failure policy; health exempt; Redis call timed out | `rate-limit.test.ts`, `api.e2e.test.ts` | `npx vitest run` | 23 + 6 pass · **never run against real Redis** |
+| **Rate limiting survives a Redis outage** | **DONE** | CRITICAL degrades to `ceil(limit/divisor)`; OPERATIONAL stays open; verified on the **compiled binary with no Redis** | `rate-limit.test.ts` | `curl` ×6 on `/auth/otp/verify` | **3 allowed, then 429** |
+| **Health checks never rate limited** | **DONE** | `@NoRateLimit()`; a 429 on a probe would make the LB eject a healthy instance | — | 400 live requests to `/v1/health` | **0 non-200** |
+| **Session revocation** | **PARTIAL** | `sid` claim + live-session check folded into the existing per-request user load; logout kills the access token at once | `api.e2e.test.ts` (11), `auth.test.ts` | `npx vitest run` | pass · **migration 0006 never applied to a real DB** |
+| **Admin suspension cuts sessions** | **PARTIAL** | revokes in the same transaction as the suspension | `api.e2e.test.ts` | `npx vitest run` | pass · **vs fake DB** |
 | **Security headers** | **DONE** | CSP `default-src 'none'`, HSTS 180d, nosniff, DENY, no X-Powered-By | live response | `curl -sD - /v1/health` | **7 headers verified on the binary** |
 | **Admin audit log** | **DONE** | actor/action/target/result/correlationId; failures recorded; PII scrubbed | `audit.service.test.ts`, `api.e2e.test.ts` | `npx vitest run` | 12 pass |
 | PII never logged | **DONE** | structural redaction at depth; coords coarsened to ~110 m | `logger.test.ts` | `npx vitest run` | 38 pass |
@@ -138,16 +142,37 @@ $ grep -rnE "\+9647[0-9]{9}" services/api/src --include=*.ts | grep -v .test.
 
 | Status | Count | Change |
 |---|---|---|
-| **DONE** — built, tested, and I ran it | **30** | +1 (security headers) |
-| **PARTIAL** — works but not fully verified, or scope-limited | **13** | +1 (UI states, was FAILED) |
-| **BLOCKED** — needs Docker, Flutter, a device, k6, or credentials | **17** | unchanged |
-| **FAILED** — not done | **0** | −1 |
+| **DONE** — built, tested, and I ran it | **33** |
+| **PARTIAL** — works but not fully verified, or scope-limited | **12** |
+| **BLOCKED** — needs Docker, Flutter, a device, k6, or credentials | **13** |
+| **FAILED** — not done | **0** |
+| **Total rows** | **58** |
+
+**Counted by machine from the rows above**, not by hand:
+
+```bash
+grep -cE '^\| [^|]+ \| \*\*DONE\*\*' docs/COMPLETION_MATRIX.md
+```
+
+**Correction:** the previous revision of this file reported 30/13/17/0 and then
+32/16/16/0. Both were hand-totalled and both were wrong — they did not match
+the rows in the file. The numbers above are derived from the file itself. The
+stack conflict in particular was never a row in this matrix (it lives in
+`docs/BLOCKERS.md`), so resolving it did not decrement `BLOCKED` here.
 
 Counted from the rows above, not estimated.
 
-**Nothing moved from BLOCKED to DONE**, because no blocking dependency became
-available. Docker, Flutter, k6 and a physical device are all still absent —
-re-verified this session, not assumed.
+**Nothing moved from BLOCKED to DONE because an implementation appeared.** The
+one BLOCKED item that closed (the stack conflict) closed because the **owner
+made the decision**, which is the dependency it was blocked on. Docker,
+Flutter, k6 and a physical device are all still absent — re-verified this
+session by running the commands, not assumed.
+
+Session revocation and admin-suspension-cuts-sessions are `PARTIAL`, not
+`DONE`, even though both are implemented and proved over real HTTP: migration
+0006 has never been applied to a real PostgreSQL, so the `session_id` column
+and the index that serves the per-request liveness check exist only in SQL
+text and in the fake.
 
 **The former `FAILED` is now `PARTIAL`, not `DONE`.** The four states were made
 structural — `AsyncView` will not compile without an empty state and a retry

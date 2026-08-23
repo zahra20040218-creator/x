@@ -29,7 +29,16 @@ and **no code was written in either direction.**
 
 ---
 
-## BLOCKER-1 · Mobile + Admin stack conflict · **BLOCKED — OWNER DECISION REQUIRED**
+## BLOCKER-1 · Mobile + Admin stack conflict · **RESOLVED — OWNER DECIDED 2026-08-23**
+
+> **Decision: KEEP the existing stack.** Flutter, Refine, NestJS, raw `pg`.
+> No migration. The brief's Kotlin/Next.js/Prisma requirement is recorded
+> as a documented conflict and is **not** being acted on. See DECISIONS.md
+> D-013.
+>
+> **This unblocks nothing on its own.** The mobile apps still have never
+> been compiled, because BLOCKER-4 (no Flutter SDK) is untouched by a
+> stack decision. Nothing moved to `DONE` as a result.
 
 | Layer | Project Brief | CLAUDE.md (binding) | Current implementation | Decision required |
 |---|---|---|---|---|
@@ -67,7 +76,11 @@ which is unchanged either way.
 
 ---
 
-## BLOCKER-2 · Scope conflict · **BLOCKED — SCOPE DECISION REQUIRED**
+## BLOCKER-2 · Scope conflict · **SCOPE DECISION PENDING (owner, 2026-08-23)**
+
+> **Decision: deliberately deferred.** KYC, driver approval, surge, zones
+> and promotions are neither built nor deleted. `CLAUDE.md` was not edited
+> to make the conflict disappear. See DECISIONS.md D-014.
 
 | Requirement | Brief | CLAUDE.md | Current implementation | Decision required |
 |---|---|---|---|---|
@@ -193,7 +206,16 @@ it against the VPS.
 
 Recorded here so the decisions are visible, but **these are not blockers**.
 
-### Rate-limiter failure policy: **FAIL-OPEN** — deliberate
+### Rate-limiter failure policy: **RISK-TIERED** — superseded the blanket fail-open
+
+**Superseded 2026-08-23.** The blanket fail-open below was the finding S-7,
+not the desired end state. The behaviour is now chosen per endpoint by its
+`RiskTier`: `OPERATIONAL` still fails open, `CRITICAL` and `STANDARD` degrade
+to a stricter in-process limiter. Full reasoning and the per-endpoint table
+are in `docs/RATE_LIMIT_POLICY.md`.
+
+The original reasoning is kept below because the availability half of it still
+holds and still explains why `OPERATIONAL` fails open.
 
 When Redis is unreachable the limiter **allows** the request and logs a warning
 at `warn` level (`event: ratelimit.unavailable`).

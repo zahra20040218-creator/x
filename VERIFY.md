@@ -179,3 +179,114 @@ $ grep -cE "\+?964[0-9]{9}" /tmp/clean_boot.log
 Still no Postgres, no Redis, no Docker, no Flutter, no device, no k6. Readiness
 returning 503 above **is** the evidence that both datastores were absent. Every
 `PARTIAL` and `BLOCKED` in `docs/COMPLETION_MATRIX.md` remains exactly as it was.
+
+---
+
+# PHASES 5 & 6 VERIFICATION — 2026-08-23
+
+## Environment re-checked first (not assumed)
+
+```
+docker / psql / pg_isready / redis-cli / redis-server / k6 / flutter / dart / gradle
+  -> ALL NOT FOUND
+netstat :5432 :6432 :6379 -> nothing listening
+adb devices -> daemon running, list EMPTY
+```
+
+Unchanged. Phases 3, 4, 7, 9, 10 and 11 of the brief remain unreachable.
+
+## Gates
+
+```
+$ npx tsc --noEmit                              TYPECHECK=0
+$ npx eslint "src/**/*.ts" "test/**/*.ts"       LINT=0
+$ npx tsc -p tsconfig.build.json                BUILD=0
+$ npx vitest run                                22 files, 683 passed, 0 skipped
+$ cd apps/admin && npx vitest run               11 passed
+```
+
+Up from 643. **No test was deleted or skipped to get there.**
+
+## The two mutation tests that make the rest of it mean something
+
+A passing test proves nothing unless it can fail. Both new mechanisms were
+broken on purpose and the suite was watched to catch it.
+
+**Rate limiting** — reverted `CRITICAL` to the old blanket fail-open:
+
+```
+× a CRITICAL endpoint does NOT become unlimited
+  → expected 30 to be 3
+× records the degraded decision so an outage is visible in logs
+× refuses rather than waves through once the fallback table saturates
+```
+
+**Session revocation** — disabled the liveness check, reproducing pre-0006:
+
+```
+× logout invalidates the access token immediately, not in an hour
+  → expected 401 "Unauthorized", got 200 "OK"
+× revokes every device, not just the one that called logout
+× logout after a rotation still kills the whole session
+```
+
+Note which tests **kept passing** under that second mutation: *"deactivating
+the account cuts a live session off"* and *"survives refresh rotation"*. That
+is the evidence for the claim that account deactivation never depended on the
+new code — and it is why the S-3 finding was corrected rather than simply
+marked fixed.
+
+Both mutations were reverted and the suite re-run green.
+
+## Live, on the compiled binary, with no Redis and no Postgres
+
+PID checked both ways again: boot log `pid: 23604, port: 4901`, and
+`netstat` shows 23604 owning 4901.
+
+**A CRITICAL endpoint no longer becomes unlimited when Redis is gone:**
+
+```
+$ curl -X POST /v1/auth/otp/verify   (×6)
+req 1 -> 401     req 4 -> 429
+req 2 -> 401     req 5 -> 429
+req 3 -> 401     req 6 -> 429
+```
+
+401 means the limiter *allowed* it and auth rejected the fake token. Three
+allowed, then refused — `ceil(10/4)`. Under the previous policy all six, and
+the six-hundredth, would have been allowed.
+
+Log decisions: `degraded 3 · rejected 3 · allowed 0 · local_saturated 0`.
+
+**Health probes are exempt:**
+
+```
+$ 400 consecutive GET /v1/health
+non-200 responses: 0
+ratelimit events logged for GET:/v1/health: 0
+```
+
+Zero events means it was exempted before any counting. Without the exemption
+the degrade policy would have cut health to 75/min per instance and rejected
+roughly 325 of those 400.
+
+## An invalid check I ran, and am not counting
+
+I also fired 200 requests at `GET /v1/driver/offers/current` (OPERATIONAL) with
+a junk bearer token and recorded 0 × 429. **That proves nothing.**
+`main.ts:122` runs `AuthGuard` before `RateLimitGuard`, so those requests were
+rejected 401 by auth and never reached the limiter at all — confirmed by
+`decision: allowed` appearing **0** times in the log.
+
+The OPERATIONAL-stays-open claim rests on the e2e test *"keeps an operational
+endpoint open when Redis dies"*, which holds a real session, not on that run.
+
+Recorded because the result looked like confirmation and would have been
+reported as such.
+
+## What none of this proves
+
+No PostgreSQL, no Redis, no Docker, no Flutter, no device, no k6. Migration
+0006 has never been applied to a real database: `session_id` and the partial
+index that serves the per-request liveness check exist only as SQL text and in
+the fake. Every rate-limit count was produced by the in-memory Redis fake.

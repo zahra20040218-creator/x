@@ -1,6 +1,6 @@
 # FINAL REPORT
 
-**Date:** 2026-08-23 · **Commit:** `354ef5a` · Every number below is counted
+**Date:** 2026-08-23 (third pass) · Every number below is counted
 from `docs/COMPLETION_MATRIX.md` or read from a command's output. None are
 estimated.
 
@@ -14,17 +14,24 @@ Redis, and the mobile apps have never been compiled at all.
 
 ---
 
-## DONE: 30
-## PARTIAL: 13
-## BLOCKED: 17
+## DONE: 33
+## PARTIAL: 12
+## BLOCKED: 13
 ## FAILED: 0
 
-`FAILED` went 1 → 0. The former failure (per-screen Loading/Empty/Error/Success)
-is now `PARTIAL`, **not** `DONE`: the four states were made structural — the
-shared `AsyncView` will not compile without an empty state and a retry handler —
-but no Flutter SDK exists here, so the 12 widget tests are written and unrun.
+Counted by machine from the 58 rows of `docs/COMPLETION_MATRIX.md`, not by
+hand. **Both earlier totals in this file (30/13/17 and 32/16/16) were wrong** —
+hand-arithmetic that did not match the file. Corrected.
 
-**Nothing moved from BLOCKED to DONE.** No blocking dependency became available.
+**Nothing moved from BLOCKED to DONE because code appeared.** The stack
+conflict closed because the **owner decided it**, which was the dependency it
+was blocked on. Every environment blocker was re-checked by running the
+commands this session and every one is still present.
+
+Session revocation and rate limiting are `PARTIAL`, not `DONE`, even though
+both are implemented, mutation-tested, and proved over HTTP: migration 0006 has
+never been applied to a real PostgreSQL and no counter has ever run against a
+real Redis.
 
 ---
 
@@ -81,7 +88,7 @@ Redis fakes.** So the wiring is proved and the storage semantics are not.
 never run. The 500-concurrent / p95 < 200ms target is **unmeasured**. Even once
 run here it would say nothing about a 4-core VPS.
 
-## SECURITY: **PASS with two open items**
+## SECURITY: **PASS with one open item** (was two)
 
 Verified live, not asserted: CSP `default-src 'none'`, HSTS 180d, `X-Frame-Options: DENY`,
 nosniff, `Referrer-Policy: no-referrer`, `x-powered-by` count **0**.
@@ -92,9 +99,24 @@ interpolated value is a string literal in source; 97 `$n` placeholders, zero
 interpolated user input. IDOR returns **404, not 403**. PII scrubbed before the
 audit-log DB write. 0 phone numbers in the live log.
 
-Open: **S-7** rate limiting fails open, so it is inactive while Redis is down —
-a deliberate availability-over-protection choice, documented, cost stated.
-**S-3** admin tokens cannot be revoked without rotating `JWT_SECRET`.
+**S-7 closed.** Rate limiting no longer fails open on endpoints that matter.
+The failure policy is now per-endpoint by risk tier; verified on the compiled
+binary with no Redis: `/auth/otp/verify` allowed 3 then returned 429 instead of
+being unlimited. Health probes are exempt entirely — 400 live requests, 0
+non-200 — because a 429 on a liveness probe makes a load balancer eject a
+healthy instance.
+
+**S-3 closed, and corrected.** The finding was written too broadly: account
+deactivation *always* revoked immediately, because the guard reloads the user
+from the database on every request. The real gap — logout leaving the access
+token alive for up to an hour — is closed by migration 0006. Proved by
+disabling the check and watching the original bug return as `expected 401, got
+200`.
+
+**Still open: D-13 (P2).** A driver who goes OFFLINE while holding an offer can
+still accept it, after their Redis presence has been deleted — so the rider
+gets an assigned driver with no location. Found while auditing, recorded with a
+characterisation test, deliberately not fixed in this pass.
 
 ## ANDROID REAL DEVICE: **BLOCKED**
 `adb` is present, **zero devices attached**. The 20-minute screen-off driving
@@ -103,25 +125,30 @@ passes; **the field test is not claimed to pass.** MIUI/One UI process killers
 have no emulator substitute, and `CLAUDE.md` §5.3 calls this the single most
 common cause of ride-hailing MVP death in production.
 
-## STACK CONFLICT: **BLOCKED — OWNER DECISION REQUIRED**
-Brief says Kotlin/Compose + Next.js + Prisma. `CLAUDE.md` §1 says Flutter +
-Refine. Implementation is **25 `.dart` files, 0 `.kt`**.
-I did **not** rewrite Flutter to Kotlin, did not treat Flutter as satisfying the
-Kotlin requirement, did not delete Dart files, did not edit `CLAUDE.md` to erase
-the conflict, and do not claim it resolved. Options and a recommendation (keep
-Flutter) are in `docs/BLOCKERS.md` BLOCKER-1.
+## STACK CONFLICT: **RESOLVED — OWNER DECIDED**
+**Keep the existing stack.** Flutter, Refine, NestJS, raw `pg`. No migration.
+The brief's Kotlin/Next.js/Prisma requirement is recorded as a documented
+conflict and is not being acted on (DECISIONS.md D-013).
 
-## SCOPE CONFLICT: **BLOCKED — SCOPE DECISION REQUIRED**
-Brief §15/§16 require KYC, driver approval, surge, zones, promotions.
-`CLAUDE.md` §2 lists all five as **OUT OF SCOPE** and §12.7 forbids scaffolding
-them. Neither built nor deleted. Recorded in BLOCKER-2.
+**This unblocked nothing by itself** — the apps still have never been compiled,
+because that depends on the Flutter SDK, not on the stack question.
+
+## SCOPE CONFLICT: **SCOPE DECISION PENDING**
+KYC, driver approval, surge, zones, promotions: required by brief §15–16,
+forbidden by `CLAUDE.md` §2. Owner deferred the decision (DECISIONS.md D-014).
+Neither built nor deleted, and `CLAUDE.md` was not edited to make the conflict
+disappear.
 
 ## PRODUCTION READY: **NO**
 
 Not "close to production ready." The precise truth: a backend that compiles,
-lints, passes 654 tests, boots, serves correct HTTP, and degrades gracefully —
-whose money, matching, and state-machine guarantees have never touched the
-databases they depend on, and whose two client apps have never been compiled.
+lints, passes 694 tests, boots, serves correct HTTP, degrades gracefully, and
+now survives a Redis outage without dropping its guard on the endpoints that
+matter — whose money, matching, and state-machine guarantees have still never
+touched the databases they depend on, and whose two client apps have still
+never been compiled.
+
+The gap between this and production is not more code. It is Docker.
 
 ---
 
@@ -129,8 +156,8 @@ databases they depend on, and whose two client apps have never been compiled.
 
 | # | Blocker | Needs | Unblocks |
 |---|---|---|---|
-| 1 | **Stack conflict** | **your decision** | mobile + admin direction |
-| 2 | **Scope conflict** | **your decision** | KYC, surge, zones, promos |
+| 1 | ~~Stack conflict~~ | **DECIDED — keep existing stack** | — |
+| 2 | **Scope conflict** | **your decision, deferred** | KYC, surge, zones, promos |
 | 3 | Docker not installed | Docker Desktop | migrations, PgBouncer, **the P0 real-Redis run**, workers, integration tests |
 | 4 | Flutter SDK not installed | Flutter 3.24+ | 25 Dart files never compiled — **expect first-run compile errors** |
 | 5 | No Android device | a real Xiaomi + Samsung | the §5.3 background-location field test |

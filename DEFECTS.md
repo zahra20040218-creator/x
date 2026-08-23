@@ -35,8 +35,10 @@ in the shape that command expects.
 |---|---|---|---|
 | P0 | D-2 | **UNRESOLVED** | The in-memory Redis has never been checked against a real Redis; double-accept protection is designed-and-unit-tested, not verified |
 | P2 | D-4 | open | Idempotent response stored outside the work's transaction |
-| P2 | S-3 | open | Admin tokens cannot be revoked without rotating JWT_SECRET |
-| P2 | S-4 | **partly fixed** | Rate limiting now implemented (Redis fixed-window, 429 verified over HTTP) but **fails open**, so it is INACTIVE whenever Redis is down - see S-7 |
+| P2 | S-3 | **fixed** | Was worded too broadly. Account deactivation ALWAYS revoked immediately (AuthGuard reloads the user every request). The real gap - logout leaving the access token alive for up to an hour - is closed by migration 0006 |
+| P2 | S-4 | **fixed** | Rate limiting implemented and verified over HTTP |
+| P2 | S-7 | **fixed** | Blanket fail-open replaced by a per-tier policy. Verified on the compiled binary with no Redis: OTP verify allowed 3 then returned 429, instead of being unlimited |
+| P2 | D-13 | open | An OFFLINE driver can still accept an outstanding offer and is silently flipped to ON_TRIP, after `goOffline` deleted their Redis presence - so the rider gets an assigned driver with no location |
 | P2 | D-7 | open | Production PgBouncer guard is a string match, not a URL parse |
 | P2 | D-6b | open | Zero-fare settlement raises a confusing error |
 

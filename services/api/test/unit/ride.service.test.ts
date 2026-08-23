@@ -205,6 +205,34 @@ describe('RideService', () => {
       expect(driver!['availability']).toBe('ON_TRIP');
     });
 
+    /**
+     * CHARACTERISATION TEST — documents defect D-13, it does not endorse it.
+     *
+     * A driver who has gone OFFLINE while holding an offer can still accept
+     * it, and is silently flipped to ON_TRIP. `goOffline` has already deleted
+     * their Redis presence, so the rider now has an assigned driver with no
+     * location to track (CLAUDE.md §3.1 makes Redis the source of truth for
+     * location), and the offer sat with an absent driver for the full timeout
+     * instead of moving to the next candidate.
+     *
+     * Recorded rather than fixed in this pass: the fix belongs in matching
+     * (expire a driver's outstanding offer when they go offline) and changing
+     * matching behaviour is not a change to make while the atomic claim is
+     * still unverified against a real Redis (D-2).
+     *
+     * WHEN D-13 IS FIXED THIS TEST MUST FAIL. That is the point of it.
+     */
+    it('[D-13] currently lets an OFFLINE driver accept an offer', async () => {
+      const ride = await offeredRide(DRIVER_A);
+      const driver = db.rows('drivers').find((d) => d['user_id'] === DRIVER_A)!;
+      driver['availability'] = 'OFFLINE';
+
+      const accepted = await service.acceptRide(ride.id, DRIVER_A);
+
+      expect(accepted.status).toBe('ACCEPTED');
+      expect(driver['availability']).toBe('ON_TRIP');
+    });
+
     it('a second driver gets 409, not a silent overwrite', async () => {
       const ride = await offeredRide();
       await service.acceptRide(ride.id, DRIVER_A);

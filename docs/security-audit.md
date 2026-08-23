@@ -352,3 +352,140 @@ cannot be revoked short of rotating `JWT_SECRET`, which signs everyone out.
 **Nothing here is claimed against real infrastructure.** Every `PARTIAL` above
 is partial for that reason, and the ones that would become `PASS` with Docker
 running are named in `docs/BLOCKERS.md`.
+
+---
+
+# THIRD PASS — 2026-08-23 (Phases 5 & 6)
+
+Two open findings from the second pass are now closed. One was closed by
+implementation; the other turned out to have been **written too broadly** and
+is corrected here rather than quietly dropped.
+
+## S-7 · Rate limiting inactive without Redis · **P2 · FIXED**
+
+Previously accepted as a deliberate fail-open trade. That was the wrong call
+for one class of endpoint, and the second pass recorded the cost without fixing
+it.
+
+The failure behaviour is now a property of the **endpoint**, not of the
+limiter. Every `@RateLimit` must declare a `RiskTier`, and the tier decides:
+
+| Tier | Redis down |
+|---|---|
+| `CRITICAL` — auth, money, admin mutation | **degrade** to `ceil(limit / RATE_LIMIT_LOCAL_DIVISOR)` in-process |
+| `STANDARD` — ride lifecycle, ratings | **degrade** |
+| `OPERATIONAL` — location, polling | **allow** (blocking breaks a live ride) |
+| `@NoRateLimit()` — health probes | never limited |
+
+**Verified on the compiled binary with no Redis running** — not in a test:
+
+```
+$ for i in 1..6; curl -X POST /v1/auth/otp/verify
+req 1 -> 401     req 4 -> 429
+req 2 -> 401     req 5 -> 429
+req 3 -> 401     req 6 -> 429
+
+$ grep '"decision"' /tmp/p56.log
+degraded 3 · rejected 3 · allowed 0 · local_saturated 0
+```
+
+Three allowed then refused, exactly `ceil(10/4)`. Under the old policy all six
+would have been allowed, and so would the six-hundredth.
+
+**Not fixed by making everything fail closed**, which was considered and
+rejected: it turns Redis into a single point of failure for the whole platform.
+The residual weakness is stated plainly in `docs/RATE_LIMIT_POLICY.md` — the
+in-process counter is per-instance, so N instances permit N× the local limit
+unless `RATE_LIMIT_LOCAL_DIVISOR` is set to the instance count.
+
+### New sub-finding · health probes were rate limited · **P2 · FIXED**
+
+Found while classifying endpoints. `/v1/health` was subject to the 300/60
+default. A 429 on a liveness probe makes a load balancer eject a healthy
+instance — the limiter causing the outage it exists to prevent. Worse, with the
+new degrade policy an unclassified health route would have been cut to 75/min
+per instance.
+
+**Verified live: 400 consecutive requests to `/v1/health`, 0 non-200.**
+
+### New sub-finding · a hung Redis would stall every request · **P2 · FIXED**
+
+ioredis **queues** commands while disconnected rather than rejecting them. With
+no timeout, a Redis that is hung rather than refused would add its full latency
+to every request on the hot path. Bounded now by
+`RATE_LIMIT_REDIS_TIMEOUT_MS` (default 50ms), and there is a test asserting the
+tier policy applies to a hung Redis, not only a refused one.
+
+## S-3 · Admin session revocation · **P2 · CORRECTED, then FIXED**
+
+**The finding as written was too broad and I should not have carried it
+forward twice.** It said an admin token "cannot be revoked short of rotating
+JWT_SECRET". Reading `auth.guard.ts` shows that is not true: the guard calls
+`loadUser` on **every** request, which reads `users.is_active` from the
+database. Deactivating an account has always taken effect on that account's
+very next request. Role changes likewise, because the role is read from the DB
+and not trusted from the token.
+
+What was genuinely missing was narrower:
+
+- `POST /auth/logout` revoked refresh tokens, but the caller's **access token
+  kept working for the rest of its hour**. "Log me out" logged nobody out.
+- No way to cut off a stolen session without deactivating the whole account or
+  rotating `JWT_SECRET` and signing out every user on the platform.
+- No session invalidation after a security-sensitive change.
+
+Migration 0006 adds `session_id` to `refresh_tokens`, carried in the access
+token as `sid`. A session is live while it has an unrevoked, unexpired refresh
+token; the check is folded into the user load that already ran, so there is no
+extra round trip.
+
+Refresh rotation deliberately **carries the session forward** — otherwise
+refreshing would sign the caller out, which is worse than the bug being fixed.
+
+Admin suspension of a driver now revokes their sessions in the same
+transaction. It deliberately does **not** set `is_active = false`: suspension
+bars a driver from taking rides, not from signing in to see that they are
+suspended.
+
+**Tokens with no `sid` are refused** — fail closed. The cost is one forced
+re-login; the alternative is preserving an unrevocable token class.
+
+**Proved non-tautological** by disabling the session check and confirming the
+suite reproduces the original bug: `expected 401 "Unauthorized", got 200 "OK"`.
+
+## Third-pass verdict
+
+| Area | Status | Change |
+|---|---|---|
+| Rate limiting | **PASS (policy)** | S-7 closed; still never run against real Redis |
+| Health probe availability | **PASS** | verified live, 400 requests |
+| Session revocation | **PASS (logic)** | S-3 closed; migration 0006 never applied to a real DB |
+| Admin session revocation | **FIXED** | was S-3/S-10 |
+| SQL injection | PASS | unchanged |
+| Secrets in repo | PASS | unchanged |
+| PII in logs / audit / fixtures | PASS | unchanged |
+| IDOR / row-level auth | PASS | unchanged |
+| Security headers | PASS | unchanged |
+| CORS | PASS | unchanged |
+| Input validation | PASS | unchanged |
+| WebSocket authorization | **PARTIAL** | still zero automated tests for the realtime layer |
+| Audit log integrity | **PARTIAL** | append-only trigger still never executed |
+| Race conditions | **PARTIAL** | still proved against a fake Redis only — D-2, the one P0 |
+
+**Nothing in this pass was verified against real infrastructure either.** The
+two `PASS (…)` rows are qualified for that reason: the decision logic is
+proved, the storage layer underneath it is not.
+
+### New defect found while auditing
+
+**D-13 · P2 · open.** A driver who goes OFFLINE while holding an outstanding
+offer can still accept it and is silently flipped to `ON_TRIP` — after
+`goOffline` has already deleted their Redis presence. The rider then has an
+assigned driver with no location to track, and the offer sat with an absent
+driver for the full timeout instead of moving to the next candidate.
+
+Recorded rather than fixed: the fix belongs in matching, and changing matching
+behaviour while the atomic claim is still unverified against a real Redis (D-2)
+trades a known small problem for an unknown larger one. There is a
+characterisation test pinning the current behaviour so the fix cannot land
+silently.
