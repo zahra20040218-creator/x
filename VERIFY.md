@@ -395,3 +395,74 @@ it entirely — it is a plain directory, not a Windows service.
 Redis is still a fake in every test. The API has never been run as more than
 one instance. No load test. The mobile apps still cannot be built. `REAL_INFRA`
 runs print `redis=FAKE` precisely so this cannot be misread later.
+
+---
+
+# D-2 CLOSED — real Redis and real PostgreSQL, 2026-08-23
+
+The P0 that was open for the entire project. Both halves are now verified
+against real servers, and the full suite runs green against them.
+
+```
+[REAL_INFRA=on] postgres=REAL redis=REAL
+Test Files  27 passed (27)
+Tests      774 passed (774)     0 skipped
+```
+
+| | Server | Evidence |
+|---|---|---|
+| PostgreSQL | 17.11 (portable, port 5433) | 10 integration tests: transaction isolation under 20 concurrent rollbacks, the guarded UPDATE race, append-only ledger triggers, BIGINT money columns, the E.164 CHECK, migration 0006's index |
+| Redis | **8.0.5 on Linux/WSL2** (port 6380) | 43 conformance assertions RAN rather than skipped, plus 5 atomic-claim tests |
+
+`redis_version:8.0.5` / `os:Linux 6.6.87.2-microsoft-standard-WSL2` — genuine
+Redis, not a compatible reimplementation.
+
+## The claim test
+
+1,000 concurrent attempts: 20 rounds of 50 drivers, each round on a fresh ride
+id, with a counter incremented on entry to the critical section and decremented
+on exit.
+
+**`maxInside` never exceeded 1.**
+
+## Two harness bugs found on the way, one of which impersonated the P0
+
+Worth recording, because both produced failures that looked like product
+defects and neither was.
+
+**1. The first version of the claim test used instantaneous work.**
+`withClaim` releases as soon as the work returns, so with
+`() => Promise.resolve()` the winner released before the stragglers had even
+attempted, and a second driver then acquired the claim entirely legitimately.
+The test reported two winners on real Redis — which is precisely what D-2
+warned about, and it was wrong. The claim guarantees mutual exclusion DURING
+the critical section; in production that section is a database transaction,
+which takes time. Fixed by holding the claim for 40ms, and by asserting on a
+concurrency counter rather than on the winner count alone.
+
+**2. Vitest ran the integration files in parallel over shared state.**
+All three share one Postgres database and one Redis database and clean up with
+`TRUNCATE` and `FLUSHDB`, so they erased each other mid-test. `maxInside` came
+back as 3.
+
+The fix is `fileParallelism: false`, and it took two attempts: setting it
+inside a project entry is **silently ignored** — it is a root-level option. It
+is now applied at the root and made conditional on `REAL_INFRA=1`, so the ~700
+fake-backed unit and e2e tests stay parallel and fast while the 63 that touch
+real services run serially.
+
+Parallel execution over shared mutable external state is not a speed-versus-
+safety trade. It invents failures indistinguishable from real ones.
+
+## What this does NOT close
+
+Docker never installed — four attempts, `installer exited with status 1`, and
+the inner installer writes its log to a temp directory it deletes on exit, so
+no root cause was ever readable. `infra/docker-compose.yml` and
+`infra/api.Dockerfile` remain **unrun**. Redis and PostgreSQL here were
+obtained without it (WSL2 and a portable build), which closed D-2 but proves
+nothing about the compose stack.
+
+The portable PostgreSQL also dies roughly every five minutes with
+`0xC0000142` on a child process — a separate, undiagnosed problem that made no
+difference here because the suite finishes in seconds.

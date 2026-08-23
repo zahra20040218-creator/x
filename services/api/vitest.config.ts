@@ -22,6 +22,28 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+
+    /**
+     * Serial file execution, but ONLY when running against real services.
+     *
+     * The integration files share one real Postgres database and one real
+     * Redis database, and they clean up with TRUNCATE and FLUSHDB. Run in
+     * parallel they erase each other's state mid-test - the claim suite
+     * flushed the conformance suite's keys, and BOTH reported failures that
+     * had nothing to do with the code. One of them looked exactly like the
+     * P0 this repository exists to close.
+     *
+     * Parallel execution over shared mutable external state is not a
+     * speed-versus-safety trade. It is simply wrong, and the failures it
+     * invents are indistinguishable from real ones.
+     *
+     * Conditional because the unit and e2e tiers use in-memory fakes with no
+     * shared state, and making 700 of them serial to protect 63 would be a
+     * poor trade. `fileParallelism` is a ROOT option - setting it inside a
+     * project entry is silently ignored, which is how this was missed the
+     * first time.
+     */
+    fileParallelism: process.env['REAL_INFRA'] !== '1',
     projects: [
       {
         extends: true,

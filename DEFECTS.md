@@ -33,7 +33,7 @@ in the shape that command expects.
 
 | Severity | ID | Status | One line |
 |---|---|---|---|
-| P0 | D-2 | **HALF CLOSED** | **Postgres half CLOSED**: the guarded `UPDATE ... WHERE status = 'OFFERED'` was run with 20 real concurrent transactions against PostgreSQL 17.11 — exactly one matched a row. The `rides_one_active_per_driver_uq` backstop was also verified to fire. **Redis half still OPEN**: the atomic claim has still never run against a real Redis, which has no official Windows build and needs Docker or WSL |
+| P0 | D-2 | **CLOSED 2026-08-23** | **Both halves now verified against real servers.** Postgres: 20 real concurrent transactions on the guarded `UPDATE ... WHERE status = 'OFFERED'` produce exactly one winner (PostgreSQL 17.11). Redis: the 43 ioredis conformance assertions RAN for the first time instead of skipping, and the atomic claim was driven 1,000 times concurrently (20 rounds x 50 drivers) with a counter inside the critical section that never exceeded 1 — against **genuine Redis 8.0.5 on Linux/WSL2**, not a compatible reimplementation and not my in-memory fake. Full suite: **774 passed, 0 skipped, `postgres=REAL redis=REAL`** |
 | P2 | D-4 | open | Idempotent response stored outside the work's transaction |
 | P2 | S-3 | **fixed** | Was worded too broadly. Account deactivation ALWAYS revoked immediately (AuthGuard reloads the user every request). The real gap - logout leaving the access token alive for up to an hour - is closed by migration 0006 |
 | P2 | S-4 | **fixed** | Rate limiting implemented and verified over HTTP |
