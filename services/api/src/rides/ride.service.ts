@@ -297,11 +297,37 @@ export class RideService {
         const ride = await this.rides.findByIdForUpdate(tx, rideId);
         if (!ride) throw new NotFoundProblem('Ride');
 
+        // D-14. The offer must actually belong to this driver.
+        //
+        // Without this check, `accept` authorised nobody: the state machine
+        // call below deliberately presents the CALLER as the offered driver so
+        // that `mustBeAssignedDriver` passes, and `ride.driver_id` is still
+        // null in OFFERED - so every driver looked like the offeree. Any driver
+        // holding a ride id could take a ride offered to someone else, and the
+        // obvious way to obtain one is to be offered a ride and decline it:
+        // decline, wait for it to be re-offered, then accept and take it from
+        // the driver who was actually dispatched.
+        //
+        // Checked inside the same transaction and the same `FOR UPDATE` as the
+        // status read, so it cannot race with the offer moving on. Served by
+        // the existing ride_offers index on (ride_id, status).
+        //
+        // 404, not 403: a driver who was not offered this ride is not entitled
+        // to learn that it exists (same rule as rider IDOR).
+        const offer = await tx.query<{ driver_id: string }>(
+          `SELECT driver_id FROM ride_offers
+            WHERE ride_id = $1 AND driver_id = $2 AND status = 'PENDING'
+            LIMIT 1`,
+          [rideId, driverId],
+        );
+        if (offer.rows.length === 0) throw new NotFoundProblem('Offer');
+
         const decision = this.stateMachine.validate({
           // The driver is not yet assigned in the database, but they hold the
-          // claim, so they ARE the offered driver. Presenting them as such is
-          // what lets the machine's `mustBeAssignedDriver` rule authorise this
-          // one transition without a special case in the rule table.
+          // claim AND the pending offer checked above, so they ARE the offered
+          // driver. Presenting them as such is what lets the machine's
+          // `mustBeAssignedDriver` rule authorise this one transition without a
+          // special case in the rule table.
           ride: { ...ride, driverId },
           to: 'ACCEPTED',
           actor: { type: 'DRIVER', id: driverId },

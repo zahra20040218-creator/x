@@ -181,16 +181,75 @@ describe('RideService', () => {
       expect([DRIVER_A, DRIVER_B, DRIVER_C]).toContain(stored['driver_id']);
     });
 
-    it('lets exactly one of twenty simultaneous drivers accept', async () => {
+    /**
+     * The atomic claim, isolated from authorisation.
+     *
+     * This used to fire twenty DIFFERENT drivers at one ride and assert that
+     * one won. After D-14 nineteen of them are refused before the claim is
+     * ever reached, which would have made this test pass for the wrong reason
+     * and stopped exercising CLAUDE.md §5.1 at all.
+     *
+     * The realistic version of the race is one driver whose app retries: a
+     * flaky Baghdad connection, a double tap, twenty in-flight requests. Only
+     * one may produce an accepted ride.
+     */
+    it('lets exactly one of twenty concurrent taps by the offered driver win', async () => {
       const ride = await offeredRide(DRIVER_A);
-      const drivers = Array.from({ length: 20 }, (_, i) => `driver-${i}`);
-      for (const d of drivers) db.seedDriver(d);
 
       const results = await Promise.allSettled(
-        drivers.map((d) => service.acceptRide(ride.id, d)),
+        Array.from({ length: 20 }, () => service.acceptRide(ride.id, DRIVER_A)),
       );
 
       expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+
+      // NOT asserted here: that an ACCEPTED row survives in ride_events.
+      //
+      // FakeDatabase.transaction snapshots the WHOLE database on entry and
+      // restores it on failure, so the nineteen rollbacks erase the winner's
+      // committed write. Real PostgreSQL isolates transactions per connection
+      // and would keep it. That divergence is a property of the fake, not of
+      // the code - and it is recorded as D-15, because it means no concurrency
+      // test in this repository proves durability under contention.
+      expect(db.rows('rides')[0]!['status']).toBeDefined();
+    });
+
+    // Both layers together: the offeree still has to win the claim, and a
+    // stale offeree from a previous round is refused outright.
+    it('lets exactly one win when a stale driver races the real offeree', async () => {
+      const ride = await offeredRide(DRIVER_A);
+
+      const results = await Promise.allSettled([
+        service.acceptRide(ride.id, DRIVER_B),
+        service.acceptRide(ride.id, DRIVER_A),
+        service.acceptRide(ride.id, DRIVER_C),
+      ]);
+
+      const [b, , c] = results;
+
+      // The stale drivers are ALWAYS refused, whatever the scheduling.
+      expect(b.status).toBe('rejected');
+      expect(c.status).toBe('rejected');
+      // Either refusal is safe: 404 from the ownership check, or
+      // RideAlreadyClaimedError from losing the claim to the other racer.
+      for (const stale of [b, c]) {
+        const reason = (stale as PromiseRejectedResult).reason as Error;
+        expect(
+          reason instanceof NotFoundProblem || reason instanceof RideAlreadyClaimedError,
+        ).toBe(true);
+      }
+
+      // At most one accept can ever succeed - the §5.1 invariant.
+      expect(results.filter((r) => r.status === 'fulfilled').length).toBeLessThanOrEqual(1);
+
+      // The offeree's own outcome is deliberately NOT asserted here. D-16:
+      // `withClaim` takes the Redis claim BEFORE the ownership check runs, so
+      // a stale driver who wins the claim first makes the legitimate offeree
+      // fail with RideAlreadyClaimedError until they retry. That is a
+      // liveness wart, not a safety one - the ride is never assigned to the
+      // wrong driver - and asserting a winner here would just encode
+      // whichever order the scheduler happened to pick.
+      expect(db.rows('rides')[0]!['driver_id']).not.toBe(DRIVER_B);
+      expect(db.rows('rides')[0]!['driver_id']).not.toBe(DRIVER_C);
     });
 
     it('marks the ride ACCEPTED and puts the driver ON_TRIP', async () => {
@@ -206,23 +265,54 @@ describe('RideService', () => {
     });
 
     /**
-     * CHARACTERISATION TEST — documents defect D-13, it does not endorse it.
+     * D-14 — ride stealing.
      *
-     * A driver who has gone OFFLINE while holding an offer can still accept
-     * it, and is silently flipped to ON_TRIP. `goOffline` has already deleted
-     * their Redis presence, so the rider now has an assigned driver with no
-     * location to track (CLAUDE.md §3.1 makes Redis the source of truth for
-     * location), and the offer sat with an absent driver for the full timeout
-     * instead of moving to the next candidate.
+     * `accept` authorised nobody. The state-machine call inside `acceptRide`
+     * presents the CALLER as the offered driver so that `mustBeAssignedDriver`
+     * passes, and `driver_id` is still null while the ride is OFFERED — so
+     * every driver looked like the offeree.
      *
-     * Recorded rather than fixed in this pass: the fix belongs in matching
-     * (expire a driver's outstanding offer when they go offline) and changing
-     * matching behaviour is not a change to make while the atomic claim is
-     * still unverified against a real Redis (D-2).
-     *
-     * WHEN D-13 IS FIXED THIS TEST MUST FAIL. That is the point of it.
+     * The practical attack needs no guessing: be offered a ride, decline it,
+     * keep the id, wait for it to be re-offered, then accept and take it from
+     * the driver who was actually dispatched.
      */
-    it('[D-13] currently lets an OFFLINE driver accept an offer', async () => {
+    it('[D-14] refuses a driver who was never offered this ride', async () => {
+      const ride = await offeredRide(DRIVER_A);
+
+      await expect(service.acceptRide(ride.id, DRIVER_B)).rejects.toThrow(NotFoundProblem);
+
+      // Not merely refused - the ride is untouched and still available to the
+      // driver it was actually offered to.
+      expect(db.rows('rides')[0]!['driver_id']).toBeNull();
+      await expect(service.acceptRide(ride.id, DRIVER_A)).resolves.toBeDefined();
+    });
+
+    it('[D-14] a driver who declined cannot take the ride back', async () => {
+      const ride = await offeredRide(DRIVER_A);
+
+      // A declines; the offer row stops being PENDING for them.
+      for (const offer of db.rows('ride_offers')) {
+        if (offer['driver_id'] === DRIVER_A) offer['status'] = 'DECLINED';
+      }
+
+      await expect(service.acceptRide(ride.id, DRIVER_A)).rejects.toThrow(NotFoundProblem);
+    });
+
+    /**
+     * D-13, residual. The SERVICE still permits this: `acceptRide` does not
+     * read `drivers.availability`, so a row that is OFFLINE with a PENDING
+     * offer can still accept.
+     *
+     * That is deliberate and it is not the hole. The hole was the API path
+     * that PUTS a driver offline while they hold an offer, and that path now
+     * releases the offer first (see driver.controller `setAvailability`, and
+     * the e2e test "going offline releases the offer"). The only remaining way
+     * to reach the state below is the presence sweeper, and the offer sweeper
+     * expires those offers on their own deadline.
+     *
+     * Kept so that the service-level behaviour is stated rather than assumed.
+     */
+    it('[D-13] the service itself does not read availability on accept', async () => {
       const ride = await offeredRide(DRIVER_A);
       const driver = db.rows('drivers').find((d) => d['user_id'] === DRIVER_A)!;
       driver['availability'] = 'OFFLINE';
@@ -250,7 +340,11 @@ describe('RideService', () => {
       await expect(service.acceptRide(ride.id, DRIVER_A)).rejects.toThrow('deadlock detected');
 
       expect(await claims.currentHolder(ride.id)).toBeNull();
-      await expect(service.acceptRide(ride.id, DRIVER_B)).resolves.toBeDefined();
+
+      // The offer is still theirs, so the retry succeeds. Previously this
+      // asserted that a DIFFERENT driver could take it, which only worked
+      // because of D-14.
+      await expect(service.acceptRide(ride.id, DRIVER_A)).resolves.toBeDefined();
     });
 
     it('404s for a ride that does not exist', async () => {

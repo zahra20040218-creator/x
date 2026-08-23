@@ -573,11 +573,82 @@ describe('API end to end', () => {
       http.post(`/v1/rides/${created.body.id}/accept`).set(auth(driver2)),
     ]);
 
-    const statuses = [a.status, b.status].sort();
-    expect(statuses).toEqual([200, 409]);
+    // CLAUDE.md §5.1: two drivers must never both accept. The invariant is
+    // "exactly one 200", not a particular rejection code - there are now two
+    // independent layers that can refuse the loser, and which one fires
+    // depends on who dispatch picked:
+    //
+    //   404  the loser was never the offeree (D-14 authorisation)
+    //   409  the loser was the offeree but lost the Redis claim (§5.1)
+    //
+    // Asserting one specific code would make this test depend on dispatch
+    // ordering rather than on the property that matters.
+    const winners = [a, b].filter((r) => r.status === 200);
+    const losers = [a, b].filter((r) => r.status !== 200);
 
-    const loser = a.status === 409 ? a : b;
-    expect(loser.body.type).toMatch(/ride-already-claimed$/);
+    expect(winners).toHaveLength(1);
+    expect(losers).toHaveLength(1);
+    expect([404, 409]).toContain(losers[0]!.status);
+
+    // The winner really did get the ride.
+    expect(winners[0]!.body.status).toBe('ACCEPTED');
+
+    // NOT asserted: that ride_events still holds the ACCEPTED row.
+    // FakeDatabase.transaction snapshots the whole database and restores it on
+    // failure, so the loser's rollback erases the winner's committed write.
+    // Real PostgreSQL would not. Recorded as D-15.
+  });
+
+  /**
+   * D-13 — going offline while holding an offer.
+   *
+   * Before the fix a driver could tap "go offline", which deletes their Redis
+   * presence, and still accept the offer afterwards. The rider ended up with
+   * an assigned driver whose location was not in Redis at all, so the tracking
+   * screen stayed empty — and until the offer timed out, no other driver was
+   * tried.
+   */
+  it('going offline releases the offer the driver was holding', async () => {
+    const riderToken = await signInRider();
+    seedDriverRow('driver-1', DRIVER_PHONE, '11111');
+    const driver1 = await signInDriver('driver-token');
+
+    await http
+      .put('/v1/driver/availability')
+      .set(auth(driver1))
+      .send({ availability: 'ONLINE', position: KARRADA })
+      .expect(200);
+
+    const created = await http
+      .post('/v1/rides')
+      .set(auth(riderToken))
+      .set('Idempotency-Key', randomUUID())
+      .send({ pickup: TAHRIR, dropoff: KARRADA })
+      .expect(201);
+
+    const matching = app.get(
+      (await import('../../src/matching/matching.service.js')).MatchingService,
+    );
+    await matching.dispatch(created.body.id);
+
+    // The offer is theirs right now.
+    await http.get('/v1/driver/offers/current').set(auth(driver1)).expect(200);
+
+    await http
+      .put('/v1/driver/availability')
+      .set(auth(driver1))
+      .send({ availability: 'OFFLINE' })
+      .expect(200);
+
+    // The offer is gone...
+    const after = await http.get('/v1/driver/offers/current').set(auth(driver1));
+    expect(after.body.offer ?? null).toBeNull();
+
+    // ...and accepting it afterwards no longer works.
+    await http
+      .post(`/v1/rides/${created.body.id}/accept`)
+      .set(auth(driver1))
+      .expect(404);
   });
 
   // -------------------------------------------------------------------------

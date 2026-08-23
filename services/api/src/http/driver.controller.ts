@@ -67,6 +67,27 @@ export class DriverController {
         `UPDATE drivers SET availability = 'OFFLINE', updated_at = now() WHERE user_id = $1`,
         [user.id],
       );
+
+      // D-13. Going offline releases any offer this driver is holding.
+      //
+      // Without this, a driver could go offline - which deletes their Redis
+      // presence - and still accept the offer afterwards, leaving the rider
+      // with an assigned driver whose location is not in Redis at all
+      // (CLAUDE.md §3.1 makes Redis the source of truth for location). The
+      // rider's tracking screen would simply stay empty.
+      //
+      // It also costs the rider real time: the offer would otherwise sit with
+      // an absent driver for the full timeout before the next candidate is
+      // tried.
+      //
+      // Treated as a decline rather than a new outcome type, because that is
+      // exactly what it is - the driver is not taking this ride - and it
+      // reuses the dispatch path that is already tested. Ordered AFTER
+      // goOffline so the re-dispatch cannot pick this driver again.
+      const outstanding = await this.matching.currentOfferFor(user.id);
+      if (outstanding) {
+        await this.matching.handleOfferOutcome(outstanding, 'declined');
+      }
     } else {
       await this.presence.goOnline(user.id, { ...body.position!, recordedAt: new Date() });
       await this.db.query(

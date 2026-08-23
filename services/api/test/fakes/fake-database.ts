@@ -613,6 +613,21 @@ export class FakeDatabase implements Database {
       return this.ok(rows as Row[]);
     }
 
+    // Two different questions share this prefix, and answering the second with
+    // the first is how D-14 hid: the ownership check "is THIS driver the
+    // offeree" was answered with "who is the offeree", which is true for
+    // everybody. Ordered so the narrower query is matched first, and the
+    // narrower one actually reads params[1].
+    if (/^SELECT driver_id FROM ride_offers\s+WHERE ride_id = \$1 AND driver_id = \$2/i.test(s)) {
+      const found = this.rows('ride_offers').find(
+        (o) =>
+          o['ride_id'] === params[0] &&
+          o['driver_id'] === params[1] &&
+          o['status'] === 'PENDING',
+      );
+      return this.ok(found ? ([{ driver_id: found['driver_id'] }] as Row[]) : []);
+    }
+
     if (/^SELECT driver_id FROM ride_offers/i.test(s)) {
       const found = this.rows('ride_offers').find(
         (o) => o['ride_id'] === params[0] && o['status'] === 'PENDING',

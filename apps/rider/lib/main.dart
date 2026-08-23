@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:rideapp_core/rideapp_core.dart';
@@ -10,6 +11,18 @@ import 'package:rideapp_rider/screens/track_ride_screen.dart';
 /// Rider app entry point. Android only in v1 (CLAUDE.md §2 — no iOS builds).
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Without this, every call to `FirebaseAuth.instance` throws
+  //   [core/no-app] No Firebase App '[DEFAULT]' has been created
+  // and sign-in fails on a real device for both apps. It was missing.
+  //
+  // No `options:` argument on purpose: on Android the google-services Gradle
+  // plugin reads `android/app/google-services.json` and initialises from
+  // resources. That file is NOT in this repository and must not be - it is
+  // per-project configuration, and CLAUDE.md §9 forbids committed config.
+  // Until it is supplied the app will fail HERE, at startup, with a clear
+  // message, instead of failing later and less clearly at the sign-in screen.
+  await Firebase.initializeApp();
 
   final tokens = SecureTokenStore();
   final api = ApiClient(

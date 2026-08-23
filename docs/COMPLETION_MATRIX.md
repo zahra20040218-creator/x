@@ -8,7 +8,12 @@ Every requirement, its status, and the command that proves it.
 **and passing** · typecheck clean · lint clean · **and I ran the command
 myself**. Anything I could not execute here is `BLOCKED`, never `DONE`.
 
-**Last verified:** 2026-08-23 (third pass) · **683 backend + 11 admin tests, 0 skipped.**
+**Last verified:** 2026-08-23 (fourth pass, commercial audit) · **687 backend + 11 admin tests, 0 skipped.**
+
+> **See `FINAL_COMMERCIAL_AUDIT.md`.** Two rows below were downgraded after the
+> commercial audit: the admin panel is not an application (`vite build` fails
+> with no entry module) and the rider app has no Android project, so neither is
+> merely *blocked* — both are missing code.
 
 ---
 
@@ -114,11 +119,11 @@ $ grep -rnE "\+9647[0-9]{9}" services/api/src --include=*.ts | grep -v .test.
 | Requirement | Status | Evidence | Test | Command | Result |
 |---|---|---|---|---|---|
 | Shared core (models, API client, design) | **BLOCKED** | 14 files, Flutter | `iqd_test.dart` written | needs Flutter | **never compiled** |
-| Rider app full flow | **BLOCKED** | auth → request → track → rate | — | needs Flutter | **never compiled** |
+| Rider app full flow | **FAILED** | auth → request → track → rate | — | needs Flutter | **never compiled** |
 | Driver app full flow | **BLOCKED** | auth → online → offer → trip → wallet | — | needs Flutter | **never compiled** |
 | **Background location (§5.3)** | **BLOCKED** | foreground service, Doze exemption + explainer, offline buffer, no WorkManager | `location_service_test.dart` written | needs Flutter **+ device** | `AUTOMATED = written, unrun` · **`REAL DEVICE = BLOCKED`** |
 | Arabic / RTL / localisation | **PARTIAL** | interface-based strings; no hardcoded user text | — | needs Flutter | **never compiled** |
-| Admin panel | **PARTIAL** | data provider, money formatter, contract paths | `money.test.ts` | `npx vitest run` | 11 pass · **no UI screens** |
+| Admin panel | **FAILED** | data provider, money formatter, contract paths | `money.test.ts` | `npx vitest run` | 11 pass · **no UI screens** |
 | Loading/Empty/Error/Success on every screen | **PARTIAL** | `AsyncView` makes all four **structural** — `empty` and `onRetry` are required params, so omitting them fails to compile; permission-denial error+retry added | `async_view_test.dart` (12 widget tests) | needs Flutter | **written, UNRUN** — see `docs/UI_STATE_MATRIX.md` |
 | KYC / documents / approval | **BLOCKED** | `CLAUDE.md` §2 says OUT OF SCOPE | — | — | **BLOCKER-2** |
 | Zones / surge / promotions | **BLOCKED** | `CLAUDE.md` §2 says OUT OF SCOPE | — | — | **BLOCKER-2** |
@@ -143,9 +148,9 @@ $ grep -rnE "\+9647[0-9]{9}" services/api/src --include=*.ts | grep -v .test.
 | Status | Count | Change |
 |---|---|---|
 | **DONE** — built, tested, and I ran it | **33** |
-| **PARTIAL** — works but not fully verified, or scope-limited | **12** |
-| **BLOCKED** — needs Docker, Flutter, a device, k6, or credentials | **13** |
-| **FAILED** — not done | **0** |
+| **PARTIAL** — works but not fully verified, or scope-limited | **11** |
+| **BLOCKED** — needs Docker, Flutter, a device, k6, or credentials | **12** |
+| **FAILED** — missing code, not a missing tool | **2** |
 | **Total rows** | **58** |
 
 **Counted by machine from the rows above**, not by hand:
