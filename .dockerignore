@@ -1,0 +1,32 @@
+# Without this, `COPY services/api services/api` copies the HOST's
+# node_modules over the ones pnpm installed inside the image. On a Windows
+# host those are Windows-native binaries, and the container would fail at
+# runtime on the first native module. The build context would also be several
+# hundred megabytes of files the image never needs.
+
+node_modules
+**/node_modules
+
+# Built on the host, rebuilt in the image. Copying a Windows-built dist over a
+# Linux build is the same class of mistake as the node_modules one.
+dist
+**/dist
+coverage
+**/coverage
+
+.git
+.github
+
+# Never build a secret into an image layer.
+.env
+.env.*
+!.env.example
+
+# Flutter and admin are not part of the API image.
+apps/rider
+apps/driver
+packages
+
+*.log
+.vscode
+.idea
