@@ -67,6 +67,7 @@ export class FakeDatabase implements Database {
       'ratings',
       'disputes',
       'wallet_topups',
+      'audit_log',
     ]) {
       this.tables.set(table, []);
     }
@@ -336,6 +337,117 @@ export class FakeDatabase implements Database {
         transaction_id: params[3], reference: params[4],
       });
       return this.ok([], 1);
+    }
+
+    // ---- admin: driver CRUD ----
+    // Admin creates a driver: 2 params, and returns created_at. Distinct from
+    // the rider self-signup INSERT, which carries a firebase_uid.
+    if (/^INSERT INTO users \(role, phone_e164, display_name\)/i.test(s)) {
+      const phone = params[0] as string;
+      if (this.rows('users').some((u) => u['phone_e164'] === phone && u['role'] === 'DRIVER')) {
+        throw Object.assign(new Error('duplicate key'), {
+          code: '23505', constraint: 'users_phone_role_uq',
+        });
+      }
+      const row: FakeRow = {
+        id: randomUUID(), role: 'DRIVER', phone_e164: phone,
+        display_name: params[1], is_active: true, created_at: new Date(),
+      };
+      this.rows('users').push(row);
+      return this.ok([{ id: row['id'], created_at: row['created_at'] }] as Row[], 1);
+    }
+
+    if (/^INSERT INTO drivers \(user_id, vehicle_plate/i.test(s)) {
+      this.rows('drivers').push({
+        user_id: params[0], vehicle_plate: params[1], vehicle_model: params[2],
+        vehicle_color: params[3], availability: 'OFFLINE', is_suspended: false,
+        suspended_reason: null, rating_sum: '0', rating_count: '0',
+      });
+      return this.ok([], 1);
+    }
+
+    // The admin driver view: users JOIN drivers LEFT JOIN wallet balances.
+    if (/^SELECT u\.id, u\.display_name, u\.phone_e164, u\.created_at/i.test(s)) {
+      const single = /WHERE u\.id = \$1/i.test(s);
+      const users = this.rows('users').filter((u) => {
+        if (u['role'] !== 'DRIVER') return false;
+        return single ? u['id'] === params[0] : true;
+      });
+
+      const rows = users
+        .map((u) => {
+          const d = this.rows('drivers').find((x) => x['user_id'] === u['id']);
+          if (!d) return null;
+          const completed = this.rows('rides').filter(
+            (r) => r['driver_id'] === u['id'] && r['status'] === 'COMPLETED',
+          ).length;
+          return {
+            id: u['id'], display_name: u['display_name'],
+            phone_e164: u['phone_e164'], created_at: u['created_at'] ?? new Date(),
+            availability: d['availability'], is_suspended: d['is_suspended'] ?? false,
+            suspended_reason: d['suspended_reason'] ?? null,
+            vehicle_plate: d['vehicle_plate'], vehicle_model: d['vehicle_model'],
+            vehicle_color: d['vehicle_color'],
+            rating_sum: d['rating_sum'] ?? '0', rating_count: d['rating_count'] ?? '0',
+            balance_iqd: String(this.walletBalance(u['id'] as string)),
+            rides_completed: String(completed),
+          };
+        })
+        .filter((r): r is NonNullable<typeof r> => r !== null);
+
+      return this.ok(rows as Row[]);
+    }
+
+    if (/^UPDATE users SET display_name/i.test(s)) {
+      const user = this.rows('users').find((u) => u['id'] === params[1]);
+      if (user) user['display_name'] = params[0];
+      return this.ok([], user ? 1 : 0);
+    }
+
+    // The dynamic driver UPDATE built column-by-column by updateDriver.
+    //
+    // Explicitly EXCLUDES the availability and rating statements, which have
+    // their own handlers further down. Matching them here would shadow those
+    // and silently stop a driver being freed after a ride - the same shadowing
+    // bug that was already caught once on the ON_TRIP path.
+    if (
+      /^UPDATE drivers SET /i.test(s) &&
+      /WHERE user_id = \$\d+/i.test(s) &&
+      !/availability = '/i.test(s) &&
+      !/rating_sum/i.test(s)
+    ) {
+      const setClause = s.slice(0, s.search(/\sWHERE\s/i));
+      const assignments = [...setClause.matchAll(/(\w+) = \$(\d+)/g)];
+      const idIndex = /WHERE user_id = \$(\d+)/i.exec(s);
+      if (!idIndex) return this.ok([], 0);
+
+      const driver = this.rows('drivers').find(
+        (d) => d['user_id'] === params[Number(idIndex[1]) - 1],
+      );
+      if (!driver) return this.ok([], 0);
+
+      for (const [, column, index] of assignments) {
+        driver[column!] = params[Number(index) - 1] as unknown;
+      }
+      return this.ok([], 1);
+    }
+
+    // ---- audit log ----
+    if (/^INSERT INTO audit_log/i.test(s)) {
+      this.rows('audit_log').push({
+        actor_id: params[0], actor_role: params[1], action: params[2],
+        target_type: params[3], target_id: params[4], result: params[5],
+        correlation_id: params[6], metadata: params[7], created_at: new Date(),
+      });
+      return this.ok([], 1);
+    }
+    if (/^SELECT id, actor_id, actor_role, action/i.test(s)) {
+      const rows = this.rows('audit_log').filter((r) =>
+        /WHERE target_type/i.test(s)
+          ? r['target_type'] === params[0] && r['target_id'] === params[1]
+          : r['actor_id'] === params[0],
+      );
+      return this.ok(rows.map((r) => ({ ...r })) as Row[]);
     }
 
     // ---- users / auth ----

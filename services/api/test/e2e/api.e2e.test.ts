@@ -837,3 +837,203 @@ describe('rate limiting', () => {
       });
   });
 });
+
+/**
+ * Admin audit trail — brief §16, security audit RISK-3.
+ *
+ * Asserted over real HTTP: an audit row is only worth anything if it appears
+ * when the actual endpoint is called, not when a service method is called
+ * directly.
+ */
+describe('admin audit log', () => {
+  let app: NestExpressApplication;
+  let db: FakeDatabase;
+  let redis: InMemoryRedis;
+  let clock: FakeClock;
+  let firebase: FakeFirebaseVerifier;
+  let http: request.Agent;
+  let adminToken: string;
+
+  beforeEach(async () => {
+    clock = new FakeClock();
+    db = new FakeDatabase();
+    redis = new InMemoryRedis(clock);
+    firebase = new FakeFirebaseVerifier();
+
+    db.seedConfig({
+      commission_bps: 0, fare_base_iqd: 2_000, fare_per_km_iqd: 500,
+      fare_per_minute_iqd: 50, fare_minimum_iqd: 3_000, fare_rounding_iqd: 250,
+      offer_timeout_seconds: 15, search_radius_meters: 5_000,
+    });
+    db.rows('users').push({
+      id: 'admin-1', role: 'ADMIN', phone_e164: '+9647700000005',
+      display_name: 'مدير', is_active: true,
+    });
+
+    const config = ConfigSchema.parse({
+      NODE_ENV: 'test',
+      DATABASE_URL: 'postgresql://x:y@pgbouncer:6432/db',
+      REDIS_URL: 'redis://localhost:6379',
+      FIREBASE_PROJECT_ID: 'test-project',
+      JWT_SECRET: 'a-test-secret-that-is-long-enough-32',
+    });
+
+    app = await NestFactory.create<NestExpressApplication>(
+      AppModule.forRoot({ config, database: db, redis, firebase, clock }),
+      { logger: false, bodyParser: false, abortOnError: false },
+    );
+    app.use(express.json({ limit: '256kb' }));
+    app.setGlobalPrefix('v1');
+    app.useGlobalFilters(new ProblemFilter());
+    app.useGlobalGuards(app.get(AuthGuard), app.get(RateLimitGuard));
+    await app.init();
+
+    http = request(app.getHttpServer());
+
+    const tokens = app.get(
+      (await import('../../src/auth/token.service.js')).TokenService,
+    );
+    adminToken = await tokens.issueAccessToken('admin-1', 'ADMIN');
+  });
+
+  afterEach(async () => {
+    await app.close();
+  });
+
+  const auth = () => ({ Authorization: `Bearer ${adminToken}` });
+
+  it('records driver creation with the acting admin', async () => {
+    await http
+      .post('/v1/admin/drivers')
+      .set(auth())
+      .send({
+        phone: '07700000009',
+        displayName: 'سائق جديد',
+        vehiclePlate: '55555',
+        vehicleModel: 'Corolla',
+        vehicleColor: 'أبيض',
+      })
+      .expect(201);
+
+    const rows = db.rows('audit_log');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!['action']).toBe('driver.create');
+    expect(rows[0]!['actor_id']).toBe('admin-1');
+    expect(rows[0]!['result']).toBe('SUCCESS');
+  });
+
+  // The row that answers "who credited this driver 500,000 dinars".
+  it('records a wallet top-up with the amount and transaction id', async () => {
+    const driverId = '11111111-1111-4111-8111-111111111111';
+    db.rows('users').push({
+      id: driverId, role: 'DRIVER', phone_e164: '+9647700000002',
+      display_name: 'سائق', is_active: true,
+    });
+    db.rows('drivers').push({
+      user_id: driverId, availability: 'OFFLINE', is_suspended: false,
+      vehicle_plate: '1', vehicle_model: 'x', vehicle_color: 'y',
+      rating_sum: '0', rating_count: '0',
+    });
+
+    await http
+      .post(`/v1/admin/drivers/${driverId}/wallet/topup`)
+      .set(auth())
+      .set('Idempotency-Key', randomUUID())
+      .send({ amountIqd: 10_000, reference: 'receipt-42' })
+      .expect(201);
+
+    const topup = db.rows('audit_log').find((r) => r['action'] === 'wallet.topup');
+    expect(topup).toBeDefined();
+    expect(topup!['target_id']).toBe(driverId);
+
+    const metadata = JSON.parse(topup!['metadata'] as string) as Record<string, unknown>;
+    expect(metadata['amountIqd']).toBe(10_000);
+    expect(metadata['transactionId']).toBeTruthy();
+  });
+
+  // Suspension gets a distinct verb from an ordinary edit, so an operator
+  // filtering the log does not have to read metadata to tell them apart.
+  it('distinguishes suspension from an ordinary update', async () => {
+    const driverId = '22222222-2222-4222-8222-222222222222';
+    db.rows('users').push({
+      id: driverId, role: 'DRIVER', phone_e164: '+9647700000003',
+      display_name: 'سائق', is_active: true,
+    });
+    db.rows('drivers').push({
+      user_id: driverId, availability: 'OFFLINE', is_suspended: false,
+      vehicle_plate: '1', vehicle_model: 'x', vehicle_color: 'y',
+      rating_sum: '0', rating_count: '0',
+    });
+
+    await http
+      .patch(`/v1/admin/drivers/${driverId}`)
+      .set(auth())
+      .send({ isSuspended: true, suspendedReason: 'complaint' })
+      .expect(200);
+
+    expect(
+      db.rows('audit_log').some((r) => r['action'] === 'driver.suspend'),
+    ).toBe(true);
+  });
+
+  // "Commission changed" is not actionable. "0 -> 2500 bps by this admin" is.
+  it('records a commission change with both the old and new value', async () => {
+    await http
+      .put('/v1/admin/config')
+      .set(auth())
+      .send({ commission_bps: 2_500 })
+      .expect(200);
+
+    const row = db.rows('audit_log').find((r) => r['action'] === 'config.update');
+    expect(row).toBeDefined();
+
+    const metadata = JSON.parse(row!['metadata'] as string) as {
+      changes: Record<string, { from: number; to: number }>;
+    };
+    expect(metadata.changes['commission_bps']).toEqual({ from: 0, to: 2_500 });
+  });
+
+  // CLAUDE.md §9 - the audit log is exported for disputes, so it is a
+  // plausible route for PII to escape.
+  it('never writes a phone number into audit metadata', async () => {
+    await http
+      .post('/v1/admin/drivers')
+      .set(auth())
+      .send({
+        phone: '07700000009',
+        displayName: 'سائق جديد',
+        vehiclePlate: '55555',
+        vehicleModel: 'Corolla',
+        vehicleColor: 'أبيض',
+      })
+      .expect(201);
+
+    const serialised = JSON.stringify(db.rows('audit_log'));
+
+    // Matched as a PHONE NUMBER, not as the substring '964'. A bare substring
+    // check false-positives on any UUID that happens to contain those digits,
+    // which makes the test flaky and - worse - would let it pass or fail for
+    // reasons unrelated to PII.
+    expect(serialised).not.toMatch(/\+?964\d{9,}/);
+    expect(serialised).not.toContain('07700000009');
+  });
+
+  it('is not writable by a non-admin', async () => {
+    firebase.register('rider-token', { uid: 'fb-r', phoneNumber: '+9647700000001' });
+    const rider = await http
+      .post('/v1/auth/otp/verify')
+      .send({ firebaseIdToken: 'rider-token', role: 'RIDER' })
+      .expect(200);
+
+    await http
+      .post('/v1/admin/drivers')
+      .set({ Authorization: `Bearer ${rider.body.accessToken}` })
+      .send({
+        phone: '07700000009', displayName: 'x',
+        vehiclePlate: '1', vehicleModel: 'x', vehicleColor: 'y',
+      })
+      .expect(403);
+
+    expect(db.rows('audit_log')).toHaveLength(0);
+  });
+});

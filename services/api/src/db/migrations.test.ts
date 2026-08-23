@@ -77,13 +77,14 @@ describe('discoverMigrations', () => {
 });
 
 describe('the real migration set', () => {
-  it('discovers all four migrations in order', async () => {
+  it('discovers every migration in order', async () => {
     const found = await discoverMigrations(REAL_MIGRATIONS);
     expect(found.map((m) => `${m.id}_${m.name}`)).toEqual([
       '0001_identity',
       '0002_rides',
       '0003_ledger',
       '0004_operations',
+      '0005_audit_log',
     ]);
   });
 

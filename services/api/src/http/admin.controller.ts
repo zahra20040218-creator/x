@@ -15,6 +15,7 @@ import {
 import { randomUUID } from 'node:crypto';
 import type { Response } from 'express';
 
+import { AUDIT_ACTIONS, AuditService } from '../audit/audit.service.js';
 import type { AuthenticatedUser } from '../auth/auth.service.js';
 import { normalizeIraqiPhone, InvalidPhoneNumberError } from '../auth/phone.js';
 import { ConflictProblem, NotFoundProblem, ValidationProblem } from '../common/problem.js';
@@ -56,6 +57,7 @@ export class AdminController {
     private readonly config: PlatformConfigService,
     private readonly rides: RideRepository,
     private readonly idempotency: IdempotencyService,
+    private readonly audit: AuditService,
   ) {}
 
   // -------------------------------------------------------------------------
@@ -96,7 +98,10 @@ export class AdminController {
 
   @Post('drivers')
   @HttpCode(201)
-  async createDriver(@Body(zodBody(CreateDriverSchema)) body: CreateDriverBody) {
+  async createDriver(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Body(zodBody(CreateDriverSchema)) body: CreateDriverBody,
+  ) {
     let phone: string;
     try {
       phone = normalizeIraqiPhone(body.phone);
@@ -123,6 +128,19 @@ export class AdminController {
            VALUES ($1, $2, $3, $4)`,
           [driverId, body.vehiclePlate, body.vehicleModel, body.vehicleColor],
         );
+
+        // In the SAME transaction as the create: an audit row for a driver
+        // that was never created would be worse than no row at all.
+        await this.audit.record(tx, {
+          actorId: admin.id,
+          actorRole: 'ADMIN',
+          action: AUDIT_ACTIONS.driverCreate,
+          targetType: 'driver',
+          targetId: driverId,
+          result: 'SUCCESS',
+          // No phone, no name - scrub() would strip them anyway.
+          metadata: { vehiclePlate: body.vehiclePlate },
+        });
 
         return {
           id: driverId,
@@ -174,6 +192,7 @@ export class AdminController {
 
   @Patch('drivers/:driverId')
   async updateDriver(
+    @CurrentUser() admin: AuthenticatedUser,
     @Param('driverId') driverId: string,
     @Body(zodBody(UpdateDriverSchema)) body: UpdateDriverBody,
   ) {
@@ -208,6 +227,30 @@ export class AdminController {
           params as never,
         );
       }
+
+      // Suspension gets its own verb. "Who suspended this driver, and when"
+      // is a different question from "who edited their plate", and an
+      // operator filtering the log should not have to read metadata to tell
+      // them apart.
+      const action =
+        body.isSuspended === undefined
+          ? AUDIT_ACTIONS.driverUpdate
+          : body.isSuspended
+            ? AUDIT_ACTIONS.driverSuspend
+            : AUDIT_ACTIONS.driverUnsuspend;
+
+      await this.audit.record(tx, {
+        actorId: admin.id,
+        actorRole: 'ADMIN',
+        action,
+        targetType: 'driver',
+        targetId: id,
+        result: 'SUCCESS',
+        metadata: {
+          fields: Object.keys(body),
+          ...(body.suspendedReason ? { suspendedReason: body.suspendedReason } : {}),
+        },
+      });
     });
 
     return this.getDriver(id);
@@ -260,6 +303,22 @@ export class AdminController {
              VALUES ($1, $2, $3, $4, $5)`,
             [id, admin.id, body.amountIqd, transactionId, body.reference ?? ''],
           );
+
+          // Money moved. This is the row that answers "who credited this
+          // driver", and it commits with the credit or not at all.
+          await this.audit.record(tx, {
+            actorId: admin.id,
+            actorRole: 'ADMIN',
+            action: AUDIT_ACTIONS.walletTopUp,
+            targetType: 'driver',
+            targetId: id,
+            result: 'SUCCESS',
+            metadata: {
+              amountIqd: body.amountIqd,
+              transactionId,
+              ...(body.reference ? { reference: body.reference } : {}),
+            },
+          });
 
           return {
             driverId: id,
@@ -446,6 +505,25 @@ export class AdminController {
 
       const row = updated.rows[0];
       if (!row) throw new ConflictProblem('This dispute has already been resolved.');
+
+      await this.audit.record(tx, {
+        actorId: admin.id,
+        actorRole: 'ADMIN',
+        action: AUDIT_ACTIONS.disputeResolve,
+        targetType: 'dispute',
+        targetId: id,
+        result: 'SUCCESS',
+        metadata: {
+          outcome: body.outcome,
+          rideId: dispute.ride_id,
+          // The adjustment is the part with financial consequence, so it is
+          // recorded explicitly rather than left inside a free-text field.
+          ...(body.adjustmentIqd !== undefined
+            ? { adjustmentIqd: body.adjustmentIqd }
+            : {}),
+        },
+      });
+
       return presentDispute(row);
     });
   }
@@ -464,7 +542,29 @@ export class AdminController {
     @CurrentUser() admin: AuthenticatedUser,
     @Body(zodBody(UpdateConfigSchema)) body: Partial<Record<ConfigKey, number>>,
   ) {
-    return this.config.update(this.db, body, admin.id);
+    const before = await this.config.read(this.db);
+    const after = await this.config.update(this.db, body, admin.id);
+
+    // Both values recorded. "Commission changed" is not actionable; "commission
+    // went from 0 to 2500 bps at 03:14 by this admin" is.
+    await this.audit.record(this.db, {
+      actorId: admin.id,
+      actorRole: 'ADMIN',
+      action: AUDIT_ACTIONS.configUpdate,
+      targetType: 'platform_config',
+      targetId: Object.keys(body).join(','),
+      result: 'SUCCESS',
+      metadata: {
+        changes: Object.fromEntries(
+          Object.keys(body).map((key) => [
+            key,
+            { from: before[key as ConfigKey], to: after[key as ConfigKey] },
+          ]),
+        ),
+      },
+    });
+
+    return after;
   }
 }
 

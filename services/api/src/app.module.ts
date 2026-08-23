@@ -1,6 +1,7 @@
 import { Module, type DynamicModule } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
+import { AuditService } from './audit/audit.service.js';
 import { AuthService } from './auth/auth.service.js';
 import {
   FIREBASE_VERIFIER,
@@ -86,6 +87,7 @@ export class AppModule {
     );
 
     const auth = new AuthService(database, firebase, tokens);
+    const audit = new AuditService(logger);
     const ledger = new LedgerService();
     const fare = new FareCalculator();
     const platformConfig = new PlatformConfigService(clock);
@@ -153,6 +155,7 @@ export class AppModule {
 
         { provide: TokenService, useValue: tokens },
         { provide: AuthService, useValue: auth },
+        { provide: AuditService, useValue: audit },
         { provide: LedgerService, useValue: ledger },
         { provide: FareCalculator, useValue: fare },
         { provide: PlatformConfigService, useValue: platformConfig },
