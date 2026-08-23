@@ -27,6 +27,7 @@ import { LedgerService } from './ledger/ledger.service.js';
 import { FcmSender, parseServiceAccount } from './push/fcm-sender.js';
 import { UnconfiguredPushSender, type PushSender } from './push/push.port.js';
 import { PushService } from './push/push.service.js';
+import { METRICS, MetricsRegistry } from './observability/metrics.js';
 import { DriverPresenceService } from './matching/driver-presence.service.js';
 import { MatchingService } from './matching/matching.service.js';
 import { RideClaimService } from './matching/ride-claim.service.js';
@@ -110,6 +111,8 @@ export class AppModule {
     }
 
     const push = new PushService(database, pushSender, clock, logger);
+
+    const metrics = new MetricsRegistry();
     const fare = new FareCalculator();
     const platformConfig = new PlatformConfigService(clock);
     const stateMachine = new RideStateMachine();
@@ -179,6 +182,8 @@ export class AppModule {
         { provide: AuditService, useValue: audit },
         { provide: LedgerService, useValue: ledger },
         { provide: PushService, useValue: push },
+        { provide: METRICS, useValue: metrics },
+        { provide: 'METRICS_TOKEN', useValue: config.METRICS_TOKEN },
         { provide: FareCalculator, useValue: fare },
         { provide: PlatformConfigService, useValue: platformConfig },
         { provide: RideStateMachine, useValue: stateMachine },

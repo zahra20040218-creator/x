@@ -78,6 +78,19 @@ export const ConfigSchema = z.object({
   FCM_SERVICE_ACCOUNT_JSON: z.string().min(1).optional(),
 
   /**
+   * Bearer token required to scrape `/v1/metrics`.
+   *
+   * When unset the endpoint returns 404 and the metrics are simply not
+   * exposed. Fail-closed on purpose: metrics describe traffic shape, ride
+   * volume and error rates, which is competitive and operational information,
+   * and an endpoint that is open by default is open in production too.
+   *
+   * 404 rather than 401 so an unauthenticated scan cannot even learn that
+   * metrics exist here.
+   */
+  METRICS_TOKEN: z.string().min(16).optional(),
+
+  /**
    * Comma-separated origins allowed to call the API from a browser.
    *
    * An ALLOWLIST, never `*`. The admin panel sends a bearer token, and `*` with

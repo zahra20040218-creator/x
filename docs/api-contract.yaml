@@ -158,6 +158,30 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /metrics:
+    get:
+      tags: [ops]
+      operationId: getMetrics
+      summary: Prometheus metrics.
+      description: >
+        CONTRACT CHANGE, 2026-08-23. Added with the observability work.
+
+        Requires `Authorization: Bearer $METRICS_TOKEN`. When METRICS_TOKEN is
+        unset the endpoint returns 404 and metrics are not exposed at all -
+        fail-closed, because ride volume and error rates are operational and
+        competitive information.
+
+        Returns 404 rather than 401 on a bad token, so a scan cannot learn that
+        metrics exist here.
+      responses:
+        '200':
+          description: Metrics in Prometheus text exposition format.
+          content:
+            text/plain:
+              schema: { type: string }
+        '404':
+          description: Metrics are disabled, or the token was wrong.
+
   /devices:
     post:
       tags: [shared]

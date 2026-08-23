@@ -10,6 +10,7 @@ import { corsOrigins, loadConfig } from './common/config.js';
 import { createLogger, newRequestId, runWithRequestContext } from './common/logger.js';
 import { DATABASE, type Database } from './db/db.port.js';
 import { ProblemFilter } from './http/problem.filter.js';
+import { METRICS, type MetricsRegistry } from './observability/metrics.js';
 import { AuthGuard } from './http/auth.guard.js';
 import { RateLimitGuard } from './http/rate-limit.js';
 import { RealtimeGateway } from './realtime/realtime.gateway.js';
@@ -60,6 +61,40 @@ async function bootstrap(): Promise<void> {
     const requestId = typeof header === 'string' && header.length <= 200 ? header : newRequestId();
     res.setHeader('X-Request-Id', requestId);
     runWithRequestContext({ requestId }, () => next());
+  });
+
+  // HTTP metrics.
+  //
+  // Registered AFTER the request-id middleware so a metric and a log line
+  // describe the same request, and BEFORE the guards so a 401 or a 429 is
+  // counted - those are precisely the responses worth alerting on, and a
+  // middleware behind the guards would never see them.
+  const metrics = app.get<MetricsRegistry>(METRICS);
+  app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const startedAt = process.hrtime.bigint();
+
+    res.once('finish', () => {
+      // The ROUTE PATTERN, never the URL. `/rides/:rideId` is one time series;
+      // the concrete path would create one per ride and eventually take the
+      // metrics backend down - and it would put ride ids, which CLAUDE.md §9
+      // treats as identifying, into a system with weaker access control than
+      // the database.
+      const route =
+        (req as unknown as { route?: { path?: string } }).route?.path ?? 'unmatched';
+
+      const labels = { method: req.method, route };
+      const seconds = Number(process.hrtime.bigint() - startedAt) / 1e9;
+
+      metrics.httpDuration.observe(seconds, labels);
+      // Status CLASS, not the exact code: 2xx/4xx/5xx is what a dashboard
+      // asks about, and it keeps cardinality to three series per route.
+      metrics.httpRequests.inc({
+        ...labels,
+        status: `${Math.floor(res.statusCode / 100)}xx`,
+      });
+    });
+
+    next();
   });
 
   // Security headers. Second-pass audit finding S-6: none were set at all.

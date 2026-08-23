@@ -19,6 +19,7 @@ import { processWebhook } from '../payments/webhook.js';
 import { REDIS, type RedisPort } from '../redis/redis.port.js';
 import { RideRepository } from '../rides/ride.repository.js';
 import { CurrentUser, Public } from './auth.guard.js';
+import { METRICS, MetricsRegistry } from '../observability/metrics.js';
 import { NoRateLimit, RateLimit } from './rate-limit.js';
 import { OpenDisputeSchema } from './schemas.js';
 import { zodBody } from './zod.pipe.js';
@@ -31,6 +32,8 @@ export class OpsController {
     private readonly rides: RideRepository,
     private readonly ledger: LedgerService,
     @Inject('GATEWAY_WEBHOOK_SECRET') private readonly gatewaySecret: string | undefined,
+    @Inject('METRICS_TOKEN') private readonly metricsToken: string | undefined,
+    @Inject(METRICS) private readonly metricsRegistry: MetricsRegistry,
   ) {}
 
   /** Liveness. Deliberately touches nothing — it answers "is the process up". */
@@ -66,6 +69,33 @@ export class OpsController {
    * Listed under /admin/disputes in the contract because that is where the
    * collection lives, but the POST is not admin-only.
    */
+  /**
+   * Prometheus scrape endpoint. See docs/api-contract.yaml (added 2026-08-23).
+   *
+   * `@NoRateLimit` for the same reason as the health checks: a scrape that
+   * gets 429 shows up as a gap in the graphs, and a gap in the graphs during
+   * an incident is exactly when you need them.
+   */
+  @Get('metrics')
+  @Public()
+  @NoRateLimit()
+  metrics(
+    @Headers('authorization') authorization: string | undefined,
+    @Res({ passthrough: true }) response: Response,
+  ): string {
+    const expected = this.metricsToken;
+
+    // Disabled, or wrong token - both answer 404. A 401 would confirm that
+    // metrics are served from this host, which is information a scanner has
+    // not earned.
+    if (!expected || authorization !== `Bearer ${expected}`) {
+      throw new NotFoundProblem('Endpoint');
+    }
+
+    response.setHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+    return this.metricsRegistry.render();
+  }
+
   @Post('admin/disputes')
   @HttpCode(201)
   async openDispute(
