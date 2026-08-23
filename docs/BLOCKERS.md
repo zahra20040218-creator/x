@@ -102,6 +102,28 @@ single-vehicle-class launch with 10 drivers add risk without adding revenue.
 
 ---
 
+## BLOCKER-8 · Revenue model conflict · **DEFERRED BY OWNER (2026-08-23)**
+
+Surfaced by reading the owner's own `خطة-درب-v3.md`, found on this machine.
+
+| | `CLAUDE.md` §6.5 (binding here) | `خطة-درب-v3.md` (owner's strategy) |
+|---|---|---|
+| Commission | configurable, default 0 | **zero forever, by identity** — "لا يملك أحد تغييره" |
+| Revenue | commission when set | **voluntary ZainCash donations**, supporter badge, explicitly **no ride priority** |
+| Transparency | not specified | public `/pricing` and `/transparency` pages |
+| Licence | not specified | AGPL-3.0 |
+
+**Owner decided: defer.** No code change, no donation system built, and
+`CLAUDE.md` not edited to erase the difference — same treatment as BLOCKER-2.
+
+**Why it matters when it is taken up:** at `commission_bps = 0` the platform
+earns nothing per ride. Under the strategy document that is correct and
+intended, and the donation ladder is the funding mechanism. Under the current
+constitution it reads as an unset config. Both cannot be true, and the code
+today implements neither donation flow.
+
+---
+
 ## Category: ENVIRONMENT REQUIRED
 
 ## BLOCKER-3 · Docker not installed · **ENVIRONMENT**

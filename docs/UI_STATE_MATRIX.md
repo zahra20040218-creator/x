@@ -80,6 +80,37 @@ localised strings for the empty cases.
 
 ---
 
+## Map states — inherited from the earlier Kotlin/Compose project
+
+The map screens are not built yet, so this is a specification rather than a
+status. It is worth writing down now because it came from a project that
+already shipped these screens once, and the list is longer than the four states
+everything else here uses.
+
+| State | Why it is separate |
+|---|---|
+| loading | tiles requested, nothing drawn yet |
+| ready | |
+| style error | the style URL failed — distinct from tiles failing, and fixed differently |
+| tiles timeout | network is up, tile server is not. Retry helps; the style error case does not |
+| offline | no network at all |
+| GPS disabled | location services off at the OS level. The fix is a settings intent, not a permission prompt |
+| permission denied | can still be asked again |
+| **permission permanently denied** | **cannot be asked again** |
+
+The last distinction is the one worth carrying over. Android stops showing the
+permission dialog after two refusals, so an app that treats "denied" and
+"permanently denied" as one state leaves the user tapping a button that can
+never do anything — and the only way forward is a link into system settings.
+
+That is exactly the defect already fixed in
+`apps/driver/lib/screens/battery_exemption_screen.dart`. It will recur on the
+map screens unless the distinction is built in from the start.
+
+Source: `ANDROID_INVENTORY.md` in the prior project. See `docs/PRIOR_PROJECTS.md`.
+
+---
+
 ## Still open
 
 | Gap | Why it is not fixed here |
