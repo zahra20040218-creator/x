@@ -1,19 +1,19 @@
 BOOTSTRAP_DONE
-IN_PROGRESS
+ALL_TASKS_RESOLVED
 
-NOT ALL_TASKS_RESOLVED.
+Every task in TASKS.md is now [x] or [BLOCKED]. Nothing is left unstarted.
 
-AGENT_LOOP_PROMPT.md says to write ALL_TASKS_RESOLVED only when EVERY task is
-[x] or [BLOCKED]. 23 of 44 tasks are still [ ] - not blocked, simply not built.
-Writing the completion marker here would tell run.sh to stop and would tell the
-owner the work is finished. It is not.
+  [x]       32
+  [BLOCKED] 12   (absent toolchains, not failing code - see BLOCKED.md)
+  [ ]        0
 
-  [x]       15
-  [BLOCKED]  6   (no Docker / no Postgres / no Flutter - see BLOCKED.md)
-  [ ]       23
-
-  524 unit tests passing, 0 failing, 0 skipped-to-pass.
+  611 tests passing (600 API + 11 admin), 0 failing, 0 skipped-to-pass.
   tsc --noEmit clean. eslint clean. All per-file 95% coverage gates pass.
+
+ALL_TASKS_RESOLVED means the LOOP is finished. It does NOT mean the product is
+safe to ship. One P0-class risk is UNRESOLVED: the in-memory Redis has never
+been checked against a real Redis, so the double-accept guarantee is
+designed-and-unit-tested rather than verified (DEFECTS.md D-2).
 
 Read FINAL_REPORT.md first, then VERIFY.md.
 If the two disagree, VERIFY.md is correct.
