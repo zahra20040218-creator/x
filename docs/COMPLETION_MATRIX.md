@@ -8,7 +8,7 @@ Every requirement, its status, and the command that proves it.
 **and passing** · typecheck clean · lint clean · **and I ran the command
 myself**. Anything I could not execute here is `BLOCKED`, never `DONE`.
 
-**Last verified:** 2026-08-23 (fourth pass, commercial audit) · **687 backend + 11 admin tests, 0 skipped.**
+**Last verified:** 2026-08-23 (fifth pass, real PostgreSQL) · **702 backend + 11 admin tests, 0 skipped** — 16 of them against **real PostgreSQL 17.11 + PostGIS 3.6**, no Docker, no administrator rights.
 
 > **See `FINAL_COMMERCIAL_AUDIT.md`.** Two rows below were downgraded after the
 > commercial audit: the admin panel is not an application (`vite build` fails
@@ -44,7 +44,7 @@ curl -s http://localhost:4123/v1/health/ready  # degraded, PG+Redis fail  503
 |---|---|---|---|---|---|
 | Money is integer minor units, never float | **DONE** | branded `IqdAmount`; 6 BIGINT columns asserted against DDL; integer-only bps | `iqd.test.ts`, `migrations.test.ts` | `npx vitest run` | 59 + 23 pass |
 | Double-entry ledger, balanced | **DONE** | service refuses unbalanced writes; DB trigger as second layer | `ledger.service.test.ts` | `npx vitest run` | 33 pass |
-| Ledger append-only | **PARTIAL** | no update/delete method exists; **DB trigger never executed** | `ledger.service.test.ts` | needs Postgres | service ✅ / schema ⛔ |
+| Ledger append-only | **DONE** | service refuses; **and the DB trigger was executed** — UPDATE and DELETE both rejected on real PostgreSQL | `ledger.service.test.ts`, `real-postgres.test.ts` | `REAL_INFRA=1 vitest --project integration` | **verified 2026-08-23** |
 | Wallet balance derived, not stored | **DONE** | `SUM(credits) - SUM(debits)`; no counter column | `ledger.service.test.ts` | `npx vitest run` | pass |
 | Commission configurable, default 0, no deploy | **DONE** | TTL cache; snapshotted per ride | `platform-config.service.test.ts` | `npx vitest run` | 23 pass |
 | Ride state machine, illegal transitions fail | **DONE** | 16 rules; all 121 pairs walked; 409 not silent | `ride-state-machine.test.ts` | `npx vitest run` | 28 pass |
@@ -106,7 +106,7 @@ $ grep -rnE "\+9647[0-9]{9}" services/api/src --include=*.ts | grep -v .test.
 | Graceful degradation | **DONE** | starts with no PG and no Redis; readiness 503 | — | curl `/v1/health/ready` | **verified** |
 | Health checks | **DONE** | liveness touches nothing; readiness checks both | `api.e2e.test.ts` | `npx vitest run` | pass |
 | Structured logging + request_id | **DONE** | request_id present in every response and log line | `logger.test.ts` | curl output | **verified** |
-| Migrations forward + reversible | **BLOCKED** | 5 up + 5 down, safety-checked | `migrations.test.ts` (static) | needs Postgres | **never executed** |
+| Migrations forward + reversible | **DONE** | 6 up + 6 down, applied to a real database and reverted cleanly | `migrations.test.ts`, live run | `node dist/db/migrate.js up` / `down 6` / `up` | **up→down→up all clean** |
 | Docker Compose | **BLOCKED** | PostGIS, PgBouncer txn mode, Redis AOF, api, worker | — | needs Docker | **never run** |
 | CI pipeline | **BLOCKED** | full workflow incl. real-Redis skip-detector | — | needs a push | **never run** |
 | BullMQ workers | **BLOCKED** | 4 recurring jobs, separate process | — | needs Redis | **never run** |

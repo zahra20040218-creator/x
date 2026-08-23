@@ -14,9 +14,9 @@
     "coverage": "vitest run --coverage",
     "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\"",
     "typecheck": "tsc --noEmit",
-    "migrate:up": "node --experimental-strip-types src/db/migrate.ts up",
-    "migrate:down": "node --experimental-strip-types src/db/migrate.ts down",
-    "seed": "node --experimental-strip-types src/db/seed.ts"
+    "migrate:up": "pnpm build && node dist/db/migrate.js up",
+    "migrate:down": "pnpm build && node dist/db/migrate.js down",
+    "seed": "pnpm build && node dist/db/seed.js"
   },
   "dependencies": {
     "@nestjs/common": "11.1.6",

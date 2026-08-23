@@ -158,10 +158,22 @@ export function assertRealRedis(redis: RedisPort): void {
 export async function truncateAll(database: Database): Promise<void> {
   assertRealDatabase(database);
 
+  // Excludes two categories that must survive:
+  //   schema_migrations - truncating it would make the next run re-apply every
+  //     migration on top of an existing schema.
+  //   PostGIS's own tables - `spatial_ref_sys` holds several thousand
+  //     projection definitions that the extension installs. Emptying it does
+  //     not fail loudly; it makes every later coordinate transform wrong.
   const result = await database.query<{ tablename: string }>(
-    `SELECT tablename FROM pg_tables
-      WHERE schemaname = current_schema()
-        AND tablename <> 'schema_migrations'`,
+    `SELECT c.relname AS tablename
+       FROM pg_class c
+       JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = current_schema()
+        AND c.relkind = 'r'
+        AND c.relname <> 'schema_migrations'
+        AND c.oid NOT IN (
+          SELECT objid FROM pg_depend WHERE deptype = 'e' AND classid = 'pg_class'::regclass
+        )`,
   );
 
   if (result.rows.length === 0) {

@@ -290,3 +290,108 @@ No PostgreSQL, no Redis, no Docker, no Flutter, no device, no k6. Migration
 0006 has never been applied to a real database: `session_id` and the partial
 index that serves the per-request liveness check exist only as SQL text and in
 the fake. Every rate-limit count was produced by the in-memory Redis fake.
+
+---
+
+# REAL POSTGRESQL — 2026-08-23
+
+**Achieved without administrator rights, without Docker, and without restarting
+the machine.** Docker was installed but needs a reboot to start its engine; the
+disk was also 100% full. Neither turned out to be a hard blocker for PostgreSQL.
+
+## How
+
+```
+pnpm store prune                       # 2.6 GB -> 6.5 GB free
+PostgreSQL 17.11 binaries (EnterpriseDB ZIP, no installer, no service)
+PostGIS 3.6.2 bundle (OSGeo), added with cp -n so nothing EDB shipped is overwritten
+initdb -D data -U postgres -A trust
+pg_ctl start -o "-p 5433 -c listen_addresses=127.0.0.1"
+```
+
+## Migrations — executed for the first time
+
+```
+$ node dist/db/migrate.js up
+  applying 0001_identity ... ok      applying 0004_operations ... ok
+  applying 0002_rides ... ok         applying 0005_audit_log ... ok
+  applying 0003_ledger ... ok        applying 0006_sessions ... ok
+Done: 6 migration(s) applied.
+
+$ node dist/db/migrate.js down 6     # all six reverted, 2 tables left
+$ node dist/db/migrate.js up         # clean re-apply
+```
+
+**Two defects were found in the first minute of doing this** — see D-17 and
+D-18. `migrate:up` had never been runnable, and the compiled path exited **0
+while applying nothing**.
+
+## Results — 16 integration tests against real PostgreSQL
+
+```
+[REAL_INFRA=on] postgres=REAL redis=FAKE
+
+✓ transaction isolation > keeps a committed write when concurrent transactions roll back
+✓ transaction isolation > rolls back only the failing transaction
+✓ concurrent acceptance > lets exactly one of twenty real concurrent transactions accept
+✓ concurrent acceptance > enforces one active ride per driver at the index level
+✓ ledger > is append-only: UPDATE is refused by the trigger
+✓ ledger > is append-only: DELETE is refused by the trigger
+✓ money columns > are BIGINT in every table that stores money
+✓ money columns > returns wallet balances as strings, which the code must parse
+✓ money columns > rejects a phone number that is not E.164 Iraqi
+✓ sessions (migration 0006) > has the session_id column and its partial index
+
+Tests  16 passed (16)
+```
+
+**D-15 is closed.** The fake erased a committed write when concurrent
+transactions rolled back; real PostgreSQL keeps it. That divergence was real,
+and the guarantee now rests on the real thing.
+
+**D-2's Postgres half is closed.** Twenty real concurrent transactions ran the
+production guard `UPDATE ... WHERE status = 'OFFERED'`; exactly one matched a
+row. The `rides_one_active_per_driver_uq` backstop fires as designed. **The
+Redis half remains open** — Redis has no official Windows build.
+
+## Four failures on the first run, all mine
+
+Recorded because "the tests failed" is the interesting part:
+
+| Failure | Cause |
+|---|---|
+| `rides_one_active_per_rider_uq` violated | My test made two rides for one rider. There is a per-rider constraint the fake never enforced |
+| `rides_completed_has_fare` violated (×2) | My test created COMPLETED rides with no fare. A real CHECK rejects that |
+| `expected 'numeric' to be 'bigint'` | My assertion matched a **view** column. `driver_wallet_balances.balance_iqd` is `numeric` because `SUM(bigint)` is numeric in PostgreSQL — not a §6.1 violation, and nothing is stored as numeric |
+
+**None was a product defect.** The last one did surface something worth having:
+node-postgres returns `numeric` and `bigint` as **strings**, while the fake
+returns JS numbers. The production code already handles this correctly
+(`parseSignedIqdFromDb`, `Number(row.balance_iqd)`) — but nothing had ever
+proved it, so there is now a test that does.
+
+## Full suite
+
+```
+$ REAL_INFRA=1 TEST_DATABASE_URL=... npx vitest run
+  Test Files  24 passed (24)
+       Tests  702 passed (702)      # 0 skipped
+$ npx tsc --noEmit    -> 0
+$ npx eslint          -> 0
+```
+
+## Restarting this environment later
+
+```bash
+/c/Users/moaay/pg17/pgsql/bin/pg_ctl.exe \
+  -D /c/Users/moaay/pg17/data -l /c/Users/moaay/pg17/pg.log \
+  -o "-p 5433 -c listen_addresses=127.0.0.1" start
+```
+Stop with `pg_ctl -D ... stop -m fast`. Delete `C:\Users\moaay\pg17` to remove
+it entirely — it is a plain directory, not a Windows service.
+
+## What this run does NOT prove
+
+Redis is still a fake in every test. The API has never been run as more than
+one instance. No load test. The mobile apps still cannot be built. `REAL_INFRA`
+runs print `redis=FAKE` precisely so this cannot be misread later.

@@ -42,6 +42,7 @@ const describeReal = RUN ? describe : describe.skip;
 const RIDER = '11111111-1111-4111-8111-111111111111';
 const DRIVER_A = 'aaaaaaaa-1111-4111-8111-111111111111';
 const DRIVER_B = 'bbbbbbbb-1111-4111-8111-111111111111';
+const RIDER_B = '22222222-1111-4111-8111-111111111111';
 const TRANSACTION = 'cccccccc-1111-4111-8111-111111111111';
 
 describeReal('real PostgreSQL', () => {
@@ -65,10 +66,11 @@ describeReal('real PostgreSQL', () => {
       `INSERT INTO users (id, role, phone_e164, display_name)
        VALUES ($1,'RIDER','+9647700000001','راكب'),
               ($2,'DRIVER','+9647700000002','سائق أ'),
-              ($3,'DRIVER','+9647700000003','سائق ب')`,
-      [RIDER, DRIVER_A, DRIVER_B],
+              ($3,'DRIVER','+9647700000003','سائق ب'),
+              ($4,'RIDER','+9647700000004','راكب ب')`,
+      [RIDER, DRIVER_A, DRIVER_B, RIDER_B],
     );
-    await db.query(`INSERT INTO riders (user_id) VALUES ($1)`, [RIDER]);
+    await db.query(`INSERT INTO riders (user_id) VALUES ($1), ($2)`, [RIDER, RIDER_B]);
     await db.query(
       `INSERT INTO drivers (user_id, vehicle_plate, vehicle_model, vehicle_color)
        VALUES ($1,'11111','Corolla','أبيض'), ($2,'22222','Corolla','أسود')`,
@@ -76,14 +78,30 @@ describeReal('real PostgreSQL', () => {
     );
   });
 
-  async function createRide(status = 'REQUESTED'): Promise<string> {
+  /**
+   * `final_fare_iqd` and `commission_iqd` are set for COMPLETED rides because
+   * of the `rides_completed_has_fare` CHECK - a completed ride without a fare
+   * is not a valid row. The fake never enforced this, so the first real run
+   * rejected it.
+   */
+  async function createRide(status = 'REQUESTED', rider = RIDER): Promise<string> {
+    const completed = status === 'COMPLETED';
     const result = await db.query<{ id: string }>(
       `INSERT INTO rides
          (rider_id, status, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng,
-          estimated_fare_iqd, estimated_distance_m, estimated_duration_s)
-       VALUES ($1, $2::ride_status, 33.3061, 44.4213, 33.2989, 44.4361, 5000, 1500, 300)
+          estimated_fare_iqd, estimated_distance_m, estimated_duration_s,
+          driver_id, final_fare_iqd, commission_iqd, accepted_at, started_at, completed_at)
+       VALUES ($1, $2::ride_status, 33.3061, 44.4213, 33.2989, 44.4361, 5000, 1500, 300,
+               $3, $4, $5, $6, $6, $6)
        RETURNING id`,
-      [RIDER, status],
+      [
+        rider,
+        status,
+        completed ? DRIVER_A : null,
+        completed ? 5000 : null,
+        completed ? 0 : null,
+        completed ? new Date() : null,
+      ],
     );
     return result.rows[0]!.id;
   }
@@ -200,8 +218,10 @@ describeReal('real PostgreSQL', () => {
     });
 
     it('enforces one active ride per driver at the index level', async () => {
-      const first = await createRide('OFFERED');
-      const second = await createRide('OFFERED');
+      // Two riders: one active ride per RIDER is separately enforced, and
+      // tripping that constraint would never reach the driver one.
+      const first = await createRide('OFFERED', RIDER);
+      const second = await createRide('OFFERED', RIDER_B);
 
       await db.query(`UPDATE rides SET driver_id = $1, status = 'ACCEPTED' WHERE id = $2`, [
         DRIVER_A,
@@ -244,18 +264,48 @@ describeReal('real PostgreSQL', () => {
   });
 
   describe('money columns', () => {
-    it('are BIGINT, not floating point', async () => {
-      const result = await db.query<{ column_name: string; data_type: string }>(
-        `SELECT column_name, data_type
-           FROM information_schema.columns
-          WHERE table_schema = current_schema()
-            AND (column_name LIKE '%_iqd' OR column_name = 'amount_iqd')`,
+    it('are BIGINT in every table that stores money', async () => {
+      // BASE TABLES only. The first run of this test also matched
+      // `driver_wallet_balances.balance_iqd`, which is a VIEW column and comes
+      // back `numeric` simply because SUM(bigint) is numeric in PostgreSQL.
+      // That is not a CLAUDE.md §6.1 violation - nothing is stored as numeric,
+      // and numeric is exact rather than floating point. Asserting on views
+      // was the test being wrong, not the schema.
+      const result = await db.query<{ table_name: string; data_type: string }>(
+        `SELECT c.table_name, c.data_type
+           FROM information_schema.columns c
+           JOIN information_schema.tables t
+             ON t.table_schema = c.table_schema AND t.table_name = c.table_name
+          WHERE c.table_schema = current_schema()
+            AND t.table_type = 'BASE TABLE'
+            AND c.column_name LIKE '%_iqd'`,
       );
 
       expect(result.rows.length).toBeGreaterThan(0);
       for (const row of result.rows) {
-        expect(row.data_type).toBe('bigint');
+        expect(`${row.table_name}.${row.data_type}`).toBe(`${row.table_name}.bigint`);
       }
+    });
+
+    /**
+     * The consequence of that numeric view column, which the fake hid.
+     *
+     * node-postgres returns `numeric` (and `bigint`) as a STRING, because both
+     * can exceed JS integer precision. The fake returns JS numbers, so any code
+     * doing arithmetic straight off the row would look correct in every test
+     * and be wrong in production.
+     */
+    it('returns wallet balances as strings, which the code must parse', async () => {
+      const rideId = await createRide('COMPLETED');
+      await seedBalancedLedger(rideId);
+
+      const result = await db.query<{ balance_iqd: unknown }>(
+        `SELECT balance_iqd FROM driver_wallet_balances WHERE driver_id = $1`,
+        [DRIVER_A],
+      );
+
+      expect(typeof result.rows[0]!.balance_iqd).toBe('string');
+      expect(Number(result.rows[0]!.balance_iqd)).toBe(5000);
     });
 
     it('rejects a phone number that is not E.164 Iraqi', async () => {

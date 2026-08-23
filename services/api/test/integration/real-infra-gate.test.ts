@@ -70,21 +70,28 @@ describe('real-infrastructure harness', () => {
    * and "0 skipped" was previously being cited as evidence that everything had
    * run. This always executes and always says which mode it was in.
    */
-  it('states plainly whether this run touched real infrastructure', () => {
+  it('states plainly which services this run touched', () => {
     const real = isRealInfraRequested();
     const hasDb = Boolean(process.env['TEST_DATABASE_URL']);
     const hasRedis = Boolean(process.env['TEST_REDIS_URL']);
 
-    if (!real) {
-      // eslint-disable-next-line no-console -- the whole point of this test
-      console.warn(
-        '\n[REAL_INFRA=off] This run used the in-memory fakes.\n' +
-          '  D-2 (real Redis) and D-15 (real Postgres concurrency) remain OPEN.\n' +
-          '  Do not report this run as verification against real infrastructure.\n' +
-          '  To close them: see test/support/real-infra.ts\n',
-      );
-    }
+    // Partial is allowed and NAMED, never averaged into "real infrastructure".
+    // The two services are genuinely separable here: PostgreSQL runs from a
+    // portable build with no administrator rights, while Redis has no official
+    // Windows build at all. A run may honestly have one and not the other, and
+    // saying which is the whole job of this test.
+    const line = `postgres=${hasDb ? 'REAL' : 'FAKE'} redis=${hasRedis ? 'REAL' : 'FAKE'}`;
 
-    expect(real ? hasDb && hasRedis : true).toBe(true);
+    // eslint-disable-next-line no-console -- the whole point of this test
+    console.warn(
+      `\n[REAL_INFRA=${real ? 'on' : 'off'}] ${line}\n` +
+        (hasDb ? '' : '  D-15 (Postgres transaction isolation) remains OPEN.\n') +
+        (hasRedis ? '' : '  D-2 (real Redis atomic claim) remains OPEN.\n') +
+        '  Report only the services marked REAL as verified.\n',
+    );
+
+    // Demanding real infrastructure and configuring none of it is a mistake,
+    // not a mode.
+    expect(real ? hasDb || hasRedis : true).toBe(true);
   });
 });
