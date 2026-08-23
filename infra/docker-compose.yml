@@ -13,8 +13,11 @@ services:
       POSTGRES_DB: rideapp
     ports:
       - "5432:5432"
+    # Creates rideapp_test alongside rideapp on first start, so the test suite
+    # TRUNCATEs its own database and never the development one.
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./initdb:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U rideapp -d rideapp"]
       interval: 5s
@@ -88,6 +91,10 @@ services:
       DATABASE_MIGRATION_URL: postgresql://rideapp:rideapp@postgres:5432/rideapp
       REDIS_URL: redis://redis:6379
       JWT_SECRET: local-development-secret-not-for-any-real-deployment
+      # Required by ConfigSchema - the process refuses to boot without it.
+      # This is a project ID, not a credential; it is public in every client
+      # bundle. Real token verification still needs Google's JWKS.
+      FIREBASE_PROJECT_ID: rideapp-local
     ports:
       - "3000:3000"
     command: ["node", "dist/main.js"]
@@ -106,6 +113,7 @@ services:
       DATABASE_URL: postgresql://rideapp:rideapp@pgbouncer:5432/rideapp
       REDIS_URL: redis://redis:6379
       JWT_SECRET: local-development-secret-not-for-any-real-deployment
+      FIREBASE_PROJECT_ID: rideapp-local
     # CLAUDE.md §3.2 - queues are a separate process. If workers share the API
     # process, a slow FCM call steals event-loop time from request handling.
     command: ["node", "dist/worker.js"]
