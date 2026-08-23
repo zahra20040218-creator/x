@@ -44,6 +44,16 @@ export const ConfigSchema = z.object({
   IDEMPOTENCY_TTL_SECONDS: intFromEnv(60, 604_800).default(86_400),
 
   GATEWAY_WEBHOOK_SECRET: z.string().min(16).optional(),
+
+  /**
+   * Comma-separated origins allowed to call the API from a browser.
+   *
+   * An ALLOWLIST, never `*`. The admin panel sends a bearer token, and `*` with
+   * credentials would let any site on the internet issue admin requests from a
+   * logged-in operator's browser. Empty means "no browser client", which is
+   * correct for a deployment that only serves the mobile apps.
+   */
+  CORS_ALLOWED_ORIGINS: z.string().default(''),
 });
 
 export type AppConfig = Readonly<z.infer<typeof ConfigSchema>>;
@@ -76,7 +86,24 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     ]);
   }
 
+  // `*` is refused outright rather than warned about. With credentials it is
+  // not a lax setting, it is an open door to every admin action.
+  if (config.CORS_ALLOWED_ORIGINS.split(',').some((o) => o.trim() === '*')) {
+    throw new ConfigError([
+      'CORS_ALLOWED_ORIGINS must not contain "*". The API is called with a ' +
+        'bearer token, and a wildcard origin would let any website issue ' +
+        'admin requests from a logged-in operator browser. List origins explicitly.',
+    ]);
+  }
+
   return Object.freeze(config);
+}
+
+/** Parsed allowlist. Empty array means no browser client is permitted. */
+export function corsOrigins(config: AppConfig): string[] {
+  return config.CORS_ALLOWED_ORIGINS.split(',')
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
 }
 
 /** DI token for the config object. */

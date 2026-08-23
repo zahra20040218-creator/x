@@ -15,7 +15,7 @@ import {
  * a phone three refactors later. So these tests are mostly about nesting.
  */
 
-const PHONE = '+9647701234567';
+const PHONE = '+9647700000001';
 
 describe('redact', () => {
   it('removes a phone at the top level', () => {

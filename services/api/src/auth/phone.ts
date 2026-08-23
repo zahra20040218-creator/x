@@ -5,7 +5,7 @@
  *   input:   accept 07XXXXXXXXX and normalise server-side
  *
  * Getting this wrong does not throw - it creates a SECOND account for the same
- * human. They sign up as 07701234567, come back later and type +9647701234567,
+ * human. They sign up as 07700000001, come back later and type +9647700000001,
  * and their ride history is gone. So normalisation is centralised, total, and
  * tested against every form a person might actually type, including the ones
  * with spaces and dashes that a phone keypad produces.
@@ -35,11 +35,11 @@ const E164 = /^\+964(7[45789]\d{8})$/;
  * Normalise any accepted input form to E.164.
  *
  * Accepted:
- *   07701234567        national with trunk prefix
- *   7701234567         national without trunk prefix
- *   +9647701234567     E.164
- *   009647701234567    international access code
- *   9647701234567      country code, no plus
+ *   07700000001        national with trunk prefix
+ *   7700000001         national without trunk prefix
+ *   +9647700000001     E.164
+ *   009647700000001    international access code
+ *   9647700000001      country code, no plus
  *   with spaces, dashes, parentheses or non-breaking spaces anywhere
  *   with Arabic-Indic digits (٠١٢٣٤٥٦٧٨٩), which Arabic keyboards produce
  *
@@ -100,7 +100,7 @@ export function isValidE164Iraqi(value: string): boolean {
 }
 
 /**
- * Display form for admin screens: `0770 123 4567`.
+ * Display form for admin screens: `0770 000 0001`.
  *
  * Never used in a log line - CLAUDE.md §9 forbids logging phone numbers, and
  * the logger redacts them structurally regardless of how they are formatted.
@@ -114,7 +114,7 @@ export function formatIraqiPhoneForDisplay(e164: string): string {
 
 /**
  * Partially masked form, for the rare place a number must be shown as a hint
- * (for example "we sent a code to 0770 *** 4567").
+ * (for example "we sent a code to 0770 *** 0001").
  */
 export function maskIraqiPhone(e164: string): string {
   const match = E164.exec(e164);

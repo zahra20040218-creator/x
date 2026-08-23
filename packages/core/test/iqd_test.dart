@@ -118,7 +118,7 @@ void main() {
         'id': 'u1',
         'displayName': 'أحمد',
         'rating': 4.8,
-        'phone': '+9647701234567',
+        'phone': '+9647700000001',
       });
 
       expect(user.displayName, 'أحمد');

@@ -36,7 +36,7 @@ class _SignInScreenState extends State<SignInScreen> {
   /// Normalise before sending to Firebase.
   ///
   /// The server normalises too (CLAUDE.md §8), but Firebase needs E.164 up
-  /// front or it rejects the request — and a driver typing `07701234567`, which
+  /// front or it rejects the request — and a driver typing `07700000001`, which
   /// is how every Iraqi writes their number, would otherwise just see a failure.
   String? _toE164(String input) {
     final digits = input.replaceAll(RegExp(r'[^0-9+]'), '');

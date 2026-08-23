@@ -5,7 +5,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import express from 'express';
 
 import { AppModule } from './app.module.js';
-import { loadConfig } from './common/config.js';
+import { corsOrigins, loadConfig } from './common/config.js';
 import { createLogger, newRequestId, runWithRequestContext } from './common/logger.js';
 import { DATABASE, type Database } from './db/db.port.js';
 import { ProblemFilter } from './http/problem.filter.js';
@@ -59,6 +59,19 @@ async function bootstrap(): Promise<void> {
     res.setHeader('X-Request-Id', requestId);
     runWithRequestContext({ requestId }, () => next());
   });
+
+  // S-5 from docs/security-audit.md. Without this the admin panel simply does
+  // not work; with a wildcard it would be a hole. Allowlist only.
+  const origins = corsOrigins(config);
+  if (origins.length > 0) {
+    app.enableCors({
+      origin: origins,
+      credentials: true,
+      allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key', 'X-Request-Id'],
+      exposedHeaders: ['X-Request-Id'],
+      maxAge: 600,
+    });
+  }
 
   app.setGlobalPrefix('v1');
   app.useGlobalFilters(new ProblemFilter(logger));

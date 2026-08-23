@@ -8,8 +8,8 @@ import { ForbiddenProblem, UnauthorizedProblem } from '../../src/common/problem.
 import { FakeDatabase } from '../fakes/fake-database.js';
 
 const SECRET = 'a-test-secret-that-is-long-enough-32';
-const RIDER_PHONE = '+9647701234567';
-const DRIVER_PHONE = '+9647709998888';
+const RIDER_PHONE = '+9647700000001';
+const DRIVER_PHONE = '+9647700000002';
 
 describe('TokenService', () => {
   let clock: FakeClock;
@@ -200,8 +200,8 @@ describe('AuthService', () => {
 
     // The duplicate-account failure CLAUDE.md §8 exists to prevent.
     it('treats every spelling of one number as the same account', async () => {
-      firebase.register('spelling-a', { uid: 'fb-1', phoneNumber: '07701234567' });
-      firebase.register('spelling-b', { uid: 'fb-1', phoneNumber: '+964 770 123 4567' });
+      firebase.register('spelling-a', { uid: 'fb-1', phoneNumber: '07700000001' });
+      firebase.register('spelling-b', { uid: 'fb-1', phoneNumber: '+964 770 000 0001' });
 
       const a = await auth.verifyOtp({ firebaseIdToken: 'spelling-a', role: 'RIDER' });
       const b = await auth.verifyOtp({ firebaseIdToken: 'spelling-b', role: 'RIDER' });

@@ -29,9 +29,9 @@ import { FakeDatabase } from '../fakes/fake-database.js';
  * not run on this host. See BLOCKED.md.
  */
 
-const RIDER_PHONE = '+9647701234567';
-const DRIVER_PHONE = '+9647709998888';
-const SECOND_DRIVER_PHONE = '+9647707776666';
+const RIDER_PHONE = '+9647700000001';
+const DRIVER_PHONE = '+9647700000002';
+const SECOND_DRIVER_PHONE = '+9647700000003';
 
 const TAHRIR = { lat: 33.3061, lng: 44.4213 };
 const KARRADA = { lat: 33.2989, lng: 44.4361 };
@@ -442,7 +442,7 @@ describe('API end to end', () => {
         .send({ pickup: TAHRIR, dropoff: KARRADA })
         .expect(201);
 
-      firebase.register('rider-b-token', { uid: 'fb-rider-b', phoneNumber: '+9647705554444' });
+      firebase.register('rider-b-token', { uid: 'fb-rider-b', phoneNumber: '+9647700000004' });
       const riderBResponse = await http
         .post('/v1/auth/otp/verify')
         .send({ firebaseIdToken: 'rider-b-token', role: 'RIDER' })
@@ -464,7 +464,7 @@ describe('API end to end', () => {
         .send({ pickup: TAHRIR, dropoff: KARRADA })
         .expect(201);
 
-      firebase.register('rider-b-token', { uid: 'fb-rider-b', phoneNumber: '+9647705554444' });
+      firebase.register('rider-b-token', { uid: 'fb-rider-b', phoneNumber: '+9647700000004' });
       const riderB = await http
         .post('/v1/auth/otp/verify')
         .send({ firebaseIdToken: 'rider-b-token', role: 'RIDER' })
@@ -510,7 +510,7 @@ describe('API end to end', () => {
 
       // Not "the field is empty" - the number appears nowhere in the response.
       expect(JSON.stringify(asDriver.body)).not.toContain(RIDER_PHONE);
-      expect(JSON.stringify(asDriver.body)).not.toContain('7701234567');
+      expect(JSON.stringify(asDriver.body)).not.toContain('7700000001');
     });
 
     it('a rider cannot call driver endpoints', async () => {
@@ -586,10 +586,10 @@ describe('API end to end', () => {
   describe('admin money operations', () => {
     async function signInAdmin(): Promise<string> {
       db.rows('users').push({
-        id: 'admin-1', role: 'ADMIN', phone_e164: '+9647701112222',
+        id: 'admin-1', role: 'ADMIN', phone_e164: '+9647700000005',
         display_name: 'مدير', is_active: true,
       });
-      firebase.register('admin-token', { uid: 'fb-admin', phoneNumber: '+9647701112222' });
+      firebase.register('admin-token', { uid: 'fb-admin', phoneNumber: '+9647700000005' });
 
       // ADMIN cannot be obtained through /auth/otp/verify by design, so the
       // token is minted directly - which is what a real admin console session
