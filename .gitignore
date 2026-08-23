@@ -14,3 +14,9 @@ logs/*.log
 .DS_Store
 pnpm-debug.log*
 .turbo/
+
+# Database dumps. They contain phone numbers (PII, CLAUDE.md §9) and must
+# never reach source control.
+backups/
+*.dump
+*.dump.sha256
