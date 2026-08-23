@@ -1,0 +1,20 @@
+<!doctype html>
+<!--
+  dir="rtl" and lang="ar" on the document, not on a wrapper div.
+
+  The operator-facing language is Arabic (CLAUDE.md §8), and setting direction
+  at the document root is what makes the browser's own logical properties -
+  margin-inline, text-align: start, scrollbar placement, form controls - flip
+  correctly. A wrapper div gets most of it and quietly misses the rest.
+-->
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>لوحة إدارة التطبيق</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

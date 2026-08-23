@@ -94,21 +94,21 @@ export function createDataProvider(
     },
 
     getOne: async ({ resource, id }) => ({
-      data: (await request(`${pathFor(resource)}/${String(id)}`)) as never,
+      data: (await request(`${pathFor(resource)}/${String(id)}`)),
     }),
 
     create: async ({ resource, variables }) => ({
       data: (await request(pathFor(resource), {
         method: 'POST',
         body: JSON.stringify(variables),
-      })) as never,
+      })),
     }),
 
     update: async ({ resource, id, variables }) => ({
       data: (await request(`${pathFor(resource)}/${String(id)}`, {
         method: 'PATCH',
         body: JSON.stringify(variables),
-      })) as never,
+      })),
     }),
 
     // CLAUDE.md §6.3 and §12.3: nothing in this panel deletes anything. A
@@ -127,7 +127,7 @@ export function createDataProvider(
         method: (method ?? 'get').toUpperCase(),
         ...(payload ? { body: JSON.stringify(payload) } : {}),
         ...(headers ? { headers: headers as Record<string, string> } : {}),
-      })) as never,
+      })),
     }),
   };
 }

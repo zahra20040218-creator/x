@@ -123,7 +123,7 @@ $ grep -rnE "\+9647[0-9]{9}" services/api/src --include=*.ts | grep -v .test.
 | Driver app full flow | **BLOCKED** | auth → online → offer → trip → wallet | — | needs Flutter | **never compiled** |
 | **Background location (§5.3)** | **BLOCKED** | foreground service, Doze exemption + explainer, offline buffer, no WorkManager | `location_service_test.dart` written | needs Flutter **+ device** | `AUTOMATED = written, unrun` · **`REAL DEVICE = BLOCKED`** |
 | Arabic / RTL / localisation | **PARTIAL** | interface-based strings; no hardcoded user text | — | needs Flutter | **never compiled** |
-| Admin panel | **FAILED** | data provider, money formatter, contract paths | `money.test.ts` | `npx vitest run` | 11 pass · **no UI screens** |
+| Admin panel | **PARTIAL** | data provider, money formatter, contract paths | `money.test.ts` | `npx vitest run` | 11 pass · **no UI screens** |
 | Loading/Empty/Error/Success on every screen | **PARTIAL** | `AsyncView` makes all four **structural** — `empty` and `onRetry` are required params, so omitting them fails to compile; permission-denial error+retry added | `async_view_test.dart` (12 widget tests) | needs Flutter | **written, UNRUN** — see `docs/UI_STATE_MATRIX.md` |
 | KYC / documents / approval | **BLOCKED** | `CLAUDE.md` §2 says OUT OF SCOPE | — | — | **BLOCKER-2** |
 | Zones / surge / promotions | **BLOCKED** | `CLAUDE.md` §2 says OUT OF SCOPE | — | — | **BLOCKER-2** |
