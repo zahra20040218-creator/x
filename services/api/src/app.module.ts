@@ -24,6 +24,9 @@ import { OpsController } from './http/ops.controller.js';
 import { RidesController } from './http/rides.controller.js';
 import { IdempotencyService } from './idempotency/idempotency.service.js';
 import { LedgerService } from './ledger/ledger.service.js';
+import { FcmSender, parseServiceAccount } from './push/fcm-sender.js';
+import { UnconfiguredPushSender, type PushSender } from './push/push.port.js';
+import { PushService } from './push/push.service.js';
 import { DriverPresenceService } from './matching/driver-presence.service.js';
 import { MatchingService } from './matching/matching.service.js';
 import { RideClaimService } from './matching/ride-claim.service.js';
@@ -89,6 +92,24 @@ export class AppModule {
     const auth = new AuthService(database, firebase, tokens);
     const audit = new AuditService(logger);
     const ledger = new LedgerService();
+
+    // Push is optional configuration, not optional behaviour: without a
+    // service account the API still enqueues jobs and the sender reports every
+    // one as a transient failure, loudly. It never reports success it did not
+    // achieve, and it never marks a real device token invalid because OUR
+    // credentials are missing - that would delete the fleet on first deploy.
+    const pushSender: PushSender = config.FCM_SERVICE_ACCOUNT_JSON
+      ? new FcmSender(parseServiceAccount(config.FCM_SERVICE_ACCOUNT_JSON), clock, logger)
+      : new UnconfiguredPushSender('FCM_SERVICE_ACCOUNT_JSON is not set');
+
+    if (!config.FCM_SERVICE_ACCOUNT_JSON) {
+      logger.warn(
+        { event: 'push.unconfigured' },
+        'push notifications are DISABLED: FCM_SERVICE_ACCOUNT_JSON is not set',
+      );
+    }
+
+    const push = new PushService(database, pushSender, clock, logger);
     const fare = new FareCalculator();
     const platformConfig = new PlatformConfigService(clock);
     const stateMachine = new RideStateMachine();
@@ -157,6 +178,7 @@ export class AppModule {
         { provide: AuthService, useValue: auth },
         { provide: AuditService, useValue: audit },
         { provide: LedgerService, useValue: ledger },
+        { provide: PushService, useValue: push },
         { provide: FareCalculator, useValue: fare },
         { provide: PlatformConfigService, useValue: platformConfig },
         { provide: RideStateMachine, useValue: stateMachine },

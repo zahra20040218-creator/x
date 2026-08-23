@@ -173,3 +173,16 @@ export const PaginationSchema = z.object({
 });
 
 export const IdempotencyKeySchema = z.string().uuid();
+
+/**
+ * Device registration. 4096 is FCM's documented maximum token length; a longer
+ * value is not a token and must be refused at the boundary rather than stored.
+ */
+export const RegisterDeviceSchema = z.object({
+  token: z.string().min(1).max(4096),
+  platform: z.enum(['ANDROID', 'IOS']),
+});
+
+export const UnregisterDeviceSchema = z.object({
+  token: z.string().min(1).max(4096),
+});

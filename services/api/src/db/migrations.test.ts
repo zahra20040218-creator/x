@@ -86,6 +86,7 @@ describe('the real migration set', () => {
       '0004_operations',
       '0005_audit_log',
       '0006_sessions',
+      '0007_device_tokens',
     ]);
   });
 

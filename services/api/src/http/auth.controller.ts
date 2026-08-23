@@ -1,11 +1,18 @@
-import { Body, Controller, Get, HttpCode, Inject, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Inject, Patch, Post } from '@nestjs/common';
 
 import { AuthService, type AuthenticatedUser } from '../auth/auth.service.js';
 import { DATABASE, type Database } from '../db/db.port.js';
 import { LedgerService } from '../ledger/ledger.service.js';
+import { PushService } from '../push/push.service.js';
 import { CurrentUser, Public } from './auth.guard.js';
 import { RateLimit } from './rate-limit.js';
-import { RefreshSchema, UpdateMeSchema, VerifyOtpSchema } from './schemas.js';
+import {
+  RefreshSchema,
+  RegisterDeviceSchema,
+  UnregisterDeviceSchema,
+  UpdateMeSchema,
+  VerifyOtpSchema,
+} from './schemas.js';
 import { zodBody } from './zod.pipe.js';
 
 @Controller()
@@ -14,6 +21,7 @@ export class AuthController {
     private readonly auth: AuthService,
     private readonly ledger: LedgerService,
     @Inject(DATABASE) private readonly db: Database,
+    private readonly push: PushService,
   ) {}
 
   @Post('auth/otp/verify')
@@ -62,6 +70,40 @@ export class AuthController {
   @HttpCode(204)
   async logout(@CurrentUser() user: AuthenticatedUser): Promise<void> {
     await this.auth.logout(user.id);
+  }
+
+  /**
+   * Register this device for push. See docs/api-contract.yaml (added 2026-08-23).
+   *
+   * Rate-limited as CRITICAL: it writes a row keyed on an attacker-supplied
+   * string, and it is the only endpoint that can move a device token from one
+   * account to another.
+   */
+  @Post('devices')
+  @HttpCode(204)
+  @RateLimit({ limit: 30, windowSeconds: 60, by: 'user', tier: 'CRITICAL' })
+  async registerDevice(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(zodBody(RegisterDeviceSchema)) body: { token: string; platform: 'ANDROID' | 'IOS' },
+  ): Promise<void> {
+    await this.push.register(user.id, body.token, body.platform);
+  }
+
+  /**
+   * Stop delivering to this device.
+   *
+   * Separate from logout on purpose: logout ends the SESSION, and a driver may
+   * legitimately want offers to stop reaching one particular handset without
+   * signing out everywhere.
+   */
+  @Delete('devices')
+  @HttpCode(204)
+  @RateLimit({ limit: 30, windowSeconds: 60, by: 'user', tier: 'STANDARD' })
+  async unregisterDevice(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(zodBody(UnregisterDeviceSchema)) body: { token: string },
+  ): Promise<void> {
+    await this.push.unregister(user.id, body.token);
   }
 
   /** The caller's OWN profile — the only shape that carries their phone. */

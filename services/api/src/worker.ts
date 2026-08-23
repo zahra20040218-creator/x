@@ -15,7 +15,16 @@ import { IoRedisAdapter } from './redis/ioredis-adapter.js';
 import { RideStateMachine } from './rides/ride-state-machine.js';
 import { RideRepository } from './rides/ride.repository.js';
 import { RideService } from './rides/ride.service.js';
-import { QUEUE_NAMES, QueueRegistry, createConnection, createWorker } from './queue/queues.js';
+import {
+  QUEUE_NAMES,
+  type PushJob,
+  QueueRegistry,
+  createConnection,
+  createWorker,
+} from './queue/queues.js';
+import { FcmSender, parseServiceAccount } from './push/fcm-sender.js';
+import { UnconfiguredPushSender, type PushSender } from './push/push.port.js';
+import { PushService } from './push/push.service.js';
 
 /**
  * Background workers.
@@ -76,6 +85,23 @@ async function bootstrap(): Promise<void> {
   const connection = createConnection(config.REDIS_URL);
   const queues = new QueueRegistry(connection);
   await queues.scheduleRecurring(config.LOCATION_FLUSH_INTERVAL_MS);
+
+  // Same construction as the API process. The worker is where delivery
+  // actually happens, so an unconfigured sender here is the difference between
+  // "drivers get offers" and "drivers get nothing" - it is logged at warn on
+  // startup rather than discovered when nobody accepts a ride.
+  const pushSender: PushSender = config.FCM_SERVICE_ACCOUNT_JSON
+    ? new FcmSender(parseServiceAccount(config.FCM_SERVICE_ACCOUNT_JSON), clock, logger)
+    : new UnconfiguredPushSender('FCM_SERVICE_ACCOUNT_JSON is not set');
+
+  if (!config.FCM_SERVICE_ACCOUNT_JSON) {
+    logger.warn(
+      { event: 'push.unconfigured' },
+      'push notifications are DISABLED: FCM_SERVICE_ACCOUNT_JSON is not set',
+    );
+  }
+
+  const push = new PushService(database, pushSender, clock, logger);
 
   const workers = [
     createWorker(
@@ -160,15 +186,28 @@ async function bootstrap(): Promise<void> {
     createWorker(
       QUEUE_NAMES.push,
       connection,
-      (job) => {
-        // CLAUDE.md §2 keeps FCM in scope but the delivery integration is not
-        // built. The job is accepted and logged so the queue path is exercised
-        // end to end; wiring the SDK here changes nothing else.
+      async (job) => {
+        const data = job.data as PushJob;
+
+        const summary = await push.pushToUser({
+          userId: data.userId,
+          title: data.title,
+          body: data.body,
+          data: data.data,
+        });
+
         logger.info(
-          { event: 'push.pending', job_id: job.id },
-          'push delivery is not implemented in v1',
+          { event: 'push.sent', job_id: job.id, ...summary },
+          'push delivery attempted',
         );
-        return Promise.resolve();
+
+        // Thrown so BullMQ retries. Deliberately only when NOTHING landed and
+        // something failed: a partial delivery must not be retried, or the
+        // devices that already received the notification would get it again
+        // on every attempt.
+        if (summary.delivered === 0 && summary.failed > 0) {
+          throw new Error(`push delivery failed for all ${summary.failed} device(s)`);
+        }
       },
       logger,
     ),

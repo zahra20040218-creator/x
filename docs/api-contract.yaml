@@ -158,6 +158,70 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /devices:
+    post:
+      tags: [shared]
+      operationId: registerDevice
+      summary: Register this device for push notifications.
+      description: >
+        CONTRACT CHANGE, 2026-08-23. Added because push delivery had no way to
+        reach a device: the backend enqueued push jobs and the worker logged
+        and dropped them, and there was nowhere for a device token to be stored
+        in the first place.
+
+        Idempotent by token. Re-registering the same token refreshes its
+        last_seen_at rather than creating a duplicate, because the apps
+        re-register on every launch and FCM reissues tokens on reinstall.
+
+        A token is bound to the authenticated caller. Registering a token that
+        already belongs to another user REASSIGNS it - that is the correct
+        behaviour when two people share a handset, and it is what stops ride
+        offers following the previous owner.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, platform]
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+                  maxLength: 4096
+                  description: The FCM registration token.
+                platform:
+                  type: string
+                  enum: [ANDROID, IOS]
+      responses:
+        '204':
+          description: Registered.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+    delete:
+      tags: [shared]
+      operationId: unregisterDevice
+      summary: Stop sending push notifications to this device.
+      description: >
+        Called on sign-out. Without it a driver who logs out keeps receiving
+        ride offers on a phone they are no longer working from.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string, minLength: 1, maxLength: 4096 }
+      responses:
+        '204':
+          description: Unregistered, or was not registered.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /me:
     get:
       tags: [shared]

@@ -64,6 +64,7 @@ export class FakeDatabase implements Database {
       'users',
       'riders',
       'refresh_tokens',
+      'device_tokens',
       'ratings',
       'disputes',
       'wallet_topups',
@@ -481,6 +482,64 @@ export class FakeDatabase implements Database {
     if (/^INSERT INTO riders/i.test(s)) {
       this.rows('riders').push({ user_id: params[0] });
       return this.ok([], 1);
+    }
+
+    // ---- device tokens ----
+    //
+    // The two UPDATEs below share the prefix `UPDATE device_tokens SET
+    // revoked_at`, and they mean different things: one revokes a single token
+    // for one user (sign-out), the other revokes a batch FCM reported as dead.
+    // They are matched on their WHERE clauses, and the batch form is checked
+    // FIRST, because `token = $2` is a prefix of nothing but `token = ANY(...)`
+    // would otherwise fall through to the single-token handler and silently
+    // revoke the wrong row. This is the D-14 shadowing mistake, avoided.
+    if (/^INSERT INTO device_tokens/i.test(s)) {
+      const [user_id, token, platform, last_seen_at] = params as [
+        string, string, string, Date,
+      ];
+      const existing = this.rows('device_tokens').find((d) => d['token'] === token);
+      if (existing) {
+        // ON CONFLICT (token) DO UPDATE - reassigns the device to the new user.
+        existing['user_id'] = user_id;
+        existing['platform'] = platform;
+        existing['last_seen_at'] = last_seen_at;
+        existing['revoked_at'] = null;
+      } else {
+        this.rows('device_tokens').push({
+          user_id, token, platform, last_seen_at, revoked_at: null,
+        });
+      }
+      return this.ok([], 1);
+    }
+    if (/^UPDATE device_tokens\s+SET revoked_at = \$1\s+WHERE token = ANY/i.test(s)) {
+      const tokens = params[1] as string[];
+      let n = 0;
+      for (const d of this.rows('device_tokens')) {
+        if (tokens.includes(d['token'] as string) && d['revoked_at'] === null) {
+          d['revoked_at'] = params[0];
+          n++;
+        }
+      }
+      return this.ok([], n);
+    }
+    if (/^UPDATE device_tokens\s+SET revoked_at = \$1\s+WHERE token = \$2/i.test(s)) {
+      let n = 0;
+      for (const d of this.rows('device_tokens')) {
+        if (d['token'] === params[1] && d['user_id'] === params[2] && d['revoked_at'] === null) {
+          d['revoked_at'] = params[0];
+          n++;
+        }
+      }
+      return this.ok([], n);
+    }
+    if (/^SELECT token FROM device_tokens/i.test(s)) {
+      const live = this.rows('device_tokens')
+        .filter((d) => d['user_id'] === params[0] && d['revoked_at'] === null)
+        .sort(
+          (a, b) =>
+            (b['last_seen_at'] as Date).getTime() - (a['last_seen_at'] as Date).getTime(),
+        );
+      return this.ok(live.map((d) => ({ token: d['token'] })) as Row[]);
     }
 
     // ---- refresh tokens ----

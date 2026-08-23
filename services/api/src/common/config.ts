@@ -65,6 +65,19 @@ export const ConfigSchema = z.object({
   GATEWAY_WEBHOOK_SECRET: z.string().min(16).optional(),
 
   /**
+   * Firebase service account JSON, for FCM HTTP v1.
+   *
+   * Optional: without it the API still boots and still enqueues push jobs, but
+   * every delivery is reported as a transient failure and logged. That is the
+   * honest degradation - reporting success would make the metrics claim
+   * notifications work, and treating it as fatal would stop a developer
+   * running the stack locally.
+   *
+   * THIS IS A SECRET. It contains a private key. ENV only, never committed.
+   */
+  FCM_SERVICE_ACCOUNT_JSON: z.string().min(1).optional(),
+
+  /**
    * Comma-separated origins allowed to call the API from a browser.
    *
    * An ALLOWLIST, never `*`. The admin panel sends a bearer token, and `*` with
