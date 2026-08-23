@@ -225,3 +225,130 @@ logged-in operator's browser.
    business, every wallet figure the admin panel shows is mislabelled — which
    becomes a P0 the first time a driver disputes a balance.
 4. **CORS and rate limiting** before any endpoint faces the open internet.
+
+
+---
+
+# SECOND PASS — 2026-08-23
+
+Run from scratch after the rate-limit and audit-log work. Fresh scans, not a
+re-read of the first pass.
+
+## Verified by scanning, not by assertion
+
+### SQL injection — **PASS**
+
+Three call sites interpolate into SQL. Each was read line by line:
+
+| Site | Interpolated | Verdict |
+|---|---|---|
+| `admin.controller.ts:225` | `sets.join(', ')` | column names are **string literals in source** (`'vehicle_plate'`, `'is_suspended'`…); every value goes through `$n` |
+| `rides.controller.ts:199` | `${table}` | a ternary over two literals: `'drivers'` / `'riders'` |
+| `ride.repository.ts:226` | `sets.join(', ')` | same whitelist pattern; `status` and all effects parameterised |
+
+**No user input reaches a SQL identifier position.** 97 parameter placeholders
+across the codebase; zero interpolated values.
+
+### Secrets in source — **PASS**
+
+The grep for assigned api-key / secret / password / token literals of 12+
+characters returns no output outside test files.
+
+### PII in fixtures — **PASS** (was S-1, fixed)
+
+All test phone numbers moved to an all-zeros subscriber block.
+
+---
+
+## New findings
+
+### S-6 · No security headers · **P2 · FIXED**
+
+The API set **no** security headers at all — no CSP, no HSTS, no
+`X-Frame-Options`, no `X-Content-Type-Options`, and it advertised
+`X-Powered-By`.
+
+Fixed with `helmet`, tuned for a JSON API rather than copied from a web-app
+config:
+
+- **`default-src 'none'`** — this server returns JSON and never HTML, so there
+  is no legitimate resource for a page to load from it.
+- **`X-Content-Type-Options: nosniff`** — the realistic XSS vector against a
+  JSON API is a browser sniffing an error body as HTML and executing it.
+- **HSTS 180 days, `includeSubDomains`, `preload: false`** — preloading is
+  effectively irreversible and is the owner's decision once a domain exists,
+  not a default to inherit.
+- **`X-Powered-By` removed** — it advertised the framework on every response.
+
+**Verified on a live response from the compiled binary**, not in a test:
+
+```
+$ curl -sD - http://localhost:4567/v1/health
+Content-Security-Policy: default-src 'none';frame-ancestors 'none';...
+Strict-Transport-Security: max-age=15552000; includeSubDomains
+X-Frame-Options: DENY
+X-Content-Type-Options: nosniff
+Referrer-Policy: no-referrer
+Cross-Origin-Resource-Policy: same-site
+
+$ curl -sD - ... | grep -ci x-powered-by
+0
+```
+
+### S-7 · Rate limiting is inactive without Redis · **P2 · ACCEPTED, documented**
+
+Fail-open is a deliberate policy, not an oversight — reasoning and the security
+trade-off are recorded in `docs/BLOCKERS.md` under *TECHNICAL — decided*.
+
+**The cost is real and is not hidden:** while Redis is down there is no rate
+limiting at all, so OTP abuse is possible in that window. Status stays
+`PARTIAL`. Verified in the compiled binary: 13 requests produced 13
+`ratelimit.unavailable` warnings.
+
+### S-8 · CSRF — **not applicable, recorded so the question is closed**
+
+The API is token-authenticated via an `Authorization` header and sets no
+session cookie. A cross-site form cannot attach a bearer token, so classic CSRF
+does not apply. CORS is an allowlist with a wildcard **refused at boot**.
+
+If cookie auth is ever introduced this changes immediately — recorded so that
+decision is made deliberately rather than by omission.
+
+### S-9 · WebSocket authorization — **PASS by construction, UNTESTED**
+
+Channels derive from the token's subject; the subscribe API takes **no channel
+argument**, so there is no frame a client can send to reach another user's
+stream.
+
+**But there is no automated test for the realtime layer at all.** The guarantee
+rests on construction and code review, not execution. Recorded as a gap, not a
+pass.
+
+### S-10 · Admin session cannot be revoked · **P2 · OPEN**
+
+Unchanged from the first pass (S-3). An admin token is issued out of band and
+cannot be revoked short of rotating `JWT_SECRET`, which signs everyone out.
+
+---
+
+## Second-pass verdict
+
+| Area | Status |
+|---|---|
+| SQL injection | **PASS** — verified line by line |
+| Secrets in repo | **PASS** |
+| PII in logs / audit / fixtures | **PASS** |
+| IDOR / row-level auth | **PASS** — 404-not-403, token-derived filters |
+| Security headers | **PASS** — verified on a live response |
+| CORS | **PASS** — allowlist, wildcard refused at boot |
+| Input validation | **PASS** — Zod at every boundary |
+| Rate limiting | **PARTIAL** — inactive without Redis |
+| WebSocket authorization | **PARTIAL** — correct by construction, untested |
+| Admin session revocation | **OPEN** |
+| Audit log integrity | **PARTIAL** — append-only trigger written, **never executed** |
+| Replay / idempotency | **PARTIAL** — proved against a fake DB only |
+| Race conditions | **PARTIAL** — proved against a fake Redis only |
+
+**Nothing here is claimed against real infrastructure.** Every `PARTIAL` above
+is partial for that reason, and the ones that would become `PASS` with Docker
+running are named in `docs/BLOCKERS.md`.

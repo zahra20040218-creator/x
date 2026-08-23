@@ -30,14 +30,29 @@ class _BatteryExemptionScreenState extends State<BatteryExemptionScreen> {
   _Step _step = _Step.foreground;
   bool _busy = false;
 
+  /// Set when a permission request comes back denied.
+  ///
+  /// Without this the screen silently did nothing on a denial: the driver
+  /// tapped, Android refused, and the same screen stared back with no
+  /// explanation and no way forward. They would conclude the app is broken -
+  /// and they would be right.
+  String? _error;
+
   Future<void> _advance() async {
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+
+    final strings = AppStrings.of(context);
 
     try {
       switch (_step) {
         case _Step.foreground:
           if (await LocationPermissions.requestForeground()) {
             setState(() => _step = _Step.background);
+          } else {
+            setState(() => _error = strings.permissionDenied);
           }
 
         case _Step.background:
@@ -45,6 +60,8 @@ class _BatteryExemptionScreenState extends State<BatteryExemptionScreen> {
           // before it is what stops the driver simply backing out.
           if (await LocationPermissions.requestBackground()) {
             setState(() => _step = _Step.battery);
+          } else {
+            setState(() => _error = strings.backgroundLocationBody);
           }
 
         case _Step.battery:
@@ -126,8 +143,21 @@ class _BatteryExemptionScreenState extends State<BatteryExemptionScreen> {
               Text(title, style: Theme.of(context).textTheme.headlineMedium),
               const SizedBox(height: AppSpacing.md),
               Text(body, style: Theme.of(context).textTheme.bodyMedium),
+
+              // The ERROR state. A denial is the most likely outcome of this
+              // screen, not an edge case, so it gets a visible explanation and
+              // the button below doubles as the retry.
+              if (_error != null) ...[
+                const SizedBox(height: AppSpacing.md),
+                StatusBanner(message: _error!, tone: BannerTone.warning),
+              ],
+
               const Spacer(),
-              PrimaryButton(label: cta, onPressed: _advance, busy: _busy),
+              PrimaryButton(
+                label: _error == null ? cta : strings.retry,
+                onPressed: _advance,
+                busy: _busy,
+              ),
               const SizedBox(height: AppSpacing.md),
             ],
           ),

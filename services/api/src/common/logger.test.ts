@@ -17,6 +17,15 @@ import {
 
 const PHONE = '+9647700000001';
 
+/**
+ * An Iraqi mobile number in any of the forms redaction has to survive.
+ *
+ * Used instead of `toContain('964')` throughout this file. The substring form
+ * is the reason a PII assertion elsewhere in this repo silently stopped testing
+ * anything, so it is not used here.
+ */
+const PHONE_PATTERN = /\+?964\d{9,}/;
+
 describe('redact', () => {
   it('removes a phone at the top level', () => {
     expect(redact({ phone: PHONE })).toEqual({ phone: '[redacted]' });
@@ -38,13 +47,16 @@ describe('redact', () => {
       ride: { id: 'r1', rider: { id: 'u1', phone: PHONE, displayName: 'Ahmed Ali' } },
     });
 
-    expect(JSON.stringify(logged)).not.toContain('964');
+    // Matched as a PHONE NUMBER, not the substring '964'. A bare substring
+    // check passes or fails on three digits that appear by chance in ids and
+    // timestamps, so it tests luck rather than redaction.
+    expect(JSON.stringify(logged)).not.toMatch(PHONE_PATTERN);
     expect(JSON.stringify(logged)).not.toContain('Ahmed');
   });
 
   it('removes a phone inside an array of objects', () => {
     const logged = redact({ drivers: [{ phone: PHONE }, { phone: PHONE }] });
-    expect(JSON.stringify(logged)).not.toContain('964');
+    expect(JSON.stringify(logged)).not.toMatch(PHONE_PATTERN);
   });
 
   // Coordinates are coarsened rather than dropped: ~110 m is enough to debug a
@@ -128,7 +140,10 @@ describe('redact', () => {
   // arrives under a key this module does not know about is NOT redacted.
   it('does NOT catch a phone hidden under an unrecognised key', () => {
     const logged = redact({ contactDetail: PHONE });
-    expect(JSON.stringify(logged)).toContain('964');
+    // Asserts the WHOLE number survives, not that three digits appear. If this
+    // ever starts passing for the wrong reason the limitation has changed and
+    // the comment above it has gone stale.
+    expect(JSON.stringify(logged)).toContain(PHONE);
   });
 });
 

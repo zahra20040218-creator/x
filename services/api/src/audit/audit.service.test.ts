@@ -145,7 +145,8 @@ describe('AuditService', () => {
 
     it('redacts nested PII', () => {
       const scrubbed = scrub({ driver: { phone: '+9647700000001', id: 'd1' } });
-      expect(JSON.stringify(scrubbed)).not.toContain('964');
+      // Phone-number pattern, not the substring '964' - see logger.test.ts.
+      expect(JSON.stringify(scrubbed)).not.toMatch(/\+?964\d{9,}/);
       expect(JSON.stringify(scrubbed)).toContain('d1');
     });
 

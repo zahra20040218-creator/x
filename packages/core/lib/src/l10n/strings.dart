@@ -64,6 +64,10 @@ abstract class AppStrings {
   String get minimumFare;
   String get rounding;
   String get total;
+  String get noRidesYet;
+  String get noRidesYetHint;
+  String get noEarningsYet;
+  String get permissionDenied;
 
   // --- driver ---
   String get goOnline;
@@ -203,6 +207,14 @@ class ArabicStrings implements AppStrings {
   String get rounding => 'التقريب';
   @override
   String get total => 'المجموع';
+  @override
+  String get noRidesYet => 'لا توجد رحلات بعد';
+  @override
+  String get noRidesYetHint => 'رحلاتك السابقة ستظهر هنا';
+  @override
+  String get noEarningsYet => 'لا توجد أرباح بعد';
+  @override
+  String get permissionDenied => 'لم يُمنح الإذن. بدونه لا يمكن إكمال هذه الخطوة.';
 
   @override
   String get goOnline => 'اتصال';
@@ -369,6 +381,14 @@ class EnglishStrings implements AppStrings {
   String get rounding => 'Rounding';
   @override
   String get total => 'Total';
+  @override
+  String get noRidesYet => 'No rides yet';
+  @override
+  String get noRidesYetHint => 'Your past rides will appear here';
+  @override
+  String get noEarningsYet => 'No earnings yet';
+  @override
+  String get permissionDenied => 'Permission was not granted. This step cannot continue without it.';
 
   @override
   String get goOnline => 'Go online';

@@ -7,6 +7,7 @@ library rideapp_core;
 export 'src/api/api_client.dart';
 export 'src/api/api_exception.dart';
 export 'src/api/token_store.dart';
+export 'src/design/async_view.dart';
 export 'src/design/theme.dart';
 export 'src/design/widgets.dart';
 export 'src/l10n/strings.dart';

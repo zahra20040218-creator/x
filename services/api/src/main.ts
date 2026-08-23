@@ -3,6 +3,7 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import express from 'express';
+import helmet from 'helmet';
 
 import { AppModule } from './app.module.js';
 import { corsOrigins, loadConfig } from './common/config.js';
@@ -60,6 +61,35 @@ async function bootstrap(): Promise<void> {
     res.setHeader('X-Request-Id', requestId);
     runWithRequestContext({ requestId }, () => next());
   });
+
+  // Security headers. Second-pass audit finding S-6: none were set at all.
+  //
+  // Tuned for a JSON API rather than copied wholesale:
+  //  - CSP `default-src 'none'` because this server returns JSON and never
+  //    HTML, so there is no legitimate resource for a page to load from it.
+  //    A permissive CSP on an API is cargo-culted from web-app configs.
+  //  - `frameguard: deny` - nothing here should ever render in an iframe.
+  //  - HSTS is 180 days with subdomains. It is NOT preloaded: preloading is
+  //    effectively irreversible, and that is the owner's decision to make once
+  //    a domain exists, not a default to inherit.
+  //  - `contentTypeOptions` stops a JSON error body being sniffed as HTML and
+  //    executed, which is the realistic XSS vector against an API.
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'none'"],
+          frameAncestors: ["'none'"],
+        },
+      },
+      hsts: { maxAge: 15_552_000, includeSubDomains: true, preload: false },
+      frameguard: { action: 'deny' },
+      referrerPolicy: { policy: 'no-referrer' },
+      // The default would advertise the framework in every response.
+      hidePoweredBy: true,
+      crossOriginResourcePolicy: { policy: 'same-site' },
+    }),
+  );
 
   // S-5 from docs/security-audit.md. Without this the admin panel simply does
   // not work; with a wildcard it would be a hole. Allowlist only.

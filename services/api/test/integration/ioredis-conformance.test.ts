@@ -25,8 +25,30 @@ import { runRedisConformance } from '../../src/redis/redis.conformance.js';
 const REDIS_URL = process.env['TEST_REDIS_URL'];
 
 if (!REDIS_URL) {
-  describe.skip('RedisPort conformance: real Redis (TEST_REDIS_URL not set)', () => {
-    it('skipped', () => undefined);
+  describe('RedisPort conformance: real Redis', () => {
+    /**
+     * NOT a silent skip.
+     *
+     * The previous form was `it('skipped', () => undefined)` inside a
+     * `describe.skip` - a test with zero assertions, which made the suite
+     * report "1 skipped" and read like partial coverage. It is not partial:
+     * when TEST_REDIS_URL is unset, NONE of the 52 conformance assertions run
+     * against a real Redis, and every concurrency guarantee in this repository
+     * rests on the in-memory implementation being right.
+     *
+     * This test asserts that fact out loud so the suite output states the gap
+     * instead of hiding it behind the word "skipped".
+     */
+    it('DID NOT RUN - the in-memory Redis is unverified against real Redis', () => {
+      expect(REDIS_URL).toBeUndefined();
+
+      // eslint-disable-next-line no-console
+      console.warn(
+        '\n  [DEFECTS.md D-2] real-Redis conformance did NOT run.\n' +
+          '  The atomic claim (CLAUDE.md 5.1) is proved only against a fake.\n' +
+          '  To close: TEST_REDIS_URL=redis://localhost:6379 pnpm test:integration\n',
+      );
+    });
   });
 } else {
   runRedisConformance('IoRedisAdapter (real Redis)', async () => {

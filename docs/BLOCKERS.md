@@ -3,60 +3,93 @@
 Things that cannot proceed without a human decision or a human-supplied
 credential. **No value here has been invented or guessed.**
 
+**Verified 2026-08-23** by running the checks, not by reading a prior report:
+
+```
+$ docker --version        docker: command not found
+$ docker compose version  docker: command not found
+$ psql / pg_isready       NOT FOUND
+$ redis-cli / redis-server NOT FOUND
+$ k6                      NOT FOUND
+$ flutter / dart          NOT FOUND
+$ gradle                  NOT FOUND
+$ adb devices             daemon started - List of devices attached: (none)
+$ netstat | grep 5432|6432|6379   (nothing listening)
+```
+
+`adb` is present but **no device is attached**, so the physical-device blocker
+is confirmed rather than assumed.
+
 ---
 
-## BLOCKER-1 · Mobile stack conflict — Flutter vs Kotlin/Compose · **OWNER DECISION**
+## Category: OWNER DECISION REQUIRED
 
-**Blocked because:** the continuation brief §5 specifies Kotlin + Jetpack
-Compose + Hilt + Room for the mobile apps. `CLAUDE.md` §1 — which the brief
-itself instructs me to treat as binding, and which says "do not silently
-comply" with a conflicting request — specifies **Flutter**.
+These two are architectural and commercial. They are recorded, not resolved,
+and **no code was written in either direction.**
 
-**What is already implemented (Flutter):**
-- `packages/core` — models, API client with idempotency + single-flight refresh,
-  design system, Arabic/RTL localisation, offline location buffer
-- `apps/rider` — auth, fare estimate, ride request, live tracking, rating
-- `apps/driver` — auth, online toggle, offer sheet, trip flow, and the full
-  CLAUDE.md §5.3 background location service with its Android manifest
-- 25 Dart files, none compiled (no SDK here)
+---
 
-**Exactly what is required from you:** a decision, one of —
+## BLOCKER-1 · Mobile + Admin stack conflict · **BLOCKED — OWNER DECISION REQUIRED**
+
+| Layer | Project Brief | CLAUDE.md (binding) | Current implementation | Decision required |
+|---|---|---|---|---|
+| Mobile | Kotlin · Jetpack Compose · Hilt · Room | **Flutter** | **Flutter — 25 `.dart` files, 0 `.kt`** | Which stack ships v1? |
+| Admin | Next.js App Router | **Refine (React)** | **Refine + Vite** | Which framework ships v1? |
+| DB access | Prisma or TypeORM | (unspecified) | Raw `pg` + hand-written SQL | Introduce an ORM? |
+
+**Why this is not mine to decide:** `CLAUDE.md` §0 states — *"If a user request
+in a session conflicts with a rule in this file, stop and say so before writing
+code. Do not silently comply."* Rewriting two mobile apps is weeks of work that
+discards functioning code.
+
+**What I did NOT do, per your instruction:**
+- did not rewrite Flutter to Kotlin
+- did not treat Flutter as satisfying the Kotlin requirement
+- did not delete Dart files to hide the conflict
+- did not edit `CLAUDE.md` to make the conflict disappear
+- did not claim it resolved
+
+**Options:**
 
 | Option | Cost | Consequence |
 |---|---|---|
-| **A. Keep Flutter** | zero | `CLAUDE.md` stays authoritative; brief §5 is amended |
-| **B. Rewrite in Kotlin/Compose** | weeks; discards all mobile work | `CLAUDE.md` §1 must be formally amended first |
-| **C. Flutter now, Kotlin later** | zero now | v1 ships Flutter; a rewrite is a v2 decision |
+| **A. Keep Flutter + Refine** | zero | Brief §5 is amended; `CLAUDE.md` stays authoritative |
+| **B. Rewrite in Kotlin + Next.js** | weeks; discards all mobile work | `CLAUDE.md` §1 must be formally amended **first** |
+| **C. Flutter now, Kotlin later** | zero now | v1 ships Flutter; rewrite is a v2 decision |
 
-**Recommendation: A.** The Flutter code already satisfies every mobile
-requirement in `CLAUDE.md`, including the §5.3 background-location design that
-the brief calls critical. A rewrite buys no capability — it changes language.
+**Recommendation: A.** The Flutter code satisfies every mobile requirement in
+`CLAUDE.md`, including the §5.3 background-location design. A rewrite buys no
+capability — it changes language.
 
-**How it will be verified once decided:** if A or C, `flutter analyze` +
-`flutter test` on all three packages. If B, the Kotlin modules are built from
-scratch against the same API contract, which is unchanged either way.
+**Verification once decided:** if A or C — `flutter analyze` + `flutter test` on
+all three packages. If B — Kotlin modules built against the same API contract,
+which is unchanged either way.
+
+---
+
+## BLOCKER-2 · Scope conflict · **BLOCKED — SCOPE DECISION REQUIRED**
+
+| Requirement | Brief | CLAUDE.md | Current implementation | Decision required |
+|---|---|---|---|---|
+| **KYC / documents** | §15 requires | §2 **OUT OF SCOPE** | Admin creates drivers manually; suspend flag | Expand v1 scope? |
+| **Driver approval flow** | §15 requires | §2 **OUT OF SCOPE** | `is_suspended` boolean only | Expand v1 scope? |
+| **Surge pricing** | §16 requires | §2 **OUT OF SCOPE** | Flat configurable tariff | Expand v1 scope? |
+| **Zones** | §16 requires | §2 **OUT OF SCOPE** | Single city, no zone model | Expand v1 scope? |
+| **Promotions** | §16 requires | §2 **OUT OF SCOPE** | None | Expand v1 scope? |
+
+**Why not resolved:** `CLAUDE.md` §12.7 — *"Never scaffold OUT-OF-SCOPE features
+'for later.' Dead code is a liability."* Building these against a document that
+forbids them would violate the constitution; deleting the requirement would hide
+your brief.
+
+**Neither added nor removed. Recorded.**
+
+**Recommendation:** keep v1 scope. Surge and zones on a single-city,
+single-vehicle-class launch with 10 drivers add risk without adding revenue.
 
 ---
 
-## BLOCKER-2 · Scope conflict — KYC, surge, zones, promotions · **OWNER DECISION**
-
-**Blocked because:** brief §15 requires "KYC / documents / Admin approval" and
-§16 requires "Zones, Surge, Promotions". `CLAUDE.md` §2 lists all of these as
-explicitly **OUT OF SCOPE for v1**, and §12.7 says *"Never scaffold
-OUT-OF-SCOPE features 'for later.' Dead code is a liability."*
-
-**What is already implemented:** admin-created drivers with a suspend flag
-(the v1 substitute for KYC that `CLAUDE.md` §2 specifies), flat configurable
-pricing, and a commission rate changeable without a deploy.
-
-**Exactly what is required from you:** confirm whether v1 scope is expanding.
-If yes, `CLAUDE.md` §2 must be amended first — I will not scaffold against a
-document that forbids it.
-
-**Recommendation:** keep v1 scope. Surge and zones on a single-city, single-
-vehicle-class launch with 10 drivers add risk without adding revenue.
-
----
+## Category: ENVIRONMENT REQUIRED
 
 ## BLOCKER-3 · Docker not installed · **ENVIRONMENT**
 
@@ -101,6 +134,8 @@ cd apps/rider   && flutter pub get && flutter analyze && flutter test
 
 ---
 
+## Category: PHYSICAL DEVICE REQUIRED
+
 ## BLOCKER-5 · No physical Android device · **HARDWARE**
 
 **Blocks:** `ACCEPTANCE_CHECKLIST.md` check 2 — twenty minutes of real driving
@@ -116,6 +151,8 @@ ride-hailing MVP failure in production", and `RUN_AUTONOMOUS.md` §5 predicts it
 **`REAL DEVICE TEST = BLOCKED`**. I will not claim the field test passed.
 
 ---
+
+## Category: EXTERNAL ACCOUNT REQUIRED
 
 ## BLOCKER-6 · Third-party credentials · **HUMAN INPUT**
 
@@ -148,3 +185,39 @@ producing a signed artefact.
 **Honest note:** even once run here, it measures the API on this machine. It
 says nothing about whether a 4-core VPS holds 500 users — that requires running
 it against the VPS.
+
+
+---
+
+## Category: TECHNICAL — decided, not blocked
+
+Recorded here so the decisions are visible, but **these are not blockers**.
+
+### Rate-limiter failure policy: **FAIL-OPEN** — deliberate
+
+When Redis is unreachable the limiter **allows** the request and logs a warning
+at `warn` level (`event: ratelimit.unavailable`).
+
+**Security reasoning:** rate limiting is a protective control, not a correctness
+one. Failing closed converts a Redis blip into a total API outage — riders
+cannot request rides and drivers cannot go online — which is a far larger
+incident than a window of unthrottled OTP requests. Fail-closed would also make
+Redis a hard single point of failure for the entire platform.
+
+**The cost, stated plainly:** while Redis is down there is **no rate limiting at
+all**, so OTP abuse is possible during that window. This is accepted, monitored
+via the warn log, and is why the status is `PARTIAL`, not `DONE`.
+
+**Verified in the real compiled binary:** 13 requests produced exactly 13
+`ratelimit.unavailable` events with no Redis present.
+
+**This policy was chosen for the security reason above, not to make a test
+green.** Reversing it is a one-line change (`return true` → `throw`) if you
+prefer availability-over-protection to be inverted.
+
+### Audit-log write failure: **swallow and log loudly** — deliberate
+
+An audit INSERT failing inside the caller's transaction would roll back a
+legitimate wallet top-up. Losing one audit row is bad; losing the operator's
+money movement is worse. The swallow is not silent — it emits
+`event: audit.write_failed` at `error`.

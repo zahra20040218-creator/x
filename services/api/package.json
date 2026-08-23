@@ -24,6 +24,7 @@
     "@nestjs/platform-express": "11.1.6",
     "bullmq": "5.58.5",
     "express": "5.1.0",
+    "helmet": "8.0.0",
     "ioredis": "5.8.2",
     "jose": "6.1.0",
     "pg": "8.16.3",
