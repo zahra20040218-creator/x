@@ -23,9 +23,31 @@ The full §12 line-by-line pass, with all six named attack cases, is in
 
 ---
 
+## Machine-readable summary
+
+`ACCEPTANCE_CHECKLIST.md` Part Zero counts unfixed P0/P1 rows with
+`grep -cE "^\| (P0|P1)" DEFECTS.md`. **That gate must be able to read this
+file, or it silently reports "clean" while a P0 is open** — which is the exact
+failure mode the checklist exists to prevent. So the open items are listed here
+in the shape that command expects.
+
+| Severity | ID | Status | One line |
+|---|---|---|---|
+| P0 | D-2 | **UNRESOLVED** | The in-memory Redis has never been checked against a real Redis; double-accept protection is designed-and-unit-tested, not verified |
+| P2 | D-4 | open | Idempotent response stored outside the work's transaction |
+| P2 | S-3 | open | Admin tokens cannot be revoked without rotating JWT_SECRET |
+| P2 | S-4 | open | No rate limiting on any endpoint |
+| P2 | D-7 | open | Production PgBouncer guard is a string match, not a URL parse |
+| P2 | D-6b | open | Zero-fare settlement raises a confusing error |
+
+Expected count from the checklist command: **1**. A `1` here means STOP and read
+this file, exactly as the checklist says.
+
+---
+
 ## UNRESOLVED
 
-### D-2 — The in-memory Redis is unverified against real Redis · **P0-class RISK**
+### D-2 — The in-memory Redis is unverified against real Redis · **P0-class RISK · UNRESOLVED**
 
 **Files:** `src/redis/in-memory-redis.ts`, `test/integration/ioredis-conformance.test.ts`
 
