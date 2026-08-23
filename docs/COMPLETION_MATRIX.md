@@ -8,7 +8,7 @@ Every requirement, its status, and the command that proves it.
 **and passing** · typecheck clean · lint clean · **and I ran the command
 myself**. Anything I could not execute here is `BLOCKED`, never `DONE`.
 
-**Last verified:** 2026-08-23 · 642 backend tests + 11 admin tests passing.
+**Last verified:** 2026-08-23 (second pass) · **643 backend + 11 admin tests, 0 skipped.**
 
 ---
 
@@ -74,6 +74,7 @@ curl -s http://localhost:4123/v1/health/ready  # degraded, PG+Redis fail  503
 | **Row-level / IDOR protection** | **DONE** | other rider's ride → **404 not 403**; list filters on token id | `api.e2e.test.ts` | `npx vitest run` | pass |
 | DTO validation on every endpoint | **DONE** | Zod at every boundary; RFC 9457 with field paths | `api.e2e.test.ts` | `npx vitest run` | pass |
 | **Rate limiting** | **PARTIAL** | Redis fixed-window; 11th OTP → 429; per-user not per-IP; spoofed XFF ignored | `api.e2e.test.ts` | `npx vitest run` | 6 pass · **fails open, so INACTIVE without Redis** |
+| **Security headers** | **DONE** | CSP `default-src 'none'`, HSTS 180d, nosniff, DENY, no X-Powered-By | live response | `curl -sD - /v1/health` | **7 headers verified on the binary** |
 | **Admin audit log** | **DONE** | actor/action/target/result/correlationId; failures recorded; PII scrubbed | `audit.service.test.ts`, `api.e2e.test.ts` | `npx vitest run` | 12 pass |
 | PII never logged | **DONE** | structural redaction at depth; coords coarsened to ~110 m | `logger.test.ts` | `npx vitest run` | 38 pass |
 | Webhook signature | **DONE** | HMAC over raw bytes, `timingSafeEqual`, checked before parsing | `webhook.test.ts` | `npx vitest run` | pass |
@@ -114,7 +115,7 @@ $ grep -rnE "\+9647[0-9]{9}" services/api/src --include=*.ts | grep -v .test.
 | **Background location (§5.3)** | **BLOCKED** | foreground service, Doze exemption + explainer, offline buffer, no WorkManager | `location_service_test.dart` written | needs Flutter **+ device** | `AUTOMATED = written, unrun` · **`REAL DEVICE = BLOCKED`** |
 | Arabic / RTL / localisation | **PARTIAL** | interface-based strings; no hardcoded user text | — | needs Flutter | **never compiled** |
 | Admin panel | **PARTIAL** | data provider, money formatter, contract paths | `money.test.ts` | `npx vitest run` | 11 pass · **no UI screens** |
-| Loading/Empty/Error/Success on every screen | **FAILED** | not systematically implemented | — | — | **not done** |
+| Loading/Empty/Error/Success on every screen | **PARTIAL** | `AsyncView` makes all four **structural** — `empty` and `onRetry` are required params, so omitting them fails to compile; permission-denial error+retry added | `async_view_test.dart` (12 widget tests) | needs Flutter | **written, UNRUN** — see `docs/UI_STATE_MATRIX.md` |
 | KYC / documents / approval | **BLOCKED** | `CLAUDE.md` §2 says OUT OF SCOPE | — | — | **BLOCKER-2** |
 | Zones / surge / promotions | **BLOCKED** | `CLAUDE.md` §2 says OUT OF SCOPE | — | — | **BLOCKER-2** |
 
@@ -135,16 +136,29 @@ $ grep -rnE "\+9647[0-9]{9}" services/api/src --include=*.ts | grep -v .test.
 
 ## Honest totals
 
-| Status | Count |
-|---|---|
-| **DONE** — built, tested, and I ran it | 29 |
-| **PARTIAL** — works but not fully verified, or scope-limited | 12 |
-| **BLOCKED** — needs Docker, Flutter, a device, k6, or credentials | 17 |
-| **FAILED** — not done | 1 |
+| Status | Count | Change |
+|---|---|---|
+| **DONE** — built, tested, and I ran it | **30** | +1 (security headers) |
+| **PARTIAL** — works but not fully verified, or scope-limited | **13** | +1 (UI states, was FAILED) |
+| **BLOCKED** — needs Docker, Flutter, a device, k6, or credentials | **17** | unchanged |
+| **FAILED** — not done | **0** | −1 |
 
-**One `FAILED`:** Loading/Empty/Error/Success is not systematically applied
-across every screen. Recorded as failed rather than partial because the brief
-states it as a per-screen requirement and it was not met.
+Counted from the rows above, not estimated.
+
+**Nothing moved from BLOCKED to DONE**, because no blocking dependency became
+available. Docker, Flutter, k6 and a physical device are all still absent —
+re-verified this session, not assumed.
+
+**The former `FAILED` is now `PARTIAL`, not `DONE`.** The four states were made
+structural — `AsyncView` will not compile without an empty state and a retry
+handler — and the worst real gap was fixed: the CLAUDE.md §5.3 permission screen
+previously did *nothing* on a denial, leaving the driver stuck with no
+explanation on the one screen that decides whether background location works.
+
+It is **not** `DONE` because no Flutter SDK exists here: the 12 widget tests are
+written and have never run, and `docs/UI_STATE_MATRIX.md` lists five gaps still
+open (ride-history screen, driver empty-earnings, map picker, dark mode,
+per-screen accessibility).
 
 ---
 
