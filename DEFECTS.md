@@ -36,7 +36,7 @@ in the shape that command expects.
 | P0 | D-2 | **UNRESOLVED** | The in-memory Redis has never been checked against a real Redis; double-accept protection is designed-and-unit-tested, not verified |
 | P2 | D-4 | open | Idempotent response stored outside the work's transaction |
 | P2 | S-3 | open | Admin tokens cannot be revoked without rotating JWT_SECRET |
-| P2 | S-4 | open | No rate limiting on any endpoint |
+| P2 | S-4 | **partly fixed** | Rate limiting now implemented (Redis fixed-window, 429 verified over HTTP) but **fails open**, so it is INACTIVE whenever Redis is down - see S-7 |
 | P2 | D-7 | open | Production PgBouncer guard is a string match, not a URL parse |
 | P2 | D-6b | open | Zero-fare settlement raises a confusing error |
 

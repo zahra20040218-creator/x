@@ -1,239 +1,151 @@
-# التقرير النهائي
+# FINAL REPORT
 
-**التاريخ:** ٢٣ آب ٢٠٢٦
-**الحالة:** كل المهام الـ٤٤ إمّا مكتملة (٣٢) أو متوقفة لغياب أداة (١٢). لا يوجد شيء لم يُبدأ.
-
----
-
-## الحكم في جملة واحدة
-
-> **لا. هذا غير صالح لإعطائه لسائقين حقيقيين وركّاب حقيقيين يحملون أموالاً حقيقية — بعد.**
->
-> ليس لأن المنتج ناقص هذه المرة، بل لأن **أخطر ادعاء فيه لم يتحقق منه أحد**، ولأن
-> ملفات قاعدة البيانات لم تُشغَّل ولا مرة، ولأن التطبيقين لم يُصرَّفا ولم يُختبرا.
-
-المنتج الآن **مبني بالكامل**. ما يمنع الإطلاق لم يعد "لا يوجد تطبيق"، بل
-**"لا يوجد جهاز تحقّقنا عليه"**.
+**Date:** 2026-08-23 · **Commit:** `354ef5a` · Every number below is counted
+from `docs/COMPLETION_MATRIX.md` or read from a command's output. None are
+estimated.
 
 ---
 
-## ١. ما الذي يستطيع المستخدم فعله الآن؟
+## FINAL STATUS
 
-بُني كل شيء طلبته. هذا ما يفعله المستخدم — **نظرياً**، لأن التطبيقين لم يُصرَّفا:
+**NOT PRODUCTION READY.** The backend is built, compiles clean, and genuinely
+runs — but it has never once been executed against a real PostgreSQL or a real
+Redis, and the mobile apps have never been compiled at all.
 
-| المستخدم | ما يستطيع فعله |
+---
+
+## DONE: 30
+## PARTIAL: 13
+## BLOCKED: 17
+## FAILED: 0
+
+`FAILED` went 1 → 0. The former failure (per-screen Loading/Empty/Error/Success)
+is now `PARTIAL`, **not** `DONE`: the four states were made structural — the
+shared `AsyncView` will not compile without an empty state and a retry handler —
+but no Flutter SDK exists here, so the 12 widget tests are written and unrun.
+
+**Nothing moved from BLOCKED to DONE.** No blocking dependency became available.
+
+---
+
+## REAL INFRASTRUCTURE: **BLOCKED**
+
+Re-checked by running the commands, not by reading a prior report:
+
+```
+docker --version   -> command not found
+psql / pg_isready  -> NOT FOUND
+redis-cli          -> NOT FOUND
+k6 / flutter / dart / gradle -> NOT FOUND
+netstat :5432 :6432 :6379    -> nothing listening
+adb devices        -> daemon started; list empty
+```
+
+## REAL DATABASE: **BLOCKED**
+5 up + 5 down migrations exist and are statically checked. **Never executed.**
+The append-only ledger trigger and the balanced-entry deferred constraint are
+written and have never run. Postgres-level guarantees are unproven.
+
+## REAL REDIS: **BLOCKED — this is the one P0**
+`DEFECTS.md D-2` remains **UNRESOLVED**. The atomic claim
+`SET ride:{id}:claim {driverId} NX PX 30000` is proved only against my own
+in-memory fake. That fake has already diverged from real Redis once in this
+project — `DEL` failed to remove hash keys, which would have left an offline
+driver visible. The conformance suite that would catch the next divergence
+exists and **skips**, loudly, with no real Redis to run against.
+
+**Consequence if it diverges again: two drivers accept the same ride.**
+
+## REAL HTTP: **PASS**
+A freshly built binary answered real requests. Verified the responding process
+was the new one by matching the PID in the boot log (`16224`) against the PID
+holding the socket — an earlier proof in this project was invalid because a
+stale process held the port.
+
+| Request | Result |
 |---|---|
-| **الراكب** | يسجّل دخوله برقمه العراقي · يحدّد وجهة · يرى الأجرة مفصّلة قبل الطلب · يطلب رحلة · يتابع السائق لحظياً · يُلغي · يقيّم |
-| **السائق** | يسجّل دخوله (بحساب تنشئه أنت) · يتصل ويصبح مرئياً · يستقبل عرضاً بمهلة · يقبل أو يرفض · يتوجّه بخرائط جوجل · يصل، يبدأ، ينهي · يرى محفظته |
-| **أنت (الإدارة)** | تنشئ سائقين · توقفهم · ترى كل الرحلات وتفاصيل كل رحلة · تشحن محافظ · تحلّ النزاعات · **تغيّر الأجرة والعمولة بلا إعادة نشر** |
+| `GET /v1/health` | 200 `{"status":"ok"}` |
+| `GET /v1/health/ready` | **503** `postgres:fail, redis:fail` |
+| `GET /v1/me` no token | 401 RFC 9457 |
+| `alg:none` forged JWT on an admin route | **401** |
+| bad body | 422 problem+json, per-field paths |
 
-**والخادم يعمل فعلاً.** ٦٠٠ اختبار آلي تمرّ عبر HTTP حقيقي، من تسجيل الدخول حتى
-تسوية المال.
+## REAL E2E: **PARTIAL**
+38 end-to-end tests run over real HTTP through the real Nest stack — real
+routing, guards, validation, serialisation. **Against in-memory Postgres and
+Redis fakes.** So the wiring is proved and the storage semantics are not.
 
----
+## LOAD TEST: **BLOCKED**
+`test/load/matching.load.js` is written with `double_accepts == 0` and
+`duplicate_rides_created == 0` as hard thresholds. k6 is not installed; it has
+never run. The 500-concurrent / p95 < 200ms target is **unmeasured**. Even once
+run here it would say nothing about a 4-core VPS.
 
-## ٢. الأرقام
+## SECURITY: **PASS with two open items**
 
-| البند | العدد |
-|---|---|
-| اختبارات آلية ناجحة | **٦١١** (٦٠٠ خادم + ١١ لوحة إدارة) |
-| اختبارات فاشلة | **صفر** |
-| أخطاء أنواع / جودة كود | **صفر** |
-| مهام مكتملة ومختبَرة | ٣٢ من ٤٤ |
-| مهام متوقفة لغياب أدوات | ١٢ |
-| مهام لم تُبدأ | **صفر** |
-| عيوب خطيرة اكتُشفت وأُصلحت | **٤** (ثلاثة P1 وواحد P3) |
+Verified live, not asserted: CSP `default-src 'none'`, HSTS 180d, `X-Frame-Options: DENY`,
+nosniff, `Referrer-Policy: no-referrer`, `x-powered-by` count **0**.
+CORS proved in three directions — allowed origin echoed, disallowed origin gets
+no ACAO, and `CORS_ALLOWED_ORIGINS="*"` **refuses to boot**.
+SQL injection re-audited line by line across all 3 interpolation sites: every
+interpolated value is a string literal in source; 97 `$n` placeholders, zero
+interpolated user input. IDOR returns **404, not 403**. PII scrubbed before the
+audit-log DB write. 0 phone numbers in the live log.
 
-**لم يُحذف أي اختبار ولم يُضعَّف أي اختبار لجعل النتيجة خضراء.**
+Open: **S-7** rate limiting fails open, so it is inactive while Redis is down —
+a deliberate availability-over-protection choice, documented, cost stated.
+**S-3** admin tokens cannot be revoked without rotating `JWT_SECRET`.
 
----
+## ANDROID REAL DEVICE: **BLOCKED**
+`adb` is present, **zero devices attached**. The 20-minute screen-off driving
+test on a Xiaomi and a Samsung has not happened. Automated buffer/sampling logic
+passes; **the field test is not claimed to pass.** MIUI/One UI process killers
+have no emulator substitute, and `CLAUDE.md` §5.3 calls this the single most
+common cause of ride-hailing MVP death in production.
 
-## ٣. الخطر الأهم — اقرأ هذا حتى لو لم تقرأ غيره ⚠️
+## STACK CONFLICT: **BLOCKED — OWNER DECISION REQUIRED**
+Brief says Kotlin/Compose + Next.js + Prisma. `CLAUDE.md` §1 says Flutter +
+Refine. Implementation is **25 `.dart` files, 0 `.kt`**.
+I did **not** rewrite Flutter to Kotlin, did not treat Flutter as satisfying the
+Kotlin requirement, did not delete Dart files, did not edit `CLAUDE.md` to erase
+the conflict, and do not claim it resolved. Options and a recommendation (keep
+Flutter) are in `docs/BLOCKERS.md` BLOCKER-1.
 
-كل ما قيل عن "٥٠ سائقاً متزامناً وفائز واحد" — الفحص رقم ٤ في قائمتك، أخطر فحص
-فيها — **جرى على نسخة مقلَّدة من Redis كتبتُها أنا في الجلسة نفسها التي كتبتُ
-فيها الكود الذي تفحصه.**
+## SCOPE CONFLICT: **BLOCKED — SCOPE DECISION REQUIRED**
+Brief §15/§16 require KYC, driver approval, surge, zones, promotions.
+`CLAUDE.md` §2 lists all five as **OUT OF SCOPE** and §12.7 forbids scaffolding
+them. Neither built nor deleted. Recorded in BLOCKER-2.
 
-بلغة أوضح: **الحَكَم الذي حكم بالنجاح صنعتُه أنا، ولم يتحقق منه أحد.**
+## PRODUCTION READY: **NO**
 
-### لماذا هذا ليس قلقاً نظرياً
-
-أثناء العمل **انكشف فعلاً اختلاف بين النسخة المقلَّدة و Redis الحقيقي**: أمر
-الحذف كان يحذف نوعاً واحداً من المفاتيح فقط، فبقي آخر موقع معروف للسائق مقروءاً
-بعد قطعه الاتصال. أُصلح، وأُضيف إلى الفحص المقارن.
-
-هذا دليلان في آن: أن آلية الكشف تعمل، **وأن الاختلاف حقيقي وليس احتمالاً بعيداً**.
-
-### ماذا لو كانت النسخة المقلَّدة مخطئة في موضع آخر؟
-
-عندها لا تعمل حماية التضارب، **والاختبارات تبقى خضراء**. هذا أسوأ شكل ممكن لعيب:
-عيب يخبرك أن كل شيء بخير.
-
-### ما يخفّف الخطر
-
-تحت طبقة Redis أربع طبقات حماية مستقلة عنها تماماً: التحديث المشروط بالحالة
-السابقة، وفهرس فريد في قاعدة البيانات يمنع رحلتين نشطتين لسائق واحد، وقاعدة
-الصلاحية داخل آلة الحالات، وتحرير الحجز عند الفشل. **اختلاف في Redis عليه أن
-يهزم الأربعة جميعاً** لينتج إرسال سائقين لراكب واحد.
-
-### كيف تغلقه — أمر واحد
-
-```bash
-docker compose -f infra/docker-compose.yml up -d redis
-TEST_REDIS_URL=redis://localhost:6379 pnpm --filter @rideapp/api test:integration
-```
-
-المتوقع: مجموعة باسم `IoRedisAdapter (real Redis)` تعمل وتنجح.
-إن رأيت `skipped` فالثغرة ما زالت مفتوحة.
-
-**أضفتُ في CI فحصاً يُسقِط البناء إن تخطّى هذا الاختبار بصمت.**
+Not "close to production ready." The precise truth: a backend that compiles,
+lints, passes 654 tests, boots, serves correct HTTP, and degrades gracefully —
+whose money, matching, and state-machine guarantees have never touched the
+databases they depend on, and whose two client apps have never been compiled.
 
 ---
 
-## ٤. عيوب خطيرة اكتُشفت وأُصلحت
+## EXACT REMAINING BLOCKERS
 
-هذه ليست تحسينات تجميلية. كل واحد منها كان سيصل إلى سائق أو راكب.
+| # | Blocker | Needs | Unblocks |
+|---|---|---|---|
+| 1 | **Stack conflict** | **your decision** | mobile + admin direction |
+| 2 | **Scope conflict** | **your decision** | KYC, surge, zones, promos |
+| 3 | Docker not installed | Docker Desktop | migrations, PgBouncer, **the P0 real-Redis run**, workers, integration tests |
+| 4 | Flutter SDK not installed | Flutter 3.24+ | 25 Dart files never compiled — **expect first-run compile errors** |
+| 5 | No Android device | a real Xiaomi + Samsung | the §5.3 background-location field test |
+| 6 | Third-party credentials | Firebase, Maps, FCM, keystore, Play | OTP, maps, push, signed build |
+| 7 | k6 not installed | k6 | the 500-user load target |
 
-**١. رحلة مكرَّرة وسائق ثانٍ (P1).** وظيفة تنظيف الطلبات القديمة كانت تحذف مفتاح
-راكب **آخر** ما زال نشطاً. النتيجة: انقطاع شبكة عند ذلك الراكب يُنتج رحلة ثانية
-وسائقاً ثانياً. أثبتُّ أن اختبار الحماية حقيقي بإعادة الخلل عمداً ورؤيته يسقط.
+**Order that matters: 3 first.** It closes the only P0 and the largest share of
+`BLOCKED` rows.
 
-**٢. سائق يرى عرضاً وهمياً (P1).** عند انتهاء مهلة العرض كان الكود يقرأ حقلاً
-يكون **دائماً فارغاً** في تلك اللحظة، فيبقى السائق يرى عرضاً لرحلة انتقلت لغيره.
-اكتُشف لأن بوابة التغطية رصدت فرعاً لا يُنفَّذ أبداً — أي أن شرط الـ٩٥٪ لم يقِس
-التغطية فقط، **بل كشف خللاً**.
-
-**٣. السائق لا يستطيع رؤية الرحلة المعروضة عليه (P1).** كان عليه أن يقرّر القبول
-دون أن يرى نقطة الانطلاق ولا الأجرة.
-
-**٤. أرقام هواتف حقيقية محتملة في ملفات الاختبار (P3).** `CLAUDE.md` §12.6 يمنع
-هذا صراحةً "بما في ذلك الاختبارات". نُقلت كلها إلى نطاق أصفار. وأثناء الإصلاح
-اكتُشف أن أحد الاختبارات **صار بلا معنى** — يفحص وجود رقم لم يعد موجوداً — فأُعيدت
-كتابته ليفحص الخاصية الحقيقية.
-
----
-
-## ٥. العيوب غير المُصلَحة، بعواقبها الواقعية
-
-| العيب | العاقبة بلغة الشارع | الخطورة |
-|---|---|---|
-| Redis المقلَّد غير متحقَّق منه | *احتمال* إرسال سائقين لراكب واحد دون أن تكشفه الاختبارات | **خطر بمستوى P0** |
-| استجابة الطلب تُحفَظ خارج المعاملة | لو مات الخادم في لحظة معيّنة، يرى الراكب رسالة محيّرة ليوم كامل **رغم أن رحلته أُنشئت فعلاً**. لا مال يُخسَر ولا سائق يُرسَل مرتين | P2 |
-| لا يمكن إبطال جلسة مدير | لو ضاع جهاز مدير، لا سبيل لقطع جلسته إلا بتغيير المفتاح — ما يُخرج الجميع | P2 |
-| لا حد لعدد الطلبات | يستطيع أحدهم استنزاف رصيد Firebase بحلقة طلبات | P2 |
-| فحص اتصال قاعدة البيانات نصّي | قد يمر إعداد إنتاج خاطئ فينهار النظام تحت الضغط | P2 |
-
----
-
-## ٦. المهام المتوقفة، وماذا تعني للمنتج
-
-| المهمة | السبب | ماذا يعني عملياً |
-|---|---|---|
-| تشغيل ملفات قاعدة البيانات | **لا Docker ولا Postgres** | مكتوبة ومفحوصة نصّياً، لكن **لم يشغّلها أحد ولا مرة**. كل ضمانات القاعدة — منع تعديل الدفتر، توازن القيود، منع رحلتين لسائق — هي اليوم **ادعاء عن ملف، لا عن قاعدة بيانات** |
-| طبقة الاتصال بالقاعدة | نفس السبب | مكتوبة، غير مجرَّبة |
-| تفريغ المواقع كل ٣٠ ثانية | نفس السبب | الجانب الذي يقرأ من Redis مختبَر؛ الكتابة في القاعدة لا |
-| **التطبيقات الثلاثة** | **لا Flutter** | مكتوبة بالكامل، **لم تُصرَّف ولم تُحلَّل ولم تُختبَر** |
-| **الموقع في الخلفية** | **لا Flutter ولا هاتف** | مبني بكل ما يطلبه §5.3 — خدمة أمامية، استثناء بطارية بشاشة شرح، تخزين مؤقت، بلا WorkManager — **ولا شيء من ذلك كافٍ** |
-| اختبار التحميل | **لا k6 ولا خادم** | مكتوب، لم يُشغَّل. أرقامه أهداف لا قياسات |
-
-### عن الموقع في الخلفية تحديداً
-
-ملفك يسميه "أشهر سبب لفشل تطبيقات النقل"، وملف التشغيل يتوقع أنه "سيُنجز نظرياً
-ويفشل على هاتف حقيقي". **كلاهما محق.**
-
-نُفّذت متطلبات §5.3 الأربعة كاملة. ومع ذلك: شاومي وسامسونغ وهواوي وأوبو يضيف كل
-منهم قاتل عمليات خاصاً به فوق أندرويد، ويختلفون عن بعضهم وعن المحاكي.
-
-**الفحص رقم ٢ في قائمتك — عشرون دقيقة قيادة حقيقية والشاشة مطفأة، مكرَّرة على
-شاومي وسامسونغ — هو الاختبار الوحيد الذي يعني شيئاً لهذه الميزة.** لا بديل عنه،
-ولا كمية اختبارات آلية تحلّ محله.
-
----
-
-## ٧. الأوامر التي تشغّلها للتحقق بنفسك
-
-**لا تصدّق هذا التقرير. شغّل الأوامر.**
+## Reproduce every claim here
 
 ```bash
-cd services/api && npx vitest run
-```
-المتوقع: `Test Files 19 passed | 1 skipped` و `Tests 600 passed | 1 skipped`
-
-```bash
-cd services/api && npx tsc --noEmit
-```
-المتوقع: **لا مخرجات إطلاقاً**
-
-```bash
-cd services/api && npx eslint "src/**/*.ts" "test/**/*.ts"
-```
-المتوقع: **لا مخرجات إطلاقاً**
-
-```bash
-cd services/api && npx vitest run --coverage
-```
-المتوقع: **لا تظهر أسطر `ERROR: Coverage ... does not meet`**.
-هذا يثبت أن نواة الصحّة تجاوزت حد ٩٥٪ الذي يفرضه `CLAUDE.md`.
-
-```bash
+cd services/api && rm -rf dist && npx tsc --noEmit && npx eslint "src/**/*.ts" "test/**/*.ts" \
+  && npx tsc -p tsconfig.build.json && npx vitest run
 cd apps/admin && npx vitest run
 ```
-المتوقع: `Tests 11 passed`
-
-**وأهم أمر، الذي يغلق الخطر في القسم ٣:**
-```bash
-docker compose -f infra/docker-compose.yml up -d redis
-TEST_REDIS_URL=redis://localhost:6379 pnpm --filter @rideapp/api test:integration
-```
-
-**القاعدة الذهبية من ملفك:** إن تعارض هذا التقرير مع `VERIFY.md`، فـ `VERIFY.md`
-هو الصحيح. هو مخرَج آلة، وهذا سرد.
-
----
-
-## ٨. خطواتك التالية، بالترتيب
-
-١. **ثبّت Docker.** يفتح ثلاثة أشياء دفعة واحدة: تشغيل قاعدة البيانات، وإغلاق
-   خطر Redis، والحلقة الذاتية كما صُمّمت. **أعلى خطوة مردوداً بفارق كبير.**
-
-٢. **شغّل فحص Redis الحقيقي.** أمر واحد، ويغلق الخطر الوحيد بمستوى P0.
-
-٣. **شغّل ملفات قاعدة البيانات صعوداً ثم نزولاً ثم صعوداً** على قاعدة نظيفة. هذا
-   يحوّل ضمانات القاعدة من ادعاء إلى واقع.
-
-٤. **ثبّت Flutter** وشغّل `flutter analyze` و `flutter test` على الحزم الثلاث.
-   **توقّع أخطاء تصريف** — الكود لم يُصرَّف ولا مرة.
-
-٥. **أضف حدّاً لعدد الطلبات** قبل أن يواجه أي منفذ الإنترنت المفتوح.
-   (CORS مُضاف بالفعل، مع رفض صريح لـ `*`.)
-
-٦. **ثم، وليس قبل ذلك، نفّذ الفحوصات الستّة في `ACCEPTANCE_CHECKLIST.md`.**
-
----
-
-## ٩. ما لا أستطيع أن أعرفه
-
-- **لم أشغّل ملفات قاعدة البيانات ولا مرة.** قد تنهار عند أول تشغيل.
-- **لم أصرّف سطر Dart واحداً.** التطبيقان قد لا يُصرَّفان من أول محاولة.
-- **لم أرَ هاتفاً.** الفحصان ١ و٢ لا يمكن لأي كمية اختبارات آلية أن تحل محلهما.
-- **راجعتُ عملي بنفسي.** ملفك يقول إن تقرير الوكيل عن عمله خاطئ في نحو ٢٣٪ من
-  الحالات. لا سبب يجعلني استثناءً — **والدليل أنني وجدتُ في مراجعتي الذاتية أربعة
-  عيوب حقيقية كنتُ قد كتبتُها بنفسي قبل ساعات.** عاملْ `DEFECTS.md` كنقطة بداية
-  لمراجعة حقيقية، لا كشهادة سلامة.
-
----
-
-## الخلاصة
-
-المنتج **مبني بالكامل**: خلفية تعمل، تطبيق راكب، تطبيق سائق، لوحة إدارة، ونواة
-صحّة مختبَرة بـ٦١١ اختباراً لا يفشل منها واحد.
-
-وما يمنع إعطاءه لأحد اليوم ليس نقصاً في البناء، بل **نقص في التحقق**:
-
-- الحَكَم الذي أثبت أخطر ميزة **صنعتُه أنا ولم يتحقق منه أحد**
-- قاعدة البيانات **لم تُشغَّل ولا مرة**
-- التطبيقان **لم يُصرَّفا ولا مرة**
-
-كل واحدة من هذه الثلاث تُغلق بأمر واحد على جهاز فيه Docker و Flutter.
-
-**حتى ذلك الحين: لا تعطِ هذا لأحد. ولا لسائق واحد.**
+Full evidence with raw output: `VERIFY.md`, `docs/COMPLETION_MATRIX.md`,
+`docs/BLOCKERS.md`, `docs/security-audit.md`, `docs/UI_STATE_MATRIX.md`, `DEFECTS.md`.
