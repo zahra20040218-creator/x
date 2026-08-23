@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import pg from 'pg';
 
@@ -133,8 +133,24 @@ export async function migrateDown(connectionString: string, steps = 1): Promise<
   }
 }
 
-// CLI entry point.
-if (import.meta.url === `file://${process.argv[1]}`) {
+/**
+ * CLI entry point.
+ *
+ * `pathToFileURL`, not string concatenation. The previous check was
+ * `import.meta.url === \`file://${process.argv[1]}\``, which on Windows
+ * compares `file:///C:/Users/.../migrate.js` against
+ * `file://C:\Users\...\migrate.js` and never matches — so
+ * `migrate:up` exited 0 having applied nothing. A migration command that
+ * reports success and does nothing is worse than one that fails: it produces
+ * an empty schema that everyone believes is migrated.
+ *
+ * Found the first time the migrations were ever executed.
+ */
+const invokedDirectly =
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (invokedDirectly) {
   const command = process.argv[2] ?? 'up';
   const steps = Number(process.argv[3] ?? 1);
 

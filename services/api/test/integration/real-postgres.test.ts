@@ -42,6 +42,7 @@ const describeReal = RUN ? describe : describe.skip;
 const RIDER = '11111111-1111-4111-8111-111111111111';
 const DRIVER_A = 'aaaaaaaa-1111-4111-8111-111111111111';
 const DRIVER_B = 'bbbbbbbb-1111-4111-8111-111111111111';
+const TRANSACTION = 'cccccccc-1111-4111-8111-111111111111';
 
 describeReal('real PostgreSQL', () => {
   let db: PgDatabase;
@@ -85,6 +86,27 @@ describeReal('real PostgreSQL', () => {
       [RIDER, status],
     );
     return result.rows[0]!.id;
+  }
+
+  /**
+   * Two entries that sum to zero, sharing one transaction_id.
+   *
+   * Both details are load-bearing: `transaction_id` is NOT NULL, and a
+   * DEFERRABLE INITIALLY DEFERRED constraint trigger rejects the transaction at
+   * COMMIT unless the entries for that id balance. An unbalanced pair would
+   * fail for the wrong reason and make the append-only tests meaningless.
+   */
+  async function seedBalancedLedger(rideId: string): Promise<void> {
+    // One transaction_id shared by both rows - generated here rather than with
+    // gen_random_uuid(), which would be evaluated per row and produce two
+    // separate, each-unbalanced transactions.
+    await db.query(
+      `INSERT INTO ledger_entries
+         (transaction_id, ride_id, account_type, account_id, direction, amount_iqd, description)
+       VALUES ($3, $1, 'DRIVER_WALLET',    $2, 'CREDIT', 5000, 'fare'),
+              ($3, $1, 'DRIVER_CASH_HELD', $2, 'DEBIT',  5000, 'cash')`,
+      [rideId, DRIVER_A, TRANSACTION],
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -204,13 +226,7 @@ describeReal('real PostgreSQL', () => {
   describe('ledger', () => {
     it('is append-only: UPDATE is refused by the trigger', async () => {
       const rideId = await createRide('COMPLETED');
-      await db.query(
-        `INSERT INTO ledger_entries
-           (ride_id, account_type, account_id, direction, amount_iqd, description)
-         VALUES ($1,'DRIVER_WALLET',$2,'CREDIT',5000,'fare'),
-                ($1,'DRIVER_CASH_HELD',$2,'DEBIT',5000,'cash')`,
-        [rideId, DRIVER_A],
-      );
+      await seedBalancedLedger(rideId);
 
       await expect(
         db.query(`UPDATE ledger_entries SET amount_iqd = 1 WHERE ride_id = $1`, [rideId]),
@@ -219,13 +235,7 @@ describeReal('real PostgreSQL', () => {
 
     it('is append-only: DELETE is refused by the trigger', async () => {
       const rideId = await createRide('COMPLETED');
-      await db.query(
-        `INSERT INTO ledger_entries
-           (ride_id, account_type, account_id, direction, amount_iqd, description)
-         VALUES ($1,'DRIVER_WALLET',$2,'CREDIT',5000,'fare'),
-                ($1,'DRIVER_CASH_HELD',$2,'DEBIT',5000,'cash')`,
-        [rideId, DRIVER_A],
-      );
+      await seedBalancedLedger(rideId);
 
       await expect(
         db.query(`DELETE FROM ledger_entries WHERE ride_id = $1`, [rideId]),
