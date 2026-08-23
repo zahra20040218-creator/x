@@ -66,6 +66,17 @@ export interface RedisPort {
   /** Milliseconds remaining. -2 if the key is gone, -1 if it has no expiry. */
   pttl(key: string): Promise<number>;
 
+  /**
+   * Atomically increment a counter, setting its expiry on FIRST creation only.
+   *
+   * Used for rate limiting. The atomicity and the "first creation only" part
+   * are both load-bearing: a GET-then-SET would let two concurrent requests
+   * both read the same count, and refreshing the TTL on every increment would
+   * turn a fixed window into a sliding one that never expires under sustained
+   * load - the limiter would lock a caller out permanently.
+   */
+  increment(key: string, ttlMs: number): Promise<number>;
+
   // -------------------------------------------------------------------------
   // Driver presence - CLAUDE.md §3.1 (locations live in Redis ONLY)
   // -------------------------------------------------------------------------

@@ -112,6 +112,26 @@ export class InMemoryRedis implements RedisPort {
     return existed ? 1 : 0;
   }
 
+  async increment(key: string, ttlMs: number): Promise<number> {
+    this.assertOpen();
+    if (!Number.isInteger(ttlMs) || ttlMs <= 0) {
+      throw new Error(`increment requires a positive integer ttlMs, got ${ttlMs}`);
+    }
+
+    // Read and write with no await between them, so two concurrent callers
+    // cannot both observe the same count.
+    if (!this.isLive(key)) {
+      this.strings.set(key, { value: '1', expiresAtMs: this.clock.nowMs() + ttlMs });
+      return 1;
+    }
+
+    const entry = this.strings.get(key)!;
+    const next = Number(entry.value) + 1;
+    // The expiry is NOT refreshed - see the port's contract.
+    entry.value = String(next);
+    return next;
+  }
+
   async pttl(key: string): Promise<number> {
     this.assertOpen();
     if (!this.isLive(key)) return -2;

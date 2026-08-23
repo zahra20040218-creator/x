@@ -21,6 +21,7 @@ import { PlatformConfigService } from '../platform-config/platform-config.servic
 import { RideService } from '../rides/ride.service.js';
 import type { Actor, RideRecord } from '../rides/ride.types.js';
 import { CurrentActor, CurrentUser, Roles } from './auth.guard.js';
+import { RateLimit } from './rate-limit.js';
 import { presentRide, type CounterpartyRow, type RidePresentation } from './presenters.js';
 import {
   CancelRideSchema,
@@ -52,6 +53,9 @@ export class RidesController {
   ) {}
 
   @Post('fare/estimate')
+  // Cheap but not free: it reads config and does trigonometry. A rider
+  // dragging a pin fires several per second, so the limit sits above that.
+  @RateLimit({ limit: 60, windowSeconds: 60, by: 'user' })
   @HttpCode(200)
   async estimate(@Body(zodBody(FareEstimateSchema)) body: { pickup: LatLng; dropoff: LatLng }) {
     const tariff = await this.config.tariff(this.db);
@@ -74,6 +78,11 @@ export class RidesController {
    */
   @Post('rides')
   @Roles('RIDER')
+  // Deliberately generous: CLAUDE.md 5.2 REQUIRES the app to retry with the
+  // same Idempotency-Key on a dropped response, and a tight limit here would
+  // punish exactly the behaviour the constitution mandates. The idempotency
+  // layer - not this limit - is what stops duplicate rides.
+  @RateLimit({ limit: 20, windowSeconds: 60, by: 'user' })
   async create(
     @CurrentUser() user: AuthenticatedUser,
     @Headers('idempotency-key') idempotencyKey: string | undefined,

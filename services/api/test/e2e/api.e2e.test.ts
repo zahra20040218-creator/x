@@ -13,6 +13,7 @@ import { FakeClock } from '../../src/common/clock.js';
 import { ConfigSchema } from '../../src/common/config.js';
 import { AuthGuard } from '../../src/http/auth.guard.js';
 import { ProblemFilter } from '../../src/http/problem.filter.js';
+import { RateLimitGuard } from '../../src/http/rate-limit.js';
 import { InMemoryRedis } from '../../src/redis/in-memory-redis.js';
 import { FakeDatabase } from '../fakes/fake-database.js';
 
@@ -671,5 +672,168 @@ describe('API end to end', () => {
         .send({})
         .expect(404);
     });
+  });
+});
+
+/**
+ * Rate limiting — security audit RISK-2 / S-4.
+ *
+ * Proved over real HTTP, because a rate limiter that is only unit-tested is a
+ * rate limiter nobody has watched reject anything.
+ */
+describe('rate limiting', () => {
+  let app: NestExpressApplication;
+  let db: FakeDatabase;
+  let redis: InMemoryRedis;
+  let clock: FakeClock;
+  let firebase: FakeFirebaseVerifier;
+  let http: request.Agent;
+
+  beforeEach(async () => {
+    clock = new FakeClock();
+    db = new FakeDatabase();
+    redis = new InMemoryRedis(clock);
+    firebase = new FakeFirebaseVerifier();
+
+    db.seedConfig({
+      commission_bps: 0, fare_base_iqd: 2_000, fare_per_km_iqd: 500,
+      fare_per_minute_iqd: 50, fare_minimum_iqd: 3_000, fare_rounding_iqd: 250,
+      offer_timeout_seconds: 15, search_radius_meters: 5_000,
+    });
+    firebase.register('rider-token', { uid: 'fb-rider', phoneNumber: '+9647700000001' });
+
+    const config = ConfigSchema.parse({
+      NODE_ENV: 'test',
+      DATABASE_URL: 'postgresql://x:y@pgbouncer:6432/db',
+      REDIS_URL: 'redis://localhost:6379',
+      FIREBASE_PROJECT_ID: 'test-project',
+      JWT_SECRET: 'a-test-secret-that-is-long-enough-32',
+    });
+
+    app = await NestFactory.create<NestExpressApplication>(
+      AppModule.forRoot({ config, database: db, redis, firebase, clock }),
+      { logger: false, bodyParser: false, abortOnError: false },
+    );
+    app.use(express.json({ limit: '256kb' }));
+    app.setGlobalPrefix('v1');
+    app.useGlobalFilters(new ProblemFilter());
+    app.useGlobalGuards(app.get(AuthGuard), app.get(RateLimitGuard));
+
+    await app.init();
+    http = request(app.getHttpServer());
+  });
+
+  afterEach(async () => {
+    await app.close();
+  });
+
+  // The endpoint the whole control exists for: unauthenticated, and every call
+  // costs a real Firebase verification.
+  it('blocks OTP abuse after 10 attempts in a window', async () => {
+    const body = { firebaseIdToken: 'rider-token', role: 'RIDER' };
+
+    for (let i = 0; i < 10; i++) {
+      await http.post('/v1/auth/otp/verify').send(body).expect(200);
+    }
+
+    const blocked = await http.post('/v1/auth/otp/verify').send(body).expect(429);
+
+    expect(blocked.headers['content-type']).toMatch(/application\/problem\+json/);
+    expect(blocked.body.type).toMatch(/rate-limit-exceeded$/);
+    expect(blocked.body.retryAfterSeconds).toBeGreaterThan(0);
+  });
+
+  it('lets the caller through again once the window rolls', async () => {
+    const body = { firebaseIdToken: 'rider-token', role: 'RIDER' };
+
+    for (let i = 0; i < 10; i++) {
+      await http.post('/v1/auth/otp/verify').send(body).expect(200);
+    }
+    await http.post('/v1/auth/otp/verify').send(body).expect(429);
+
+    clock.advanceSeconds(61);
+
+    await http.post('/v1/auth/otp/verify').send(body).expect(200);
+  });
+
+  // The limit must not be defeatable by a header the client controls.
+  it('cannot be reset by spoofing X-Forwarded-For when trust proxy is off', async () => {
+    const body = { firebaseIdToken: 'rider-token', role: 'RIDER' };
+
+    for (let i = 0; i < 10; i++) {
+      await http.post('/v1/auth/otp/verify').send(body).expect(200);
+    }
+
+    await http
+      .post('/v1/auth/otp/verify')
+      .set('X-Forwarded-For', '203.0.113.99')
+      .send(body)
+      .expect(429);
+  });
+
+  // Buckets are per-route: exhausting one endpoint must not lock a user out of
+  // the whole API, or a stuck client would take the rider's ride with it.
+  it('keys buckets per route, so one endpoint does not block another', async () => {
+    const body = { firebaseIdToken: 'rider-token', role: 'RIDER' };
+
+    const session = await http.post('/v1/auth/otp/verify').send(body).expect(200);
+    for (let i = 0; i < 9; i++) {
+      await http.post('/v1/auth/otp/verify').send(body).expect(200);
+    }
+    await http.post('/v1/auth/otp/verify').send(body).expect(429);
+
+    // A different route is unaffected.
+    await http
+      .get('/v1/me')
+      .set('Authorization', `Bearer ${session.body.accessToken}`)
+      .expect(200);
+  });
+
+  // Authenticated limits key on the USER, so two riders behind one carrier NAT
+  // do not consume each other's budget - the common case in Baghdad.
+  it('keys authenticated limits per user, not per IP', async () => {
+    firebase.register('rider-b', { uid: 'fb-b', phoneNumber: '+9647700000004' });
+
+    const a = await http.post('/v1/auth/otp/verify').send({
+      firebaseIdToken: 'rider-token', role: 'RIDER',
+    }).expect(200);
+    const b = await http.post('/v1/auth/otp/verify').send({
+      firebaseIdToken: 'rider-b', role: 'RIDER',
+    }).expect(200);
+
+    // Exhaust rider A's fare-estimate budget (60/min).
+    for (let i = 0; i < 60; i++) {
+      await http
+        .post('/v1/fare/estimate')
+        .set('Authorization', `Bearer ${a.body.accessToken}`)
+        .send({ pickup: TAHRIR, dropoff: KARRADA })
+        .expect(200);
+    }
+    await http
+      .post('/v1/fare/estimate')
+      .set('Authorization', `Bearer ${a.body.accessToken}`)
+      .send({ pickup: TAHRIR, dropoff: KARRADA })
+      .expect(429);
+
+    // Rider B, same IP, is unaffected.
+    await http
+      .post('/v1/fare/estimate')
+      .set('Authorization', `Bearer ${b.body.accessToken}`)
+      .send({ pickup: TAHRIR, dropoff: KARRADA })
+      .expect(200);
+  });
+
+  // Fail OPEN: a limiter outage must not become an API outage.
+  it('allows requests when Redis is unreachable', async () => {
+    await redis.close();
+
+    await http
+      .post('/v1/auth/otp/verify')
+      .send({ firebaseIdToken: 'rider-token', role: 'RIDER' })
+      // 200 would need a working DB path too; what matters is that it is NOT
+      // 429 - the limiter did not reject it.
+      .expect((response) => {
+        expect(response.status).not.toBe(429);
+      });
   });
 });

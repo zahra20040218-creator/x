@@ -1,4 +1,5 @@
 import { Module, type DynamicModule } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 
 import { AuthService } from './auth/auth.service.js';
 import {
@@ -16,6 +17,7 @@ import { FareCalculator } from './fare/fare-calculator.js';
 import { AdminController } from './http/admin.controller.js';
 import { AuthController } from './http/auth.controller.js';
 import { AuthGuard } from './http/auth.guard.js';
+import { RateLimitGuard } from './http/rate-limit.js';
 import { DriverController } from './http/driver.controller.js';
 import { OpsController } from './http/ops.controller.js';
 import { RidesController } from './http/rides.controller.js';
@@ -166,6 +168,12 @@ export class AppModule {
         { provide: QueueRegistry, useValue: queues },
 
         AuthGuard,
+        {
+          provide: RateLimitGuard,
+          useFactory: (reflector: Reflector) =>
+            new RateLimitGuard(redis, clock, reflector, logger),
+          inject: [Reflector],
+        },
 
         // Controllers take these by symbol rather than by class, because
         // Database and RedisPort are interfaces with no runtime identity.

@@ -181,6 +181,59 @@ export function runRedisConformance(
       });
     });
 
+    // Rate limiting depends on all three of these being true at once.
+    describe('increment (rate-limit counter)', () => {
+      it('starts at 1 and counts up', async () => {
+        expect(await redis.increment('rl', 60_000)).toBe(1);
+        expect(await redis.increment('rl', 60_000)).toBe(2);
+        expect(await redis.increment('rl', 60_000)).toBe(3);
+      });
+
+      // A GET-then-SET would let concurrent callers read the same count and
+      // each write count+1, letting a burst through the limit.
+      it('never loses an increment under concurrency', async () => {
+        const results = await Promise.all(
+          Array.from({ length: 100 }, () => redis.increment('rl', 60_000)),
+        );
+
+        expect(results.sort((a, b) => a - b)).toEqual(
+          Array.from({ length: 100 }, (_, i) => i + 1),
+        );
+      });
+
+      it('expires the counter, so a window resets', async () => {
+        expect(await redis.increment('rl', 100)).toBe(1);
+        expect(await redis.increment('rl', 100)).toBe(2);
+
+        await harness.advance(150);
+
+        expect(await redis.increment('rl', 100)).toBe(1);
+      });
+
+      // Refreshing the TTL on every increment turns a fixed window into one
+      // that never expires under sustained load - locking a caller out forever.
+      it('does NOT refresh the expiry on later increments', async () => {
+        await redis.increment('rl', 200);
+        await harness.advance(120);
+        await redis.increment('rl', 200);
+        await harness.advance(120);
+
+        // 240ms elapsed against a 200ms TTL: the window must have rolled.
+        expect(await redis.increment('rl', 200)).toBe(1);
+      });
+
+      it('keeps separate keys separate', async () => {
+        await redis.increment('rl:a', 60_000);
+        await redis.increment('rl:a', 60_000);
+        expect(await redis.increment('rl:b', 60_000)).toBe(1);
+      });
+
+      it('rejects a non-positive ttl', async () => {
+        await expect(redis.increment('rl', 0)).rejects.toThrow();
+        await expect(redis.increment('rl', -1)).rejects.toThrow();
+      });
+    });
+
     describe('pttl', () => {
       it('reports -2 for a missing key and a positive remainder for a live one', async () => {
         expect(await redis.pttl('missing')).toBe(-2);

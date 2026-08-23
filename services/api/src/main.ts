@@ -10,6 +10,7 @@ import { createLogger, newRequestId, runWithRequestContext } from './common/logg
 import { DATABASE, type Database } from './db/db.port.js';
 import { ProblemFilter } from './http/problem.filter.js';
 import { AuthGuard } from './http/auth.guard.js';
+import { RateLimitGuard } from './http/rate-limit.js';
 import { RealtimeGateway } from './realtime/realtime.gateway.js';
 
 /**
@@ -73,9 +74,22 @@ async function bootstrap(): Promise<void> {
     });
   }
 
+  // Behind a reverse proxy, req.ip must come from X-Forwarded-For or every
+  // caller looks like the proxy and they all share one bucket. Express only
+  // honours that header when trust proxy is set - and setting it when there is
+  // NO proxy would let any client spoof their own address and reset their
+  // bucket at will, so it is tied to an explicit env flag.
+  if (process.env['TRUST_PROXY'] === 'true') {
+    app.set('trust proxy', 1);
+  }
+
   app.setGlobalPrefix('v1');
   app.useGlobalFilters(new ProblemFilter(logger));
-  app.useGlobalGuards(app.get(AuthGuard));
+  // Auth FIRST, then the rate limiter: the limiter keys on the caller's user
+  // id when there is one, and that id only exists after AuthGuard has run.
+  // Reversing them would bucket every authenticated user by IP, so a whole
+  // office or a carrier NAT would share one limit.
+  app.useGlobalGuards(app.get(AuthGuard), app.get(RateLimitGuard));
   app.enableShutdownHooks();
 
   const server = await app.listen(config.PORT);

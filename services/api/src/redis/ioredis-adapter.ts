@@ -23,6 +23,19 @@ export class IoRedisAdapter implements RedisPort {
   constructor(private readonly redis: Redis) {
     // Registered once, in the constructor. Doing it per-subscribe would attach
     // a new listener on every call and re-deliver each message N times.
+    // INCR then PEXPIRE only when the counter was just created. Two commands
+    // in a pipeline would not be atomic; a Lua script is.
+    this.redis.defineCommand('incrementWithTtl', {
+      numberOfKeys: 1,
+      lua: `
+        local count = redis.call("INCR", KEYS[1])
+        if count == 1 then
+          redis.call("PEXPIRE", KEYS[1], ARGV[1])
+        end
+        return count
+      `,
+    });
+
     this.redis.defineCommand('compareAndDelete', {
       numberOfKeys: 1,
       lua: `
@@ -81,6 +94,17 @@ export class IoRedisAdapter implements RedisPort {
 
   async pttl(key: string): Promise<number> {
     return this.redis.pttl(key);
+  }
+
+  async increment(key: string, ttlMs: number): Promise<number> {
+    if (!Number.isInteger(ttlMs) || ttlMs <= 0) {
+      throw new Error(`increment requires a positive integer ttlMs, got ${ttlMs}`);
+    }
+    return (
+      this.redis as Redis & {
+        incrementWithTtl(key: string, ttlMs: number): Promise<number>;
+      }
+    ).incrementWithTtl(key, ttlMs);
   }
 
   // -------------------------------------------------------------------------

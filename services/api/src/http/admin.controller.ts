@@ -25,6 +25,7 @@ import { iqd, signedIqd } from '../money/iqd.js';
 import { PlatformConfigService, type ConfigKey } from '../platform-config/platform-config.service.js';
 import { RideRepository } from '../rides/ride.repository.js';
 import { CurrentUser, Roles } from './auth.guard.js';
+import { RateLimit } from './rate-limit.js';
 import { presentLedgerEntry, presentRide } from './presenters.js';
 import { requireUuid } from './rides.controller.js';
 import {
@@ -220,6 +221,9 @@ export class AdminController {
    * on the client sending the same key, and a client is not a guarantee.
    */
   @Post('drivers/:driverId/wallet/topup')
+  // Money movement. An operator tops up a handful of wallets a day; anything
+  // faster is a stuck script or a compromised admin session.
+  @RateLimit({ limit: 30, windowSeconds: 60, by: 'user' })
   async topUp(
     @CurrentUser() admin: AuthenticatedUser,
     @Param('driverId') driverId: string,

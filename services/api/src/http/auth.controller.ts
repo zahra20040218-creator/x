@@ -4,6 +4,7 @@ import { AuthService, type AuthenticatedUser } from '../auth/auth.service.js';
 import { DATABASE, type Database } from '../db/db.port.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { CurrentUser, Public } from './auth.guard.js';
+import { RateLimit } from './rate-limit.js';
 import { RefreshSchema, UpdateMeSchema, VerifyOtpSchema } from './schemas.js';
 import { zodBody } from './zod.pipe.js';
 
@@ -17,6 +18,11 @@ export class AuthController {
 
   @Post('auth/otp/verify')
   @Public()
+  // The tightest limit in the system, and the reason rate limiting exists.
+  // Unauthenticated by necessity, and every call costs a real Firebase
+  // verification - unbounded it is both a bill and an enumeration oracle.
+  // 10/minute per IP is far above any honest sign-in and far below abuse.
+  @RateLimit({ limit: 10, windowSeconds: 60, by: 'ip' })
   @HttpCode(200)
   async verifyOtp(
     @Body(zodBody(VerifyOtpSchema))
@@ -38,6 +44,9 @@ export class AuthController {
 
   @Post('auth/refresh')
   @Public()
+  // Refresh rotates, so an honest client refreshes about once an hour. A flood
+  // here is either a broken client retry loop or someone brute-forcing tokens.
+  @RateLimit({ limit: 30, windowSeconds: 60, by: 'ip' })
   @HttpCode(200)
   async refresh(@Body(zodBody(RefreshSchema)) body: { refreshToken: string }) {
     const session = await this.auth.refresh(body.refreshToken);

@@ -21,6 +21,7 @@ import { MatchingService } from '../matching/matching.service.js';
 import { RideService } from '../rides/ride.service.js';
 import type { Actor } from '../rides/ride.types.js';
 import { CurrentActor, CurrentUser, Roles } from './auth.guard.js';
+import { RateLimit } from './rate-limit.js';
 import { presentLedgerEntry, presentRide } from './presenters.js';
 import {
   CompleteRideSchema as CompleteBodySchema,
@@ -85,6 +86,12 @@ export class DriverController {
    * driver app retries from its own buffer if this never lands.
    */
   @Post('driver/location')
+  // The highest-volume endpoint in the system. The app samples every 5s and
+  // flushes every 15s, so ~4/minute is normal - but a driver reconnecting
+  // after a long dead zone flushes a large backlog in several batches, and
+  // throttling that would discard exactly the data CLAUDE.md 5.3 preserves.
+  // Set well above the honest ceiling; this is an abuse guard, not a shaper.
+  @RateLimit({ limit: 120, windowSeconds: 60, by: 'user' })
   @HttpCode(202)
   async reportLocation(
     @CurrentUser() user: AuthenticatedUser,
@@ -151,6 +158,9 @@ export class DriverController {
 
   /** CLAUDE.md §5.1 - exactly one concurrent caller can succeed. */
   @Post('rides/:rideId/accept')
+  // A driver racing for a ride may legitimately tap more than once. The Redis
+  // claim decides the winner; this only stops a scripted flood.
+  @RateLimit({ limit: 60, windowSeconds: 60, by: 'user' })
   @HttpCode(200)
   async accept(@CurrentUser() user: AuthenticatedUser, @Param('rideId') rideId: string) {
     const ride = await this.rides.acceptRide(requireUuid(rideId), user.id);
