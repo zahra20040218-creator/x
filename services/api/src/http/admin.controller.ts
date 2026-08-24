@@ -20,6 +20,10 @@ import type { AuthenticatedUser } from '../auth/auth.service.js';
 import { normalizeIraqiPhone, InvalidPhoneNumberError } from '../auth/phone.js';
 import { TokenService } from '../auth/token.service.js';
 import { ConflictProblem, NotFoundProblem, ValidationProblem } from '../common/problem.js';
+import {
+  DRIVER_DOCUMENT_TYPES,
+  DriverComplianceService,
+} from '../compliance/driver-compliance.service.js';
 import { DATABASE, isUniqueViolationOn, type Database } from '../db/db.port.js';
 import { IdempotencyService } from '../idempotency/idempotency.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
@@ -34,11 +38,13 @@ import {
   CreateDriverSchema,
   IdempotencyKeySchema,
   PaginationSchema,
+  RecordDriverDocumentSchema,
   ResolveDisputeSchema,
   TopUpWalletSchema,
   UpdateConfigSchema,
   UpdateDriverSchema,
 } from './schemas.js';
+import type { RecordDriverDocumentBody } from './schemas.js';
 import { decodeKeysetCursor, nextKeysetCursor } from './cursor.js';
 import { zodBody } from './zod.pipe.js';
 
@@ -54,6 +60,7 @@ import { zodBody } from './zod.pipe.js';
 @Roles('ADMIN')
 export class AdminController {
   constructor(
+    private readonly compliance: DriverComplianceService,
     @Inject(DATABASE) private readonly db: Database,
     private readonly ledger: LedgerService,
     private readonly config: PlatformConfigService,
@@ -357,6 +364,132 @@ export class AdminController {
   // -------------------------------------------------------------------------
   // Rides
   // -------------------------------------------------------------------------
+
+
+  /**
+   * The documents on file for one driver, and whether they satisfy the current
+   * policy.
+   *
+   * The verdict is computed rather than stored, so it reflects today's expiry
+   * dates and today's configured policy — not whatever was true when the row
+   * was last written.
+   */
+  @Get('drivers/:driverId/documents')
+  async listDriverDocuments(@Param('driverId') driverId: string) {
+    const id = requireUuid(driverId);
+
+    const result = await this.db.query<{
+      doc_type: string;
+      status: string;
+      reference: string;
+      expires_at: Date | null;
+      verified_by: string | null;
+      verified_at: Date | null;
+      note: string;
+      updated_at: Date;
+    }>(
+      `SELECT doc_type, status, reference, expires_at, verified_by, verified_at,
+              note, updated_at
+         FROM driver_documents
+        WHERE driver_id = $1
+        ORDER BY doc_type`,
+      [id],
+    );
+
+    const verdict = await this.compliance.evaluate(this.db, id);
+
+    return {
+      items: result.rows.map((row) => ({
+        docType: row.doc_type,
+        status: row.status,
+        reference: row.reference,
+        expiresAt: row.expires_at ? toDateOnly(row.expires_at) : null,
+        verifiedBy: row.verified_by,
+        verifiedAt: row.verified_at?.toISOString() ?? null,
+        note: row.note,
+        updatedAt: row.updated_at.toISOString(),
+      })),
+      compliance: verdict,
+    };
+  }
+
+  /**
+   * Record the outcome of an administrator checking a document.
+   *
+   * PUT, and one row per (driver, type): re-checking a renewed licence updates
+   * the record rather than adding a second one, and there is never a question
+   * of which of two rows is current. The history is in the audit log, which is
+   * already append-only — keeping a second copy here would give two accounts of
+   * the same event and no rule for which is right.
+   */
+  @Put('drivers/:driverId/documents/:docType')
+  @RateLimit({ limit: 60, windowSeconds: 60, by: 'user', tier: 'CRITICAL' })
+  async recordDriverDocument(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Param('driverId') driverId: string,
+    @Param('docType') docType: string,
+    @Body(zodBody(RecordDriverDocumentSchema)) body: RecordDriverDocumentBody,
+  ) {
+    const id = requireUuid(driverId);
+
+    const type = docType.toUpperCase();
+    if (!(DRIVER_DOCUMENT_TYPES as readonly string[]).includes(type)) {
+      throw new ValidationProblem([
+        { path: 'docType', message: `Unknown document type: ${docType}` },
+      ]);
+    }
+
+    const driver = await this.db.query(`SELECT 1 FROM drivers WHERE user_id = $1`, [id]);
+    if (driver.rowCount === 0) throw new NotFoundProblem('Driver');
+
+    // VERIFIED carries the verifier; anything else clears them, so a document
+    // downgraded from verified does not keep an approval that no longer applies.
+    const verifying = body.status === 'VERIFIED';
+
+    await this.db.transaction(async (tx) => {
+      await tx.query(
+        `INSERT INTO driver_documents
+           (driver_id, doc_type, status, reference, expires_at, verified_by, verified_at, note)
+         VALUES ($1, $2::driver_document_type, $3::driver_document_status, $4, $5::date, $6, $7, $8)
+         ON CONFLICT (driver_id, doc_type) DO UPDATE SET
+           status      = EXCLUDED.status,
+           reference   = EXCLUDED.reference,
+           expires_at  = EXCLUDED.expires_at,
+           verified_by = EXCLUDED.verified_by,
+           verified_at = EXCLUDED.verified_at,
+           note        = EXCLUDED.note,
+           updated_at  = now()`,
+        [
+          id,
+          type,
+          body.status,
+          body.reference ?? '',
+          body.expiresAt ?? null,
+          verifying ? admin.id : null,
+          verifying ? new Date() : null,
+          body.note ?? '',
+        ],
+      );
+
+      await this.audit.record(tx, {
+        actorId: admin.id,
+        actorRole: 'ADMIN',
+        action:
+          body.status === 'REJECTED'
+            ? AUDIT_ACTIONS.documentReject
+            : AUDIT_ACTIONS.documentVerify,
+        targetType: 'driver_document',
+        targetId: id,
+        result: 'SUCCESS',
+        // The document NUMBER is deliberately absent: it is the closest thing
+        // to an identity document this system holds, and the audit log is
+        // exported for disputes (CLAUDE.md §9 - no PII in logs).
+        metadata: { docType: type, status: body.status, hasExpiry: body.expiresAt !== undefined },
+      });
+    });
+
+    return this.listDriverDocuments(driverId);
+  }
 
   @Get('rides')
   async listRides(
@@ -685,3 +818,11 @@ interface ResolveDisputeBody {
 }
 
 export { presentLedgerEntry };
+
+/** A DATE column rendered back as `YYYY-MM-DD`, without a timezone shift. */
+function toDateOnly(value: Date): string {
+  const y = value.getFullYear();
+  const m = String(value.getMonth() + 1).padStart(2, '0');
+  const d = String(value.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}

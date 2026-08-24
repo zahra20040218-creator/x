@@ -16,6 +16,8 @@ enum ApiProblem {
   rideActorNotPermitted('ride-actor-not-permitted'),
   rideAlreadyClaimed('ride-already-claimed'),
   idempotencyKeyReused('idempotency-key-reused'),
+  /// A required driver document is missing, rejected or expired.
+  driverNotCompliant('driver-not-compliant'),
   idempotencyInProgress('idempotency-in-progress'),
   notImplemented('not-implemented'),
   serviceUnavailable('service-unavailable'),
@@ -55,6 +57,7 @@ class ApiException implements Exception {
     this.detail,
     this.errors = const [],
     this.requestId,
+    this.extra = const {},
   });
 
   factory ApiException.from(DioException error) {
@@ -81,6 +84,11 @@ class ApiException implements Exception {
       status: response.statusCode ?? 0,
       detail: data['detail'] as String?,
       requestId: data['requestId'] as String?,
+      // The whole decoded body. RFC 9457 lets a problem carry members beyond
+      // the standard ones, and some of ours do - driver-not-compliant lists
+      // the documents at fault. Dropping them here would leave the app able to
+      // say only "you cannot go online".
+      extra: data,
       errors: (data['errors'] as List<dynamic>? ?? [])
           .whereType<Map<String, dynamic>>()
           .map(
@@ -98,6 +106,10 @@ class ApiException implements Exception {
   final String? detail;
   final List<FieldError> errors;
   final String? requestId;
+
+  /// The raw problem body, including any non-standard members. See [extra] use
+  /// in `ComplianceFailure`.
+  final Map<String, dynamic> extra;
 
   /// Worth retrying with the SAME idempotency key.
   ///

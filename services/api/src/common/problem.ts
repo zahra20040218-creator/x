@@ -126,6 +126,29 @@ export class ConflictProblem extends ProblemError {
   }
 }
 
+/**
+ * A driver cannot go online because a required document is missing or lapsed.
+ *
+ * 403, not 409: nothing about the request conflicts with current state, the
+ * driver is simply not permitted to work yet.
+ *
+ * The lists are machine-readable document type names, never prose. The driver
+ * app renders them in Arabic through its own localisation layer (CLAUDE.md §8)
+ * — a server that returns a translated sentence has decided the user's language
+ * for them, and gets it wrong the moment anyone opens the app in English.
+ */
+export class DriverNotCompliantProblem extends ProblemError {
+  constructor(missing: readonly string[], expired: readonly string[], rejected: readonly string[]) {
+    super({
+      type: 'driver-not-compliant',
+      title: 'Driver documents incomplete',
+      status: 403,
+      detail: 'One or more required driver documents are missing, rejected or expired.',
+      extra: { missing, expired, rejected },
+    });
+  }
+}
+
 /** CLAUDE.md §4 - an invalid transition is 409 and never a silent no-op. */
 export class InvalidRideTransitionError extends ProblemError {
   constructor(

@@ -186,3 +186,25 @@ export const RegisterDeviceSchema = z.object({
 export const UnregisterDeviceSchema = z.object({
   token: z.string().min(1).max(4096),
 });
+
+/**
+ * Recording that an administrator checked a driver's document.
+ *
+ * `reference` is the number printed on the document, not the document. v1
+ * stores no images - see migration 0010.
+ */
+export const RecordDriverDocumentSchema = z.object({
+  status: z.enum(['PENDING', 'VERIFIED', 'REJECTED']),
+  reference: z.string().max(120).optional(),
+  /**
+   * `YYYY-MM-DD`. A date, not a timestamp: documents expire on a day, and a
+   * timestamp would make the boundary depend on the reader's timezone.
+   */
+  expiresAt: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'expiresAt must be YYYY-MM-DD')
+    .optional(),
+  note: z.string().max(500).optional(),
+});
+
+export type RecordDriverDocumentBody = z.infer<typeof RecordDriverDocumentSchema>;

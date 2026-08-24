@@ -13,7 +13,7 @@ import {
 import type { Response } from 'express';
 
 import type { AuthenticatedUser } from '../auth/auth.service.js';
-import { ConflictProblem, NotFoundProblem } from '../common/problem.js';
+import { ConflictProblem, DriverNotCompliantProblem, NotFoundProblem } from '../common/problem.js';
 import { DATABASE, type Database } from '../db/db.port.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { DriverPresenceService } from '../matching/driver-presence.service.js';
@@ -31,6 +31,7 @@ import {
 } from './schemas.js';
 import { requireUuid } from './rides.controller.js';
 import { decodeKeysetCursor, nextKeysetCursor } from './cursor.js';
+import { DriverComplianceService } from '../compliance/driver-compliance.service.js';
 import { zodBody } from './zod.pipe.js';
 
 /** Driver-side endpoints. Every path is in `docs/api-contract.yaml`. */
@@ -42,6 +43,7 @@ export class DriverController {
     private readonly matching: MatchingService,
     private readonly presence: DriverPresenceService,
     private readonly ledger: LedgerService,
+    private readonly compliance: DriverComplianceService,
     @Inject(DATABASE) private readonly db: Database,
   ) {}
 
@@ -90,6 +92,21 @@ export class DriverController {
         await this.matching.handleOfferOutcome(outstanding, 'declined');
       }
     } else {
+      // Checked BEFORE presence is written. Going online first and refusing
+      // afterwards would leave the driver in the Redis geo set - matchable, and
+      // holding a slot no dispatch can use.
+      //
+      // No-op unless an owner has configured a document policy; see
+      // DriverComplianceService.
+      const verdict = await this.compliance.evaluate(this.db, user.id);
+      if (!verdict.compliant) {
+        throw new DriverNotCompliantProblem(
+          verdict.missing,
+          verdict.expired,
+          verdict.rejected,
+        );
+      }
+
       await this.presence.goOnline(user.id, { ...body.position!, recordedAt: new Date() });
       await this.db.query(
         `UPDATE drivers SET availability = 'ONLINE', updated_at = now()

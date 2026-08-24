@@ -69,6 +69,7 @@ export class FakeDatabase implements Database {
       'disputes',
       'wallet_topups',
       'audit_log',
+      'driver_documents',
     ]) {
       this.tables.set(table, []);
     }
@@ -586,6 +587,98 @@ export class FakeDatabase implements Database {
         }
       }
       return this.ok([], n);
+    }
+
+    // ---- driver documents (migration 0010) ----
+    //
+    // Patterns are anchored on their full column list, not just the table: two
+    // of these read driver_documents with different projections, and a prefix
+    // broad enough to catch both would answer one query with the other's
+    // shape. That mistake has been made in this file before.
+
+    if (/^SELECT value FROM platform_config WHERE key = 'required_driver_documents'/i.test(s)) {
+      const row = this.rows('platform_config').find(
+        (r) => r['key'] === 'required_driver_documents',
+      );
+      return this.ok(row ? ([{ value: row['value'] }] as Row[]) : []);
+    }
+
+    // DriverComplianceService.evaluate
+    if (/^SELECT doc_type, status, expires_at FROM driver_documents/i.test(s)) {
+      const [driverId, types] = params as [string, string[]];
+      const wanted = new Set(types);
+      return this.ok(
+        this.rows('driver_documents')
+          .filter((d) => d['driver_id'] === driverId && wanted.has(d['doc_type'] as string))
+          .map((d) => ({
+            doc_type: d['doc_type'],
+            status: d['status'],
+            expires_at: d['expires_at'] ?? null,
+          })) as Row[],
+      );
+    }
+
+    // DriverComplianceService.filterCompliant
+    if (/^SELECT driver_id, doc_type, status, expires_at FROM driver_documents/i.test(s)) {
+      const [driverIds, types] = params as [string[], string[]];
+      const drivers = new Set(driverIds);
+      const wanted = new Set(types);
+      return this.ok(
+        this.rows('driver_documents')
+          .filter((d) => drivers.has(d['driver_id'] as string) && wanted.has(d['doc_type'] as string))
+          .map((d) => ({
+            driver_id: d['driver_id'],
+            doc_type: d['doc_type'],
+            status: d['status'],
+            expires_at: d['expires_at'] ?? null,
+          })) as Row[],
+      );
+    }
+
+    // AdminController.listDriverDocuments
+    if (/^SELECT doc_type, status, reference, expires_at/i.test(s)) {
+      return this.ok(
+        this.rows('driver_documents')
+          .filter((d) => d['driver_id'] === params[0])
+          .sort((a, b) => String(a['doc_type']).localeCompare(String(b['doc_type'])))
+          .map((d) => ({
+            doc_type: d['doc_type'],
+            status: d['status'],
+            reference: d['reference'] ?? '',
+            expires_at: d['expires_at'] ?? null,
+            verified_by: d['verified_by'] ?? null,
+            verified_at: d['verified_at'] ?? null,
+            note: d['note'] ?? '',
+            updated_at: d['updated_at'] ?? new Date(),
+          })) as Row[],
+      );
+    }
+
+    // AdminController.recordDriverDocument - upsert on (driver_id, doc_type).
+    if (/^INSERT INTO driver_documents/i.test(s)) {
+      const [driverId, docType, status, reference, expiresAt, verifiedBy, verifiedAt, note] =
+        params as [string, string, string, string, string | null, string | null, Date | null, string];
+
+      const row = {
+        driver_id: driverId,
+        doc_type: docType,
+        status,
+        reference,
+        expires_at: expiresAt === null ? null : new Date(`${expiresAt}T00:00:00.000Z`),
+        verified_by: verifiedBy,
+        verified_at: verifiedAt,
+        note,
+        updated_at: new Date(),
+      };
+
+      const rows = this.rows('driver_documents');
+      const existing = rows.findIndex(
+        (d) => d['driver_id'] === driverId && d['doc_type'] === docType,
+      );
+      if (existing === -1) rows.push(row);
+      else rows[existing] = row;
+
+      return this.ok([] as Row[]);
     }
 
     if (/^SELECT key, value FROM platform_config/i.test(s)) {

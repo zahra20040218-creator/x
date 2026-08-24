@@ -136,7 +136,7 @@ $ grep -rnE "\+9647[0-9]{9}" services/api/src --include=*.ts | grep -v .test.
 | Arabic / RTL / localisation | **DONE** | interface-based strings, no hardcoded user text, `statusLabel` as a method so a new status fails to compile | `async_view_test.dart` (RTL under an Arabic locale) | `flutter test` | **compiled and run** |
 | Admin panel | **PARTIAL** | data provider, money formatter, contract paths | `money.test.ts` | `npx vitest run` | 11 pass · **no UI screens** |
 | Loading/Empty/Error/Success on every screen | **DONE** | `AsyncView` makes all four structural — `empty` and `onRetry` are required parameters | `async_view_test.dart` | `flutter test` | **12 pass, previously unrun** |
-| KYC / documents / approval | **BLOCKED** | `CLAUDE.md` §2 says OUT OF SCOPE | — | — | **BLOCKER-2** |
+| KYC / documents / approval | **DONE** | owner decision D-018: `driver_documents`, two enforcement points, admin workflow, audit trail — **disabled by default, and disabled means no query runs** | 23 unit + 13 real-PG + 6 e2e + 11 Dart | `REAL_INFRA=1` + `flutter test` | **no image upload (§2), no vehicle classes (§2), no document mandatory by default** |
 | Zones / surge / promotions | **BLOCKED** | `CLAUDE.md` §2 says OUT OF SCOPE | — | — | **BLOCKER-2** |
 
 ---
@@ -158,9 +158,9 @@ $ grep -rnE "\+9647[0-9]{9}" services/api/src --include=*.ts | grep -v .test.
 
 | Status | Count | Change |
 |---|---|---|
-| **DONE** — built, tested, and I ran it | **54** |
+| **DONE** — built, tested, and I ran it | **55** |
 | **PARTIAL** — works but not fully verified, or scope-limited | **7** |
-| **BLOCKED** — needs a device, k6, Docker, or an owner decision | **8** |
+| **BLOCKED** — needs a device, k6, Docker, or an owner decision | **7** |
 | **FAILED** — missing code, not a missing tool | **0** |
 | **Total rows** | **69** |
 

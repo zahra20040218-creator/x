@@ -188,6 +188,8 @@ describe('AuditService', () => {
           'wallet.topup',
           'dispute.resolve',
           'config.update',
+          'document.verify',
+          'document.reject',
         ]),
       );
     });

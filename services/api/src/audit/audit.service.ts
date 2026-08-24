@@ -31,6 +31,10 @@ export type AuditResult = 'SUCCESS' | 'FAILURE';
 export const AUDIT_ACTIONS = {
   driverCreate: 'driver.create',
   driverUpdate: 'driver.update',
+  // Its own verb: "who approved this licence, and when" is the question asked
+  // after an incident, and it should not require reading metadata to answer.
+  documentVerify: 'document.verify',
+  documentReject: 'document.reject',
   driverSuspend: 'driver.suspend',
   driverUnsuspend: 'driver.unsuspend',
   walletTopUp: 'wallet.topup',

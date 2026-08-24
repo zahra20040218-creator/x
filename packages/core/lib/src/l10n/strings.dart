@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
+import 'package:rideapp_core/src/compliance/compliance_failure.dart';
 import '../models/models.dart';
 
 /// The localisation layer.
@@ -177,6 +178,24 @@ abstract class AppStrings {
   /// A method because the unit is part of the translation: the receipt used to
   /// interpolate 'كم' directly, so an English UI read "3.2 كم".
   String distanceKm(double km);
+
+  /// A required driver document, in the user's language.
+  ///
+  /// A method for the same reason as [statusLabel]: a document type added to
+  /// the server enum must fail to compile here rather than show a driver the
+  /// string `VEHICLE_AUTHORIZATION`.
+  String documentLabel(DriverDocumentType type);
+
+  /// Headline when the platform will not bring the driver online.
+  String get cannotGoOnline;
+
+  /// "Bring these documents" / "renew these" / "these were refused".
+  String get documentsMissing;
+  String get documentsExpired;
+  String get documentsRejected;
+
+  /// The server refused but named no document this build understands.
+  String get documentsUnknownReason;
 
   String get loadMore;
   String get reportProblem;
@@ -470,6 +489,24 @@ class ArabicStrings implements AppStrings {
 
   @override
   String distanceKm(double km) => '${km.toStringAsFixed(1)} كم';
+  @override
+  String documentLabel(DriverDocumentType type) => switch (type) {
+        DriverDocumentType.nationalId => 'البطاقة الوطنية',
+        DriverDocumentType.drivingLicence => 'إجازة السوق',
+        DriverDocumentType.vehicleRegistration => 'سنوية المركبة',
+        DriverDocumentType.vehicleAuthorization => 'إجازة العمل',
+      };
+  @override
+  String get cannotGoOnline => 'لا يمكنك الاتصال حالياً';
+  @override
+  String get documentsMissing => 'وثائق مطلوبة';
+  @override
+  String get documentsExpired => 'وثائق منتهية الصلاحية - تحتاج تجديداً';
+  @override
+  String get documentsRejected => 'وثائق مرفوضة - راجع الإدارة';
+  @override
+  String get documentsUnknownReason =>
+      'هناك وثيقة مطلوبة غير معروفة في هذا الإصدار. حدّث التطبيق أو راجع الإدارة.';
   @override
   String get loadMore => 'تحميل المزيد';
   @override
@@ -771,6 +808,24 @@ class EnglishStrings implements AppStrings {
 
   @override
   String distanceKm(double km) => '${km.toStringAsFixed(1)} km';
+  @override
+  String documentLabel(DriverDocumentType type) => switch (type) {
+        DriverDocumentType.nationalId => 'National ID',
+        DriverDocumentType.drivingLicence => 'Driving licence',
+        DriverDocumentType.vehicleRegistration => 'Vehicle registration',
+        DriverDocumentType.vehicleAuthorization => 'Operating permit',
+      };
+  @override
+  String get cannotGoOnline => 'You cannot go online yet';
+  @override
+  String get documentsMissing => 'Documents required';
+  @override
+  String get documentsExpired => 'Documents expired - renewal needed';
+  @override
+  String get documentsRejected => 'Documents rejected - contact the office';
+  @override
+  String get documentsUnknownReason =>
+      'A required document is not recognised by this version. Update the app or contact the office.';
   @override
   String get loadMore => 'Load more';
   @override

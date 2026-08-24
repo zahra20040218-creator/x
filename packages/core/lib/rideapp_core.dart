@@ -24,3 +24,4 @@ export 'src/push/firebase_push_token_source.dart';
 export 'src/disputes/report_problem_sheet.dart';
 export 'src/config/endpoint_config.dart';
 export 'src/config/misconfigured_app.dart';
+export 'src/compliance/compliance_failure.dart';

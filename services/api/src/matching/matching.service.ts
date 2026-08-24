@@ -1,3 +1,4 @@
+import type { DriverComplianceService } from '../compliance/driver-compliance.service.js';
 import type { Clock } from '../common/clock.js';
 import type { Logger } from '../common/logger.js';
 import type { Database } from '../db/db.port.js';
@@ -48,6 +49,12 @@ export class MatchingService {
     private readonly clock: Clock,
     private readonly maxDriversPerRide = 8,
     private readonly logger?: Logger,
+    /**
+     * Optional so every existing construction site keeps working and behaves
+     * exactly as before. Absent means no document policy, which is also what an
+     * empty policy means.
+     */
+    private readonly compliance?: DriverComplianceService,
   ) {}
 
   /**
@@ -268,7 +275,11 @@ export class MatchingService {
    * Durable eligibility, from Postgres.
    *
    * Suspension and current-trip status are not in Redis on purpose: a cache
-   * flush must not silently make a suspended driver matchable again.
+   * flush must not silently make a suspended driver matchable again. Document
+   * compliance is here for the same reason, and for one more: a licence lapses
+   * on a date, so a driver who was compliant when they went online this morning
+   * may not be this evening. Checking only at the point of going online would
+   * miss exactly that.
    */
   private async filterEligible(driverIds: string[]): Promise<Set<string>> {
     if (driverIds.length === 0) return new Set();
@@ -281,6 +292,11 @@ export class MatchingService {
       [driverIds as never],
     );
 
-    return new Set(result.rows.map((r) => r.user_id));
+    const eligible = new Set(result.rows.map((r) => r.user_id));
+    if (!this.compliance || eligible.size === 0) return eligible;
+
+    // Costs nothing when no document policy is configured - filterCompliant
+    // returns the input set without querying.
+    return this.compliance.filterCompliant(this.db, [...eligible]);
   }
 }

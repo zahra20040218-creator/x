@@ -36,6 +36,7 @@ import {
   GatewayProvider,
   PaymentProviderRegistry,
 } from './payments/payment-provider.js';
+import { DriverComplianceService } from './compliance/driver-compliance.service.js';
 import { PlatformConfigService } from './platform-config/platform-config.service.js';
 import { IoRedisAdapter } from './redis/ioredis-adapter.js';
 import { REDIS, type RedisPort } from './redis/redis.port.js';
@@ -138,6 +139,22 @@ export class AppModule {
       logger,
     );
 
+    // Document compliance. Reads its policy from platform_config, so an owner
+    // can turn it on without a deploy (the same mechanism as commission,
+    // CLAUDE.md §6.5). Empty policy - the default - means no check runs at all.
+    //
+    // An unknown document name in the configured list is logged rather than
+    // thrown: it comes from a text field in an admin form, and an exception
+    // here would take driver matching down for the whole city over a typo.
+    const compliance = new DriverComplianceService(clock, () =>
+      platformConfig.requiredDriverDocuments(database, (unknown) => {
+        logger.warn(
+          { event: 'compliance.unknown_document_type', value: unknown },
+          'ignoring an unknown document type in required_driver_documents',
+        );
+      }),
+    );
+
     const matching = new MatchingService(
       database,
       rideRepository,
@@ -148,6 +165,7 @@ export class AppModule {
       clock,
       config.MATCH_MAX_DRIVERS_PER_RIDE,
       logger,
+      compliance,
     );
 
     const idempotency = new IdempotencyService(clock, config.IDEMPOTENCY_TTL_SECONDS);
@@ -186,6 +204,7 @@ export class AppModule {
         { provide: 'METRICS_TOKEN', useValue: config.METRICS_TOKEN },
         { provide: FareCalculator, useValue: fare },
         { provide: PlatformConfigService, useValue: platformConfig },
+        { provide: DriverComplianceService, useValue: compliance },
         { provide: RideStateMachine, useValue: stateMachine },
         { provide: RideRepository, useValue: rideRepository },
         { provide: RideClaimService, useValue: claims },

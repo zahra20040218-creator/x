@@ -875,6 +875,113 @@ describe('API end to end', () => {
         .expect(401);
     });
   });
+
+  // -------------------------------------------------------------------------
+  // Driver document compliance
+  //
+  // Owner decision, 2026-08-24, overriding the CLAUDE.md §2 OUT-OF-SCOPE entry
+  // for KYC. See DECISIONS.md.
+  //
+  // The first test is the one that matters. The feature ships DISABLED, and
+  // "disabled" has to mean the system behaves exactly as it did before - not
+  // "a policy that happens to permit everyone".
+  // -------------------------------------------------------------------------
+
+  describe('driver documents', () => {
+    async function onlineDriver(): Promise<string> {
+      seedDriverRow('driver-1', DRIVER_PHONE, '12345');
+      return signInDriver('driver-token');
+    }
+
+    const goOnline = (token: string) =>
+      http
+        .put('/v1/driver/availability')
+        .set(auth(token))
+        .send({ availability: 'ONLINE', position: KARRADA });
+
+    function requireDocuments(value: string): void {
+      db.rows('platform_config').push({ key: 'required_driver_documents', value });
+    }
+
+    it('with no policy configured, a driver goes online exactly as before', async () => {
+      const driverToken = await onlineDriver();
+
+      await goOnline(driverToken).expect(200);
+    });
+
+    it('with a policy configured, a driver with no documents is refused', async () => {
+      requireDocuments('DRIVING_LICENCE');
+      const driverToken = await onlineDriver();
+
+      const response = await goOnline(driverToken).expect(403);
+
+      // Named, so the app can tell the driver what to bring. The server sends
+      // the document CODE, never Arabic prose - the app localises it
+      // (CLAUDE.md §8).
+      expect(response.body.missing).toEqual(['DRIVING_LICENCE']);
+      expect(response.body.type).toContain('driver-not-compliant');
+    });
+
+    it('a refused driver is not left in the Redis geo set', async () => {
+      requireDocuments('DRIVING_LICENCE');
+      const driverToken = await onlineDriver();
+
+      await goOnline(driverToken).expect(403);
+
+      // Checked BEFORE presence is written. The other order leaves a driver
+      // matchable while being told they cannot work.
+      const state = await http.get('/v1/me').set(auth(driverToken)).expect(200);
+      expect(state.body.driver?.availability ?? 'OFFLINE').toBe('OFFLINE');
+    });
+
+    it('a verified, unexpired document lets the driver online', async () => {
+      requireDocuments('DRIVING_LICENCE');
+      const driverToken = await onlineDriver();
+
+      db.rows('driver_documents').push({
+        driver_id: 'driver-1',
+        doc_type: 'DRIVING_LICENCE',
+        status: 'VERIFIED',
+        expires_at: new Date('2030-01-01T00:00:00.000Z'),
+      });
+
+      await goOnline(driverToken).expect(200);
+    });
+
+    it('an expired document is reported as expired, not as missing', async () => {
+      requireDocuments('DRIVING_LICENCE');
+      const driverToken = await onlineDriver();
+
+      db.rows('driver_documents').push({
+        driver_id: 'driver-1',
+        doc_type: 'DRIVING_LICENCE',
+        status: 'VERIFIED',
+        expires_at: new Date('2020-01-01T00:00:00.000Z'),
+      });
+
+      const response = await goOnline(driverToken).expect(403);
+
+      // The driver has the document and needs it renewed. Telling them it is
+      // missing sends them to the wrong office.
+      expect(response.body.expired).toEqual(['DRIVING_LICENCE']);
+      expect(response.body.missing).toEqual([]);
+    });
+
+    it('a pending document does not count as held', async () => {
+      requireDocuments('DRIVING_LICENCE');
+      const driverToken = await onlineDriver();
+
+      db.rows('driver_documents').push({
+        driver_id: 'driver-1',
+        doc_type: 'DRIVING_LICENCE',
+        status: 'PENDING',
+        expires_at: null,
+      });
+
+      await goOnline(driverToken).expect(403);
+    });
+  });
+
 });
 
 /**

@@ -4,6 +4,10 @@ import type { Clock } from '../common/clock.js';
 import type { Queryable } from '../db/db.port.js';
 import { iqd, type IqdAmount } from '../money/iqd.js';
 import type { FareTariff } from '../fare/fare-calculator.js';
+import {
+  parseRequiredDocuments,
+  type DriverDocumentType,
+} from '../compliance/driver-compliance.service.js';
 
 /**
  * CLAUDE.md §6.5 - "Commission rate is config, not a constant. Changing it must
@@ -86,6 +90,13 @@ export class InvalidConfigValueError extends Error {
 export class PlatformConfigService {
   private cache: { value: PlatformConfig; expiresAtMs: number } | null = null;
 
+  /**
+   * Cached separately from the numeric config: this is a list of strings and
+   * does not fit `PlatformConfig`, and widening that type would put a string
+   * member on the fare hot path for the sake of a check that is off by default.
+   */
+  private documentsCache: { value: DriverDocumentType[]; expiresAtMs: number } | null = null;
+
   constructor(
     private readonly clock: Clock,
     private readonly cacheTtlMs = 30_000,
@@ -128,6 +139,38 @@ export class PlatformConfigService {
 
     this.cache = { value: config, expiresAtMs: now + this.cacheTtlMs };
     return config;
+  }
+
+  /**
+   * Which documents a driver must hold to go online.
+   *
+   * Empty unless an owner has configured it — see migration 0010. Empty is not
+   * "a policy that allows everyone": the compliance service issues no query at
+   * all for it.
+   *
+   * [onUnknown] receives any configured name that is not a real document type,
+   * so a typo in the admin form is logged rather than silently narrowing the
+   * policy.
+   */
+  async requiredDriverDocuments(
+    q: Queryable,
+    onUnknown?: (value: string) => void,
+  ): Promise<DriverDocumentType[]> {
+    const now = this.clock.nowMs();
+    if (this.documentsCache && this.documentsCache.expiresAtMs > now) {
+      return this.documentsCache.value;
+    }
+
+    const result = await q.query<{ value: string }>(
+      `SELECT value FROM platform_config WHERE key = 'required_driver_documents'`,
+    );
+
+    // Absent means the migration has not run. Treated as empty, which is the
+    // same as disabled - the safe direction for a check that gates earning.
+    const value = parseRequiredDocuments(result.rows[0]?.value ?? '', onUnknown);
+
+    this.documentsCache = { value, expiresAtMs: now + this.cacheTtlMs };
+    return value;
   }
 
   /** Keys absent from the database, i.e. running on a built-in default. */

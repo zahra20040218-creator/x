@@ -89,6 +89,7 @@ describe('the real migration set', () => {
       '0007_device_tokens',
       '0008_ledger_keyset',
       '0009_keyset_indexes',
+      '0010_driver_documents',
     ]);
   });
 

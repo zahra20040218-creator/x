@@ -838,6 +838,93 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/ValidationError' }
 
+  /admin/drivers/{driverId}/documents:
+    parameters:
+      - name: driverId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [admin]
+      operationId: adminListDriverDocuments
+      summary: Documents on file for a driver, with a live compliance verdict.
+      description: >
+        The verdict is computed at request time, not stored, so it reflects
+        today's expiry dates and today's configured policy. Added 2026-08-24 by
+        owner decision overriding the CLAUDE.md 2 KYC scope entry; see
+        DECISIONS.md. v1 records that an administrator SAW a document - there is
+        no image upload.
+      responses:
+        '200':
+          description: Documents and verdict.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, compliance]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/DriverDocument' }
+                  compliance: { $ref: '#/components/schemas/ComplianceVerdict' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /admin/drivers/{driverId}/documents/{docType}:
+    parameters:
+      - name: driverId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: docType
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/DriverDocumentType' }
+    put:
+      tags: [admin]
+      operationId: adminRecordDriverDocument
+      summary: Record the outcome of checking a document.
+      description: >
+        PUT, and one row per (driver, document type): re-checking a renewed
+        licence updates the record rather than adding a second one. The history
+        is in the audit log, which is already append-only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:    { type: string, enum: [PENDING, VERIFIED, REJECTED] }
+                reference:
+                  type: string
+                  maxLength: 120
+                  description: The number printed on the document. Not the document.
+                expiresAt:
+                  type: string
+                  format: date
+                  description: >
+                    YYYY-MM-DD. A date, not a timestamp - documents expire on a
+                    day, and the document is valid through the whole of it.
+                note:      { type: string, maxLength: 500 }
+      responses:
+        '200':
+          description: The driver's documents after the change.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, compliance]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/DriverDocument' }
+                  compliance: { $ref: '#/components/schemas/ComplianceVerdict' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+
   /admin/drivers/{driverId}/wallet/topup:
     parameters:
       - name: driverId
@@ -1205,6 +1292,45 @@ components:
           schema: { $ref: '#/components/schemas/Problem' }
 
   schemas:
+    DriverDocumentType:
+      type: string
+      enum: [NATIONAL_ID, DRIVING_LICENCE, VEHICLE_REGISTRATION, VEHICLE_AUTHORIZATION]
+
+    DriverDocument:
+      type: object
+      required: [docType, status, reference, expiresAt, verifiedBy, verifiedAt, note, updatedAt]
+      properties:
+        docType:    { $ref: '#/components/schemas/DriverDocumentType' }
+        status:     { type: string, enum: [PENDING, VERIFIED, REJECTED] }
+        reference:  { type: string }
+        expiresAt:  { type: string, format: date, nullable: true }
+        verifiedBy: { type: string, format: uuid, nullable: true }
+        verifiedAt: { type: string, format: date-time, nullable: true }
+        note:       { type: string }
+        updatedAt:  { type: string, format: date-time }
+
+    ComplianceVerdict:
+      type: object
+      description: >
+        Why a driver may not work. EXPIRED is not a stored status - it is
+        derived from expiresAt when asked, so it cannot go stale between runs
+        of a job. All three lists are empty when no policy is configured, which
+        is the default.
+      required: [compliant, missing, expired, rejected]
+      properties:
+        compliant: { type: boolean }
+        missing:
+          type: array
+          description: Required but never supplied, or supplied and still PENDING.
+          items: { $ref: '#/components/schemas/DriverDocumentType' }
+        expired:
+          type: array
+          description: Verified, but past its expiry date. Needs renewal, not resubmission.
+          items: { $ref: '#/components/schemas/DriverDocumentType' }
+        rejected:
+          type: array
+          items: { $ref: '#/components/schemas/DriverDocumentType' }
+
 
     Problem:
       type: object

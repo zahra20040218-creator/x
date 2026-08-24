@@ -215,6 +215,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
   String _messageFor(ApiException error) {
     final strings = AppStrings.of(context);
+
+    // Compliance is handled before the switch because it is the only refusal
+    // that names something the driver can act on. "You cannot go online" tells
+    // them nothing; "your licence expired" tells them where to go.
+    final compliance = ComplianceFailure.from(error);
+    if (compliance != null) return _complianceMessage(compliance, strings);
+
     return switch (error.problem) {
       ApiProblem.network => strings.noInternet,
       ApiProblem.unauthorized => strings.sessionExpired,
@@ -223,6 +230,31 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       ApiProblem.forbidden => strings.accountSuspended,
       _ => strings.somethingWentWrong,
     };
+  }
+
+  /// The three lists are kept apart on purpose: they send the driver to three
+  /// different places. Missing means bring it in, expired means renew it first,
+  /// rejected means the same document will not do and another trip with it is
+  /// wasted.
+  String _complianceMessage(ComplianceFailure failure, AppStrings strings) {
+    if (failure.isUnexplained) {
+      // The server named a document type this build does not know - possible
+      // after a server deployment. Saying nothing would be worse.
+      return '${strings.cannotGoOnline}\n${strings.documentsUnknownReason}';
+    }
+
+    final lines = <String>[strings.cannotGoOnline];
+
+    void section(String heading, List<DriverDocumentType> types) {
+      if (types.isEmpty) return;
+      lines.add('$heading: ${types.map(strings.documentLabel).join('، ')}');
+    }
+
+    section(strings.documentsMissing, failure.missing);
+    section(strings.documentsExpired, failure.expired);
+    section(strings.documentsRejected, failure.rejected);
+
+    return lines.join('\n');
   }
 
   @override
