@@ -280,6 +280,55 @@ class ApiClient {
     return Ride.fromJson(json['ride'] as Map<String, dynamic>);
   }
 
+/// The driver's ledger, newest first.
+  ///
+  /// Returns BOTH sides of every transaction, exactly as the server stores
+  /// them. Summing `amountIqd` here would double-count; sum `signedIqd`.
+  Future<List<LedgerEntry>> walletEntries({int limit = 50, DateTime? before}) async {
+    final json = await _send<Map<String, dynamic>>(
+      'GET',
+      '/driver/wallet/entries',
+      query: {
+        'limit': limit,
+        if (before != null) 'cursor': before.toUtc().toIso8601String(),
+      },
+    );
+    return (json['items'] as List<dynamic>)
+        .map((item) => LedgerEntry.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Register this device for push notifications.
+  ///
+  /// Idempotent by token: the apps call it on every launch, because FCM
+  /// reissues tokens on reinstall and after a data clear. A device that is
+  /// never registered silently receives no ride offers at all, which is
+  /// indistinguishable from there being no demand.
+  Future<void> registerDevice({
+    required String token,
+    String platform = 'ANDROID',
+  }) async {
+    await _send<void>(
+      'POST',
+      '/devices',
+      body: {'token': token, 'platform': platform},
+      expectNoContent: true,
+    );
+  }
+
+  /// Stop delivering to this device. Called on sign-out.
+  ///
+  /// Without it a driver who logs out keeps receiving ride offers on a phone
+  /// they are no longer working from.
+  Future<void> unregisterDevice(String token) async {
+    await _send<void>(
+      'DELETE',
+      '/devices',
+      body: {'token': token},
+      expectNoContent: true,
+    );
+  }
+
   Future<WalletBalance> wallet() async => WalletBalance.fromJson(
         await _send<Map<String, dynamic>>('GET', '/driver/wallet'),
       );

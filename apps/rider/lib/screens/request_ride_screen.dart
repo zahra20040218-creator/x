@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:rideapp_core/rideapp_core.dart';
+
+import 'profile_screen.dart';
+import 'ride_history_screen.dart';
 import 'package:rideapp_rider/screens/track_ride_screen.dart';
 
 /// Set a destination, see the fare, request the ride.
@@ -17,9 +20,18 @@ import 'package:rideapp_rider/screens/track_ride_screen.dart';
 /// to prevent: three taps through bad coverage, three rides, three drivers
 /// dispatched.
 class RequestRideScreen extends StatefulWidget {
-  const RequestRideScreen({required this.api, super.key});
+  const RequestRideScreen({
+    required this.api,
+    required this.onSignedOut,
+    super.key,
+  });
 
   final ApiClient api;
+
+  /// Raised after the profile screen signs the rider out, so the app returns
+  /// to the sign-in flow rather than sitting on a screen whose every request
+  /// will now 401.
+  final VoidCallback onSignedOut;
 
   @override
   State<RequestRideScreen> createState() => _RequestRideScreenState();
@@ -123,7 +135,32 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
     final ready = _pickup != null && _dropoff != null;
 
     return Scaffold(
-      appBar: AppBar(title: Text(strings.whereTo)),
+      appBar: AppBar(
+        title: Text(strings.whereTo),
+        actions: [
+          IconButton(
+            tooltip: strings.rideHistory,
+            icon: const Icon(Icons.receipt_long),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => RideHistoryScreen(api: widget.api),
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: strings.profile,
+            icon: const Icon(Icons.person_outline),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => ProfileScreen(
+                  api: widget.api,
+                  onSignedOut: widget.onSignedOut,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsetsDirectional.all(AppSpacing.md),
         children: [

@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:rideapp_core/rideapp_core.dart';
+
+import 'earnings_screen.dart';
 import 'package:rideapp_driver/location/location_service.dart';
 import 'package:rideapp_driver/screens/offer_sheet.dart';
 import 'package:rideapp_driver/screens/trip_screen.dart';
@@ -204,7 +206,20 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     final isOnline = me?.availability == DriverAvailability.online;
 
     return Scaffold(
-      appBar: AppBar(title: Text(strings.appNameDriver)),
+      appBar: AppBar(
+        title: Text(strings.appNameDriver),
+        actions: [
+          IconButton(
+            tooltip: strings.earnings,
+            icon: const Icon(Icons.account_balance_wallet_outlined),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => EarningsScreen(api: widget.api),
+              ),
+            ),
+          ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: ListView(

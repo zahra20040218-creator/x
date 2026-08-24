@@ -119,7 +119,13 @@ class _RiderAppState extends State<RiderApp> {
             return TrackRideScreen(api: widget.api, ride: active);
           }
 
-          return RequestRideScreen(api: widget.api);
+          return RequestRideScreen(
+            api: widget.api,
+            onSignedOut: () => setState(() {
+              _signedIn = false;
+              _activeRide = null;
+            }),
+          );
         },
       ),
     );

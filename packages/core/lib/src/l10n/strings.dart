@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
+import '../models/models.dart';
+
 /// The localisation layer.
 ///
 /// CLAUDE.md §8: "Never hardcode a user-facing string. All strings go through
@@ -48,6 +50,44 @@ abstract class AppStrings {
 
   String get grantPermission;
   String get openSettings;
+
+  // --- History, receipt, profile, earnings ---------------------------------
+
+  String get rideHistory;
+  String get receipt;
+  String get rideNumber;
+  String get requestedAt;
+  String get completedAt;
+  String get route;
+  String get pickup;
+  String get destination;
+  String get driver;
+  String get fare;
+  String get estimated;
+  String get distance;
+  String get paymentMethod;
+  String get cash;
+  String get fareNotSettledYet;
+  String get cancellationReason;
+  String get profile;
+  String get phone;
+  String get saving;
+  String get saved;
+  String get displayName;
+  String get save;
+  String get signOut;
+  String get earnings;
+  String get todayEarnings;
+  String get totalEarnings;
+  String get completedRides;
+  String get statement;
+
+  /// A ride status in the user's language.
+  ///
+  /// A method rather than a map so a new enum value fails to compile here
+  /// instead of rendering its wire name to a user.
+  String statusLabel(RideStatus status);
+
 
   String get somethingWentWrong;
   String get noInternet;
@@ -181,6 +221,79 @@ class ArabicStrings implements AppStrings {
 
   @override
   String get openSettings => 'فتح الإعدادات';
+
+  @override
+  String get rideHistory => 'رحلاتي';
+  @override
+  String get receipt => 'الإيصال';
+  @override
+  String get rideNumber => 'رقم الرحلة';
+  @override
+  String get requestedAt => 'وقت الطلب';
+  @override
+  String get completedAt => 'وقت الانتهاء';
+  @override
+  String get route => 'المسار';
+  @override
+  String get pickup => 'نقطة الانطلاق';
+  @override
+  String get destination => 'الوجهة';
+  @override
+  String get driver => 'السائق';
+  @override
+  String get fare => 'الأجرة';
+  @override
+  String get estimated => 'تقديري';
+  @override
+  String get distance => 'المسافة';
+  @override
+  String get paymentMethod => 'طريقة الدفع';
+  @override
+  String get cash => 'نقداً';
+  @override
+  String get fareNotSettledYet => 'لم تُحتسب الأجرة النهائية بعد.';
+  @override
+  String get cancellationReason => 'سبب الإلغاء';
+  @override
+  String get profile => 'حسابي';
+  @override
+  String get phone => 'رقم الهاتف';
+  @override
+  String get saving => 'جارٍ الحفظ…';
+  @override
+  String get saved => 'تم الحفظ';
+  @override
+  String get displayName => 'الاسم';
+  @override
+  String get save => 'حفظ';
+  @override
+  String get signOut => 'تسجيل الخروج';
+  @override
+  String get earnings => 'الأرباح';
+  @override
+  String get todayEarnings => 'أرباح اليوم';
+  @override
+  String get totalEarnings => 'الرصيد الحالي';
+  @override
+  String get completedRides => 'الرحلات المكتملة';
+  @override
+  String get statement => 'كشف الحساب';
+
+  @override
+  String statusLabel(RideStatus status) => switch (status) {
+        RideStatus.requested => 'قيد الطلب',
+        RideStatus.offered => 'بانتظار سائق',
+        RideStatus.accepted => 'السائق في الطريق',
+        RideStatus.driverArrived => 'وصل السائق',
+        RideStatus.inProgress => 'الرحلة جارية',
+        RideStatus.completed => 'مكتملة',
+        RideStatus.cancelledByRider => 'ألغيتها',
+        RideStatus.cancelledByDriver => 'ألغاها السائق',
+        RideStatus.cancelledInTrip => 'أُلغيت أثناء الرحلة',
+        RideStatus.expired => 'انتهت المهلة',
+        RideStatus.noDriversFound => 'لا يوجد سائق متاح',
+      };
+
 
   @override
   String get somethingWentWrong => 'حدث خطأ. حاول مرة أخرى.';
@@ -382,6 +495,79 @@ class EnglishStrings implements AppStrings {
 
   @override
   String get openSettings => 'Open settings';
+
+  @override
+  String get rideHistory => 'My rides';
+  @override
+  String get receipt => 'Receipt';
+  @override
+  String get rideNumber => 'Ride number';
+  @override
+  String get requestedAt => 'Requested';
+  @override
+  String get completedAt => 'Completed';
+  @override
+  String get route => 'Route';
+  @override
+  String get pickup => 'Pickup';
+  @override
+  String get destination => 'Destination';
+  @override
+  String get driver => 'Driver';
+  @override
+  String get fare => 'Fare';
+  @override
+  String get estimated => 'Estimated';
+  @override
+  String get distance => 'Distance';
+  @override
+  String get paymentMethod => 'Payment';
+  @override
+  String get cash => 'Cash';
+  @override
+  String get fareNotSettledYet => 'The final fare has not been settled yet.';
+  @override
+  String get cancellationReason => 'Cancellation reason';
+  @override
+  String get profile => 'Profile';
+  @override
+  String get phone => 'Phone number';
+  @override
+  String get saving => 'Saving…';
+  @override
+  String get saved => 'Saved';
+  @override
+  String get displayName => 'Name';
+  @override
+  String get save => 'Save';
+  @override
+  String get signOut => 'Sign out';
+  @override
+  String get earnings => 'Earnings';
+  @override
+  String get todayEarnings => "Today's earnings";
+  @override
+  String get totalEarnings => 'Current balance';
+  @override
+  String get completedRides => 'Completed rides';
+  @override
+  String get statement => 'Statement';
+
+  @override
+  String statusLabel(RideStatus status) => switch (status) {
+        RideStatus.requested => 'Requested',
+        RideStatus.offered => 'Finding a driver',
+        RideStatus.accepted => 'Driver on the way',
+        RideStatus.driverArrived => 'Driver arrived',
+        RideStatus.inProgress => 'In progress',
+        RideStatus.completed => 'Completed',
+        RideStatus.cancelledByRider => 'You cancelled',
+        RideStatus.cancelledByDriver => 'Driver cancelled',
+        RideStatus.cancelledInTrip => 'Cancelled mid-trip',
+        RideStatus.expired => 'Offer expired',
+        RideStatus.noDriversFound => 'No driver available',
+      };
+
 
   @override
   String get somethingWentWrong => 'Something went wrong. Please try again.';

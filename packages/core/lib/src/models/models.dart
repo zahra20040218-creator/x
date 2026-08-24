@@ -421,6 +421,62 @@ class AuthSession extends Equatable {
   List<Object?> get props => [accessToken, refreshToken, user];
 }
 
+/// One side of a double-entry ledger row.
+///
+/// Mirrors `presentLedgerEntry` on the server. The ledger is append-only
+/// (CLAUDE.md §6.3), so there is deliberately no way to construct a mutation
+/// from this model — it is read-only by design, not by omission.
+class LedgerEntry extends Equatable {
+  const LedgerEntry({
+    required this.id,
+    required this.transactionId,
+    required this.accountType,
+    required this.direction,
+    required this.amountIqd,
+    required this.description,
+    required this.createdAt,
+    this.rideId,
+  });
+
+  factory LedgerEntry.fromJson(Map<String, dynamic> json) => LedgerEntry(
+        id: json['id'].toString(),
+        transactionId: json['transactionId'] as String,
+        rideId: json['rideId'] as String?,
+        accountType: json['accountType'] as String,
+        direction: json['direction'] as String,
+        amountIqd: IqdAmount(json['amountIqd'] as int),
+        description: json['description'] as String? ?? '',
+        createdAt: DateTime.parse(json['createdAt'] as String),
+      );
+
+  final String id;
+
+  /// Groups the two or more rows that balance to zero.
+  final String transactionId;
+
+  final String? rideId;
+  final String accountType;
+
+  /// `CREDIT` or `DEBIT`.
+  final String direction;
+
+  final IqdAmount amountIqd;
+  final String description;
+  final DateTime createdAt;
+
+  /// True when this row increases the driver's balance.
+  bool get isCredit => direction == 'CREDIT';
+
+  /// Signed value, for summing a statement.
+  ///
+  /// A statement that added the absolute values would show a driver twice
+  /// what they earned, because every transaction has both sides.
+  int get signedIqd => isCredit ? amountIqd.value : -amountIqd.value;
+
+  @override
+  List<Object?> get props => [id];
+}
+
 class WalletBalance extends Equatable {
   const WalletBalance({required this.driverId, required this.balanceIqd});
 
