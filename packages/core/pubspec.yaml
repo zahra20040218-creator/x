@@ -7,7 +7,7 @@ version: 1.0.0
 publish_to: none
 
 environment:
-  sdk: ">=3.5.0 <4.0.0"
+  sdk: ">=3.6.0 <4.0.0"
   flutter: ">=3.24.0"
 
 dependencies:
@@ -24,7 +24,15 @@ dependencies:
   # which is world-readable on a rooted device.
   flutter_secure_storage: ^9.2.2
 
-  intl: ^0.19.0
+  # The map widget lives here rather than in each app, because CLAUDE.md 1
+  # treats duplicated widget code between rider and driver as a defect — and
+  # both apps show a map.
+  google_maps_flutter: ^2.9.0
+
+  # Permission and position stream for the map's own location handling.
+  geolocator: ^13.0.2
+
+  intl: ^0.20.3
   uuid: ^4.5.1
   equatable: ^2.0.5
 

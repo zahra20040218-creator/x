@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Default (English) launcher label. The Arabic value in values-ar/ is what
+     an Arabic-locale device shows, which is the primary market. -->
+<resources>
+    <string name="app_name">Darb Driver</string>
+</resources>

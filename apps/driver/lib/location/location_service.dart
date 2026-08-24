@@ -108,8 +108,11 @@ class _LocationTaskHandler extends TaskHandler {
     });
   }
 
+  /// `flutter_foreground_task` 8.17.0 declares `onDestroy(DateTime)`.
+  /// This was written with a second `bool isTimeout` parameter from memory of
+  /// a different version - the first compile caught it.
   @override
-  Future<void> onDestroy(DateTime timestamp, bool isTimeout) async {
+  Future<void> onDestroy(DateTime timestamp) async {
     await _positions?.cancel();
     _flushTimer?.cancel();
   }

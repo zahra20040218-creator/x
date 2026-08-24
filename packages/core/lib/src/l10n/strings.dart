@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 /// The localisation layer.
@@ -22,6 +23,32 @@ abstract class AppStrings {
   String get confirm;
   String get back;
   String get loading;
+
+  // --- Maps -----------------------------------------------------------------
+
+  /// Title of the point-picking screen.
+  String get pickOnMap;
+
+  /// The map cannot render at all — a build configuration problem the user
+  /// cannot fix, so it is worded as a statement rather than an instruction.
+  String get mapUnavailable;
+
+  String get offline;
+
+  /// Location services are off at the OS level. The fix is settings, not a
+  /// permission prompt.
+  String get locationServicesOff;
+
+  /// Refused once; can be asked again.
+  String get locationPermissionNeeded;
+
+  /// Refused permanently. Android will not show the dialog again, so the copy
+  /// must send the user to settings instead of implying another prompt.
+  String get locationPermissionBlocked;
+
+  String get grantPermission;
+  String get openSettings;
+
   String get somethingWentWrong;
   String get noInternet;
   String get sessionExpired;
@@ -128,6 +155,33 @@ class ArabicStrings implements AppStrings {
   String get back => 'رجوع';
   @override
   String get loading => 'جارٍ التحميل…';
+
+  @override
+  String get pickOnMap => 'اختر الموقع على الخريطة';
+
+  @override
+  String get mapUnavailable => 'الخريطة غير متاحة حالياً. تواصل مع الدعم.';
+
+  @override
+  String get offline => 'لا يوجد اتصال بالإنترنت.';
+
+  @override
+  String get locationServicesOff => 'خدمات الموقع مغلقة في إعدادات الجهاز.';
+
+  @override
+  String get locationPermissionNeeded =>
+      'نحتاج إذن الموقع لتحديد نقطة الانطلاق. يمكنك اختيارها يدوياً أيضاً.';
+
+  @override
+  String get locationPermissionBlocked =>
+      'إذن الموقع مرفوض نهائياً. افتح إعدادات التطبيق للسماح به.';
+
+  @override
+  String get grantPermission => 'السماح بالموقع';
+
+  @override
+  String get openSettings => 'فتح الإعدادات';
+
   @override
   String get somethingWentWrong => 'حدث خطأ. حاول مرة أخرى.';
   @override
@@ -302,6 +356,33 @@ class EnglishStrings implements AppStrings {
   String get back => 'Back';
   @override
   String get loading => 'Loading…';
+
+  @override
+  String get pickOnMap => 'Pick a location';
+
+  @override
+  String get mapUnavailable => 'The map is unavailable. Please contact support.';
+
+  @override
+  String get offline => 'No internet connection.';
+
+  @override
+  String get locationServicesOff => 'Location services are turned off on this device.';
+
+  @override
+  String get locationPermissionNeeded =>
+      'Location permission helps set your pickup point. You can also choose it manually.';
+
+  @override
+  String get locationPermissionBlocked =>
+      'Location permission is permanently denied. Open app settings to allow it.';
+
+  @override
+  String get grantPermission => 'Allow location';
+
+  @override
+  String get openSettings => 'Open settings';
+
   @override
   String get somethingWentWrong => 'Something went wrong. Please try again.';
   @override
@@ -460,9 +541,20 @@ class AppStringsDelegate extends LocalizationsDelegate<AppStrings> {
   @override
   bool isSupported(Locale locale) => true;
 
+  /// Resolves on the SAME frame, not a later one.
+  ///
+  /// Both string tables are `const` objects that are already in memory, so
+  /// there is nothing to await. Returning a real `Future` here made
+  /// `Localizations` report itself unready for the first frame, and every
+  /// screen under it rendered empty until the microtask queue drained - a
+  /// blank flash on every cold start, for data that was never loading.
+  ///
+  /// `SynchronousFuture` is the mechanism Flutter provides for exactly this,
+  /// and it is what `flutter_localizations` itself uses.
   @override
-  Future<AppStrings> load(Locale locale) async =>
-      locale.languageCode == 'en' ? const EnglishStrings() : const ArabicStrings();
+  Future<AppStrings> load(Locale locale) => SynchronousFuture<AppStrings>(
+        locale.languageCode == 'en' ? const EnglishStrings() : const ArabicStrings(),
+      );
 
   @override
   bool shouldReload(AppStringsDelegate old) => false;

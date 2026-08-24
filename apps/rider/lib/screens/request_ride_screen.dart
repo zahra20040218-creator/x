@@ -239,52 +239,36 @@ class _LocationField extends StatelessWidget {
   }
 }
 
-/// Map picker screen. Kept minimal deliberately — CLAUDE.md §2 rules out
-/// in-app navigation, and this is a point picker, not a routing UI.
-class MapPickerScreen extends StatefulWidget {
+/// Map picker screen.
+///
+/// A thin wrapper over `MapPickerView` in `packages/core` — the map itself is
+/// shared with the driver app, because CLAUDE.md §1 treats duplicated widget
+/// code between the two as a defect.
+///
+/// `hasApiKey` comes from a compile-time define rather than being probed at
+/// runtime: the key lives in the Android manifest and Dart cannot read it.
+/// Passing it in keeps the "no key" path honest instead of rendering a blank
+/// grey tile the user cannot distinguish from a network failure.
+class MapPickerScreen extends StatelessWidget {
   const MapPickerScreen({required this.title, super.key});
 
   final String title;
 
-  @override
-  State<MapPickerScreen> createState() => _MapPickerScreenState();
-}
+  /// Set with `--dart-define=MAPS_CONFIGURED=true` in any build that also
+  /// injects `-PMAPS_API_KEY`. Defaults to false so an unconfigured build
+  /// says so plainly.
+  static const bool _mapsConfigured =
+      bool.fromEnvironment('MAPS_CONFIGURED');
 
-class _MapPickerScreenState extends State<MapPickerScreen> {
-  /// Baghdad city centre, used only as the map's INITIAL camera position -
-  /// never as a submitted coordinate. The user must move the pin and confirm.
+  /// Baghdad. A starting camera position only, never a submitted coordinate —
+  /// the user must move the map and confirm.
   static const LatLng _baghdadCentre = LatLng(lat: 33.3152, lng: 44.3661);
 
-  LatLng _centre = _baghdadCentre;
-
   @override
-  Widget build(BuildContext context) {
-    final strings = AppStrings.of(context);
-
-    return Scaffold(
-      appBar: AppBar(title: Text(widget.title)),
-      body: Stack(
-        alignment: Alignment.center,
-        children: [
-          // GoogleMap goes here; it needs an API key and a device, so the
-          // picker is left as a surface the map plugs into rather than a
-          // half-built map that cannot render.
-          const ColoredBox(
-            color: AppColors.surfaceVariant,
-            child: SizedBox.expand(),
-          ),
-          const Icon(Icons.place, size: 48, color: AppColors.danger),
-          PositionedDirectional(
-            start: AppSpacing.md,
-            end: AppSpacing.md,
-            bottom: AppSpacing.lg,
-            child: PrimaryButton(
-              label: strings.confirm,
-              onPressed: () => Navigator.of(context).pop(_centre),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => MapPickerView(
+        title: title,
+        initialCentre: _baghdadCentre,
+        hasApiKey: _mapsConfigured,
+        onConfirm: (picked) => Navigator.of(context).pop(picked),
+      );
 }

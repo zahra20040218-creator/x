@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rideapp_core/rideapp_core.dart';
 
@@ -9,9 +10,29 @@ import 'package:rideapp_core/rideapp_core.dart';
 /// internal state. A snapshot test would pass on a blank screen as readily as
 /// on a correct one.
 void main() {
+  /// Mirrors the real apps' MaterialApp configuration exactly.
+  ///
+  /// The first version of this harness set `locale: Locale('ar')` and stopped
+  /// there. MaterialApp's default `supportedLocales` is `[en_US]`, so 'ar' was
+  /// not supported, resolution fell back to English, and the retry button
+  /// rendered "Retry" — while the test looked for 'إعادة المحاولة' and
+  /// reported a failure that looked like a missing button.
+  ///
+  /// The global delegates are equally load-bearing: without
+  /// GlobalWidgetsLocalizations there is no Directionality for 'ar', and the
+  /// tree renders LTR under an Arabic locale.
+  ///
+  /// Both apps declare all of this correctly. A test harness that configures
+  /// less than the app does not test the app.
   Widget host(Widget child) => MaterialApp(
-        localizationsDelegates: const [AppStringsDelegate()],
         locale: const Locale('ar'),
+        supportedLocales: const [Locale('ar'), Locale('en')],
+        localizationsDelegates: const [
+          AppStringsDelegate(),
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
         home: Scaffold(body: child),
       );
 
