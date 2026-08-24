@@ -1,4 +1,12 @@
-import { type AdminSession, createDataProvider, topUpWallet } from './data-provider';
+import {
+  type AdminSession,
+  type DriverDocuments,
+  type DriverDocumentType,
+  createDataProvider,
+  fetchDriverDocuments,
+  recordDriverDocument,
+  topUpWallet,
+} from './data-provider';
 
 /**
  * The one place that owns the API base URL and the live session.
@@ -25,4 +33,18 @@ export function topUp(
   idempotencyKey: string,
 ): Promise<{ driverId: string; balanceIqd: number }> {
   return topUpWallet(API_BASE_URL, session, driverId, amountIqd, idempotencyKey, reference);
+}
+
+/** `fetchDriverDocuments` with the base URL and session already applied. */
+export function driverDocuments(driverId: string): Promise<DriverDocuments> {
+  return fetchDriverDocuments(API_BASE_URL, session, driverId);
+}
+
+/** `recordDriverDocument` with the base URL and session already applied. */
+export function saveDriverDocument(
+  driverId: string,
+  docType: DriverDocumentType,
+  body: { status: 'PENDING' | 'VERIFIED' | 'REJECTED'; reference?: string; expiresAt?: string; note?: string },
+): Promise<DriverDocuments> {
+  return recordDriverDocument(API_BASE_URL, session, driverId, docType, body);
 }

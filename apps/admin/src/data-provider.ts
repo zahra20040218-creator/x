@@ -177,3 +177,97 @@ export async function topUpWallet(
 
   return (await response.json()) as { driverId: string; balanceIqd: number };
 }
+
+export const DRIVER_DOCUMENT_TYPES = [
+  'NATIONAL_ID',
+  'DRIVING_LICENCE',
+  'VEHICLE_REGISTRATION',
+  'VEHICLE_AUTHORIZATION',
+] as const;
+
+export type DriverDocumentType = (typeof DRIVER_DOCUMENT_TYPES)[number];
+
+export interface DriverDocument {
+  docType: DriverDocumentType;
+  status: 'PENDING' | 'VERIFIED' | 'REJECTED';
+  reference: string;
+  expiresAt: string | null;
+  verifiedBy: string | null;
+  verifiedAt: string | null;
+  note: string;
+  updatedAt: string;
+}
+
+export interface ComplianceVerdict {
+  compliant: boolean;
+  missing: DriverDocumentType[];
+  expired: DriverDocumentType[];
+  rejected: DriverDocumentType[];
+}
+
+export interface DriverDocuments {
+  items: DriverDocument[];
+  compliance: ComplianceVerdict;
+}
+
+async function adminRequest<T>(
+  baseUrl: string,
+  session: AdminSession,
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
+  const response = await fetch(`${baseUrl}${path}`, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(session.accessToken ? { Authorization: `Bearer ${session.accessToken}` } : {}),
+      ...(init?.headers ?? {}),
+    },
+  });
+
+  if (!response.ok) {
+    const problem = (await response.json().catch(() => null)) as { detail?: string } | null;
+    throw new Error(problem?.detail ?? `Request failed (${response.status})`);
+  }
+
+  return (await response.json()) as T;
+}
+
+/** Documents on file for a driver, with a verdict computed at request time. */
+export function fetchDriverDocuments(
+  baseUrl: string,
+  session: AdminSession,
+  driverId: string,
+): Promise<DriverDocuments> {
+  return adminRequest<DriverDocuments>(
+    baseUrl,
+    session,
+    `/admin/drivers/${driverId}/documents`,
+  );
+}
+
+/**
+ * Record the outcome of checking one document.
+ *
+ * PUT: one record per (driver, type), so re-checking a renewed licence updates
+ * it rather than leaving two rows with no rule for which is current.
+ */
+export function recordDriverDocument(
+  baseUrl: string,
+  session: AdminSession,
+  driverId: string,
+  docType: DriverDocumentType,
+  body: {
+    status: DriverDocument['status'];
+    reference?: string;
+    expiresAt?: string;
+    note?: string;
+  },
+): Promise<DriverDocuments> {
+  return adminRequest<DriverDocuments>(
+    baseUrl,
+    session,
+    `/admin/drivers/${driverId}/documents/${docType}`,
+    { method: 'PUT', body: JSON.stringify(body) },
+  );
+}

@@ -2,15 +2,23 @@ import { useCreate, useList, useUpdate } from '@refinedev/core';
 import { useState } from 'react';
 
 import { topUp } from '../api';
+import { Documents } from './driver-documents';
 import { formatDateTime, formatIqd } from '../money';
 
 /**
  * Driver operations — the screen the business actually runs on.
  *
- * CLAUDE.md §2 puts driver self-signup and KYC out of scope for v1, so an
- * administrator creating drivers by hand is not a stopgap: it is the design.
+ * An administrator creating drivers by hand is not a stopgap: it is the design.
  * That makes this page the only way a driver gets onto the platform at all.
+ *
+ * Document verification (owner decision D-018) lives here rather than on its
+ * own screen because it is the same job - the person deciding whether someone
+ * may drive is the person holding their licence. It is also the ONLY way to
+ * verify a document: without it the endpoints have no caller, and the policy
+ * could be switched on with no way for anyone to satisfy it.
  */
+
+
 
 interface Driver {
   id: string;
@@ -93,6 +101,7 @@ function DriverRow({
 }): JSX.Element {
   const { mutate: update, isLoading } = useUpdate();
   const [toppingUp, setToppingUp] = useState(false);
+  const [showingDocuments, setShowingDocuments] = useState(false);
 
   function toggleSuspension(): void {
     const suspending = !driver.isSuspended;
@@ -139,6 +148,7 @@ function DriverRow({
         <td>{formatDateTime(driver.createdAt)}</td>
         <td className="actions">
           <button onClick={() => setToppingUp((v) => !v)}>شحن</button>
+          <button onClick={() => setShowingDocuments((v) => !v)}>الوثائق</button>
           <button onClick={toggleSuspension} disabled={isLoading}>
             {driver.isSuspended ? 'إلغاء الإيقاف' : 'إيقاف'}
           </button>
@@ -154,6 +164,13 @@ function DriverRow({
                 onChanged();
               }}
             />
+          </td>
+        </tr>
+      )}
+      {showingDocuments && (
+        <tr>
+          <td colSpan={9}>
+            <Documents driverId={driver.id} />
           </td>
         </tr>
       )}
