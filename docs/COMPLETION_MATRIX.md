@@ -119,10 +119,11 @@ $ grep -rnE "\+9647[0-9]{9}" services/api/src --include=*.ts | grep -v .test.
 | Requirement | Status | Evidence | Test | Command | Result |
 |---|---|---|---|---|---|
 | **Android build — both apps** | **DONE** | `√ Built app-debug.apk` rider 158 MB, driver 159 MB | — | `flutter build apk` | **both build** |
+| **Driver earnings arithmetic** | **DONE** | pure function; double-entry double-count guarded | `earnings_test.dart` | `flutter test` | **9 pass** |
 | **Map picker (M-3)** | **PARTIAL** | real `GoogleMap`, 8 states, no crash without a key | `map_state_test.dart`, `location_gate_test.dart` | `flutter test` | 19 pass · **never rendered on a device** |
 | Shared core (models, API client, design) | **DONE** | compiled, analysed, tested | 65 tests | `flutter test` | **65 pass, 0 errors** |
-| Rider app full flow | **PARTIAL** | auth → request → track → rate | — | needs Flutter | **never compiled** |
-| Driver app full flow | **PARTIAL** | auth → online → offer → trip → wallet | — | needs Flutter | **never compiled** |
+| Rider app full flow | **PARTIAL** | sign-in, request, track, **history, receipt, profile** — all wired to the real API | — | `flutter analyze` | **0 errors** · no device test |
+| Driver app full flow | **PARTIAL** | sign-in, home, offer, trip, battery exemption, **earnings** | `location_service_test.dart` | `flutter test` | 6 pass · no device test |
 | **Background location (§5.3)** | **BLOCKED** | foreground service, Doze exemption + explainer, offline buffer, no WorkManager | `location_service_test.dart` written | needs Flutter **+ device** | `AUTOMATED = written, unrun` · **`REAL DEVICE = BLOCKED`** |
 | Arabic / RTL / localisation | **PARTIAL** | interface-based strings; no hardcoded user text | — | needs Flutter | **never compiled** |
 | Admin panel | **PARTIAL** | data provider, money formatter, contract paths | `money.test.ts` | `npx vitest run` | 11 pass · **no UI screens** |
@@ -149,11 +150,11 @@ $ grep -rnE "\+9647[0-9]{9}" services/api/src --include=*.ts | grep -v .test.
 
 | Status | Count | Change |
 |---|---|---|
-| **DONE** — built, tested, and I ran it | **38** |
+| **DONE** — built, tested, and I ran it | **39** |
 | **PARTIAL** — works but not fully verified, or scope-limited | **13** |
-| **BLOCKED** — needs a device, k6, Docker, or credentials | **9** |
+| **BLOCKED** — needs a device, k6, or credentials | **9** |
 | **FAILED** — missing code, not a missing tool | **0** |
-| **Total rows** | **60** |
+| **Total rows** | **61** |
 
 **Counted by machine from the rows above**, not by hand:
 
