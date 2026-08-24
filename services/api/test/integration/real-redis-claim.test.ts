@@ -53,7 +53,7 @@ describeReal('atomic ride claim on real Redis', () => {
     expect(winners).toHaveLength(1);
 
     for (const loser of results.filter((r) => r.status === 'rejected')) {
-      expect((loser as PromiseRejectedResult).reason).toBeInstanceOf(RideAlreadyClaimedError);
+      expect(loser.reason).toBeInstanceOf(RideAlreadyClaimedError);
     }
   });
 
