@@ -115,3 +115,57 @@ would make the suite unrunnable without Docker, which is the situation you are
 in right now. The fix for D-2/D-15 is that the same tests must *also* run
 against real services and that no run may claim to have done so when it did
 not — which is what the harness enforces.
+
+---
+
+## Load test — first run, 2026-08-24
+
+k6 v0.54.0, against the API, PostgreSQL 17.11 and Redis 8.0.5 all on one
+Windows laptop. 400 driver VUs reporting position every 5s, 120 ride requests
+per minute each retried with the same idempotency key, and 20 drivers racing
+one ride. Fixtures from `services/api/scripts/load-fixtures.mjs`.
+
+### What held
+
+| Invariant | Result |
+|---|---|
+| §5.1 atomic claim | **1 winner, 961 losers.** Never two. |
+| §5.2 idempotency | **0 duplicate rides** across 600 retried pairs. |
+| Claim rollback | 38 accepts whose transaction failed released the claim rather than leaking it — a leaked claim blocks that ride for the full 30s TTL. |
+
+### What it found
+
+Running **without PgBouncer**, at the default `DATABASE_MAX_CONNECTIONS=10`,
+400 concurrent drivers exhausted the pool:
+
+```
+8 × "timeout exceeded when trying to connect"  →  8 × HTTP 500
+http_req_duration p95   908 ms
+location ingest   p95   935 ms
+```
+
+Raising the pool to 50 removed it completely:
+
+```
+server errors (5xx)     0
+http_req_duration p95   161 ms
+location ingest   p95   164 ms   (target < 200)
+accept            p95    98 ms
+```
+
+This is exactly the failure CLAUDE.md §3.3 exists to prevent, and it confirms
+the invariant rather than contradicting it: the app pool is deliberately small
+because PgBouncer is supposed to be multiplexing in front of it. **Deploying
+without PgBouncer and leaving the pool at 10 will produce 500s under load.**
+
+Also observed: 29 × `rate limiter unavailable; allowing request` — the Redis
+rate-limit check exceeded its timeout under load and degraded to allowing, per
+`UNAVAILABLE_POLICY`. Redis runs in WSL2 here, which adds a hop that a real
+deployment will not have.
+
+### What these numbers are NOT
+
+They are not a measurement of the 4-core VPS. The load generator competed with
+the server for the same cores throughout, so treat the latencies as a
+pessimistic floor. And **matching latency (§3, "< 3s") is still unmeasured** —
+this script does not time request-to-offer at all.
