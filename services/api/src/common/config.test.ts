@@ -65,6 +65,53 @@ describe('loadConfig', () => {
       ).toThrow(/PgBouncer/);
     });
 
+    it('catches a URL that names no port at all', () => {
+      // The likeliest form of the mistake, and the one the old regex missed:
+      // PostgreSQL defaults to 5432 when the URL omits it, so this connects
+      // straight to Postgres while looking like it says nothing about ports.
+      expect(() =>
+        loadConfig({
+          ...VALID,
+          NODE_ENV: 'production',
+          DATABASE_URL: 'postgresql://u:p@postgres/rideapp',
+        }),
+      ).toThrow(/PgBouncer/);
+    });
+
+    it('catches a URL with no trailing slash after the port', () => {
+      expect(() =>
+        loadConfig({
+          ...VALID,
+          NODE_ENV: 'production',
+          DATABASE_URL: 'postgresql://u:p@postgres:5432',
+        }),
+      ).toThrow(/PgBouncer/);
+    });
+
+    it('is not fooled by a password containing the port text', () => {
+      // The old regex matched anywhere in the string. This connects to
+      // PgBouncer on 6432 and must be allowed.
+      expect(() =>
+        loadConfig({
+          ...VALID,
+          NODE_ENV: 'production',
+          DATABASE_URL: 'postgresql://u:has%3A5432%2Fin-it@pgbouncer:6432/rideapp',
+        }),
+      ).not.toThrow();
+    });
+
+    it('rejects a DATABASE_URL that is not a URL, without echoing the password', () => {
+      // Skipping the check for an unparseable value would turn one mistake
+      // into two, and the message must not put credentials in a log.
+      expect(() =>
+        loadConfig({
+          ...VALID,
+          NODE_ENV: 'production',
+          DATABASE_URL: 'not a url at all',
+        }),
+      ).toThrow();
+    });
+
     it('allows port 5432 outside production, where there may be no PgBouncer', () => {
       expect(() =>
         loadConfig({

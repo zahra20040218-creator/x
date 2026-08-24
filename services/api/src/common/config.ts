@@ -110,6 +110,33 @@ export class ConfigError extends Error {
   }
 }
 
+
+/**
+ * The port a PostgreSQL URL actually resolves to.
+ *
+ * Returns 5432 when the URL names no port, because that is what the driver
+ * will connect to — the whole point of parsing rather than matching text.
+ *
+ * Throws on something that is not a URL: a DATABASE_URL that cannot be parsed
+ * is a configuration error in its own right, and silently skipping the
+ * PgBouncer check for it would turn one mistake into two.
+ */
+function databasePort(url: string): number {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new ConfigError([`DATABASE_URL is not a valid URL: ${redactUrl(url)}`]);
+  }
+
+  return parsed.port ? Number(parsed.port) : 5432;
+}
+
+/** A URL with its password removed, safe to put in an error message. */
+function redactUrl(url: string): string {
+  return url.replace(/\/\/[^@/]*@/, '//***@');
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const parsed = ConfigSchema.safeParse(env);
   if (!parsed.success) {
@@ -123,7 +150,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   // A production deployment pointed straight at Postgres would work fine in
   // testing and then exhaust connections at ~100 concurrent users. Fail at boot
   // rather than discovering it in the field (CLAUDE.md §3.3).
-  if (config.NODE_ENV === 'production' && /:5432\//.test(config.DATABASE_URL)) {
+  //
+  // This was a regex against `:5432/`, which missed the likeliest form of the
+  // mistake: `postgres://host/rideapp` names no port at all and PostgreSQL
+  // defaults to 5432. It also missed a URL with no trailing slash, and matched
+  // a password that happened to contain the text.
+  if (config.NODE_ENV === 'production' && databasePort(config.DATABASE_URL) === 5432) {
     throw new ConfigError([
       'DATABASE_URL points at port 5432, which is Postgres itself. ' +
         'All application DB access must go through PgBouncer (CLAUDE.md §3.3). ' +
