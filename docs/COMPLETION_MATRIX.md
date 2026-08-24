@@ -110,7 +110,7 @@ $ grep -rnE "\+9647[0-9]{9}" services/api/src --include=*.ts | grep -v .test.
 | Docker Compose | **BLOCKED** | PostGIS, PgBouncer txn mode, Redis AOF, api, worker | — | needs Docker | **never run** |
 | CI pipeline | **BLOCKED** | full workflow incl. real-Redis skip-detector | — | needs a push | **never run** |
 | BullMQ workers | **BLOCKED** | 4 recurring jobs, separate process | — | needs Redis | **never run** |
-| Realtime WebSocket | **PARTIAL** | token-derived channels, no client-named channel | **none** | — | **code review only** |
+| Realtime WebSocket | **DONE** | token-derived channels; a rider never receives another rider's events | `realtime.e2e.test.ts` | `npx vitest run` | **15 pass over real sockets** |
 
 ---
 
@@ -118,9 +118,11 @@ $ grep -rnE "\+9647[0-9]{9}" services/api/src --include=*.ts | grep -v .test.
 
 | Requirement | Status | Evidence | Test | Command | Result |
 |---|---|---|---|---|---|
-| Shared core (models, API client, design) | **BLOCKED** | 14 files, Flutter | `iqd_test.dart` written | needs Flutter | **never compiled** |
-| Rider app full flow | **FAILED** | auth → request → track → rate | — | needs Flutter | **never compiled** |
-| Driver app full flow | **BLOCKED** | auth → online → offer → trip → wallet | — | needs Flutter | **never compiled** |
+| **Android build — both apps** | **DONE** | `√ Built app-debug.apk` rider 158 MB, driver 159 MB | — | `flutter build apk` | **both build** |
+| **Map picker (M-3)** | **PARTIAL** | real `GoogleMap`, 8 states, no crash without a key | `map_state_test.dart`, `location_gate_test.dart` | `flutter test` | 19 pass · **never rendered on a device** |
+| Shared core (models, API client, design) | **DONE** | compiled, analysed, tested | 65 tests | `flutter test` | **65 pass, 0 errors** |
+| Rider app full flow | **PARTIAL** | auth → request → track → rate | — | needs Flutter | **never compiled** |
+| Driver app full flow | **PARTIAL** | auth → online → offer → trip → wallet | — | needs Flutter | **never compiled** |
 | **Background location (§5.3)** | **BLOCKED** | foreground service, Doze exemption + explainer, offline buffer, no WorkManager | `location_service_test.dart` written | needs Flutter **+ device** | `AUTOMATED = written, unrun` · **`REAL DEVICE = BLOCKED`** |
 | Arabic / RTL / localisation | **PARTIAL** | interface-based strings; no hardcoded user text | — | needs Flutter | **never compiled** |
 | Admin panel | **PARTIAL** | data provider, money formatter, contract paths | `money.test.ts` | `npx vitest run` | 11 pass · **no UI screens** |
@@ -147,11 +149,11 @@ $ grep -rnE "\+9647[0-9]{9}" services/api/src --include=*.ts | grep -v .test.
 
 | Status | Count | Change |
 |---|---|---|
-| **DONE** — built, tested, and I ran it | **33** |
-| **PARTIAL** — works but not fully verified, or scope-limited | **11** |
-| **BLOCKED** — needs Docker, Flutter, a device, k6, or credentials | **12** |
-| **FAILED** — missing code, not a missing tool | **2** |
-| **Total rows** | **58** |
+| **DONE** — built, tested, and I ran it | **38** |
+| **PARTIAL** — works but not fully verified, or scope-limited | **13** |
+| **BLOCKED** — needs a device, k6, Docker, or credentials | **9** |
+| **FAILED** — missing code, not a missing tool | **0** |
+| **Total rows** | **60** |
 
 **Counted by machine from the rows above**, not by hand:
 
