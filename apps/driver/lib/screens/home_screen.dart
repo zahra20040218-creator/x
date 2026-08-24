@@ -15,17 +15,56 @@ class DriverHomeScreen extends StatefulWidget {
   const DriverHomeScreen({
     required this.api,
     required this.location,
+    required this.onSignedOut,
     super.key,
   });
 
   final ApiClient api;
   final DriverLocationService location;
 
+  /// Raised after the server has revoked the session.
+  ///
+  /// The driver app had no sign-out at all until now: a driver ending a shift,
+  /// or handing the phone to someone else, stayed authenticated — and with
+  /// push registered the next person would have received their ride offers.
+  final VoidCallback onSignedOut;
+
   @override
   State<DriverHomeScreen> createState() => _DriverHomeScreenState();
 }
 
 class _DriverHomeScreenState extends State<DriverHomeScreen> {
+  bool _signingOut = false;
+
+  /// Go offline first, then end the session.
+  ///
+  /// Order matters: a driver who signs out while still ONLINE keeps receiving
+  /// offers from matching until the presence sweeper notices, and those offers
+  /// go to a phone nobody is watching.
+  Future<void> _signOut() async {
+    setState(() => _signingOut = true);
+
+    try {
+      await widget.location.stop();
+      await widget.api.setAvailability(availability: DriverAvailability.offline);
+    } on Object {
+      // Best effort. Failing to go offline must not trap the driver in a
+      // session they asked to end - the presence sweeper evicts them anyway,
+      // and the revocation below is what actually ends the session.
+    }
+
+    try {
+      await widget.api.logout();
+    } on ApiException {
+      // Local tokens are cleared either way.
+    }
+
+    if (mounted) {
+      setState(() => _signingOut = false);
+      widget.onSignedOut();
+    }
+  }
+
   Me? _me;
   Ride? _activeRide;
   RideOffer? _offer;
@@ -209,6 +248,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       appBar: AppBar(
         title: Text(strings.appNameDriver),
         actions: [
+          IconButton(
+            tooltip: strings.signOut,
+            icon: const Icon(Icons.logout),
+            onPressed: _signingOut ? null : _signOut,
+          ),
           IconButton(
             tooltip: strings.earnings,
             icon: const Icon(Icons.account_balance_wallet_outlined),

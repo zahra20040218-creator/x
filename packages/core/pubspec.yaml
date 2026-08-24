@@ -27,6 +27,12 @@ dependencies:
   # The map widget lives here rather than in each app, because CLAUDE.md 1
   # treats duplicated widget code between rider and driver as a defect — and
   # both apps show a map.
+  # Push. The registration flow is shared: both apps obtain a token the same
+  # way and register it against the same endpoint, and CLAUDE.md 1 treats
+  # duplicated logic between them as a defect.
+  firebase_core: ^3.8.0
+  firebase_messaging: ^15.1.5
+
   google_maps_flutter: ^2.9.0
 
   # Permission and position stream for the map's own location handling.

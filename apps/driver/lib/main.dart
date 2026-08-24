@@ -68,6 +68,36 @@ class _DriverAppState extends State<DriverApp> {
   bool _permissionsDone = false;
   bool _checking = true;
 
+
+  /// Set with `--dart-define=FIREBASE_CONFIGURED=true` on any build that also
+  /// ships `google-services.json`. False by default so an unconfigured build
+  /// reports `notConfigured` instead of prompting for a notification
+  /// permission that can never produce a working registration.
+  static const bool _firebaseConfigured =
+      bool.fromEnvironment('FIREBASE_CONFIGURED');
+
+  PushRegistrar? _push;
+
+  /// Register this device for ride notifications.
+  ///
+  /// Deliberately not awaited by anything the UI depends on: a push problem
+  /// must not delay or block the first screen. The registrar reports its own
+  /// status and never throws.
+  void _startPush() {
+    _push ??= PushRegistrar(
+      api: widget.api,
+      source: const FirebasePushTokenSource(isConfigured: _firebaseConfigured),
+    );
+    unawaited(_push!.start());
+  }
+
+  /// BEFORE the session is revoked — `DELETE /devices` is authenticated, so
+  /// once the token is gone the device stays registered and the next person to
+  /// sign in on this handset would receive the previous user's offers.
+  Future<void> _stopPush() async {
+    await _push?.stop();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -78,6 +108,9 @@ class _DriverAppState extends State<DriverApp> {
     final token = await widget.tokens.accessToken();
     setState(() {
       _signedIn = token != null;
+      // A returning user never passes through onSignedIn, so without this
+      // their device would only ever be registered on first install.
+      if (token != null) _startPush();
       _checking = false;
     });
   }
@@ -127,7 +160,10 @@ class _DriverAppState extends State<DriverApp> {
           if (!_signedIn) {
             return SignInScreen(
               api: widget.api,
-              onSignedIn: () => setState(() => _signedIn = true),
+              onSignedIn: () {
+                setState(() => _signedIn = true);
+                _startPush();
+              },
             );
           }
 
@@ -150,7 +186,14 @@ class _DriverAppState extends State<DriverApp> {
                   body: Center(child: CircularProgressIndicator()),
                 );
               }
-              return DriverHomeScreen(api: widget.api, location: service);
+              return DriverHomeScreen(
+                api: widget.api,
+                location: service,
+                onSignedOut: () {
+                  unawaited(_stopPush());
+                  setState(() => _signedIn = false);
+                },
+              );
             },
           );
         },
