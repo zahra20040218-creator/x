@@ -8,9 +8,43 @@ import 'package:rideapp_core/rideapp_core.dart';
 /// (CLAUDE.md §6.3) — so a network round trip here would add a loading state
 /// and a failure mode to a screen that has nothing new to learn.
 class RideReceiptScreen extends StatelessWidget {
-  const RideReceiptScreen({required this.ride, super.key});
+  const RideReceiptScreen({required this.ride, required this.api, super.key});
 
   final Ride ride;
+
+  /// Needed only to file a dispute. The receipt itself never re-fetches.
+  final ApiClient api;
+
+  /// A rider can report the fare, a driver who never arrived, or unsafe
+  /// behaviour. `riderNoShow` is deliberately absent — it is the driver's
+  /// complaint, and offering it here invites a report about oneself.
+  static const _riderReasons = [
+    DisputeReason.fareWrong,
+    DisputeReason.driverNoShow,
+    DisputeReason.unsafe,
+    DisputeReason.other,
+  ];
+
+  Future<void> _report(BuildContext context) async {
+    final strings = AppStrings.of(context);
+    final dispute = await showReportProblemSheet(
+      context: context,
+      api: api,
+      rideId: ride.id,
+      reasons: _riderReasons,
+    );
+    if (dispute == null || !context.mounted) return;
+
+    // The reference is the point: a complaint with no receipt is one the rider
+    // has no reason to believe was filed.
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '${strings.reportReceived} — ${strings.reportReference} ${dispute.reference}',
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -109,6 +143,16 @@ class RideReceiptScreen extends StatelessWidget {
               title: strings.cancellationReason,
               child: Text(ride.cancellationReason!),
             ),
+
+          const SizedBox(height: AppSpacing.sm),
+          OutlinedButton.icon(
+            onPressed: () => _report(context),
+            icon: const Icon(Icons.flag_outlined),
+            label: Text(strings.reportProblem),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+            ),
+          ),
         ],
       ),
     );

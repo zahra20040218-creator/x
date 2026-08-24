@@ -21,3 +21,4 @@ export 'src/l10n/dates.dart';
 export 'src/money/earnings.dart';
 export 'src/push/push_registrar.dart';
 export 'src/push/firebase_push_token_source.dart';
+export 'src/disputes/report_problem_sheet.dart';

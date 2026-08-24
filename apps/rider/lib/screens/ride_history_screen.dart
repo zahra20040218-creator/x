@@ -68,7 +68,10 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
               ride: rides[index],
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (_) => RideReceiptScreen(ride: rides[index]),
+                  builder: (_) => RideReceiptScreen(
+                    ride: rides[index],
+                    api: widget.api,
+                  ),
                 ),
               ),
             ),

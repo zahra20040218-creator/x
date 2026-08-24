@@ -170,6 +170,22 @@ abstract class AppStrings {
 
   static AppStrings of(BuildContext context) =>
       Localizations.of<AppStrings>(context, AppStrings) ?? const ArabicStrings();
+
+  // Disputes. A rider or driver reporting a problem with a finished ride.
+  String get reportProblem;
+  String get reportProblemPrompt;
+  String get describeProblemOptional;
+  String get submitReport;
+  String get reportReceived;
+  String get reportReference;
+
+  /// A dispute reason in the user's language.
+  ///
+  /// A method for the same reason as [statusLabel]: adding a reason code to
+  /// the server enum must fail to compile here rather than show an Iraqi rider
+  /// the string `DRIVER_NO_SHOW`.
+  String disputeReasonLabel(DisputeReason reason);
+
 }
 
 /// Primary language. CLAUDE.md §8.
@@ -444,6 +460,29 @@ class ArabicStrings implements AppStrings {
   String get foregroundServiceBody => 'جارٍ استقبال طلبات الرحلات';
   @override
   String get bufferedLocations => 'مواقع بانتظار الإرسال';
+
+  @override
+  String get reportProblem => 'الإبلاغ عن مشكلة';
+  @override
+  String get reportProblemPrompt => 'ما المشكلة في هذه الرحلة؟';
+  @override
+  String get describeProblemOptional => 'وصف المشكلة (اختياري)';
+  @override
+  String get submitReport => 'إرسال البلاغ';
+  @override
+  String get reportReceived => 'تم استلام بلاغك';
+  @override
+  String get reportReference => 'رقم البلاغ';
+
+  @override
+  String disputeReasonLabel(DisputeReason reason) => switch (reason) {
+        DisputeReason.fareWrong => 'الأجرة غير صحيحة',
+        DisputeReason.driverNoShow => 'السائق لم يحضر',
+        DisputeReason.riderNoShow => 'الراكب لم يحضر',
+        DisputeReason.unsafe => 'سلوك غير آمن',
+        DisputeReason.other => 'مشكلة أخرى',
+      };
+
 }
 
 /// Secondary language, LTR.
@@ -718,6 +757,29 @@ class EnglishStrings implements AppStrings {
   String get foregroundServiceBody => 'Receiving ride requests';
   @override
   String get bufferedLocations => 'Locations waiting to send';
+
+  @override
+  String get reportProblem => 'Report a problem';
+  @override
+  String get reportProblemPrompt => 'What went wrong with this ride?';
+  @override
+  String get describeProblemOptional => 'Describe the problem (optional)';
+  @override
+  String get submitReport => 'Submit report';
+  @override
+  String get reportReceived => 'Your report was received';
+  @override
+  String get reportReference => 'Report number';
+
+  @override
+  String disputeReasonLabel(DisputeReason reason) => switch (reason) {
+        DisputeReason.fareWrong => 'The fare is wrong',
+        DisputeReason.driverNoShow => 'The driver did not arrive',
+        DisputeReason.riderNoShow => 'The rider did not arrive',
+        DisputeReason.unsafe => 'Unsafe behaviour',
+        DisputeReason.other => 'Something else',
+      };
+
 }
 
 /// Delegate. Arabic is the default for any locale that is not English.

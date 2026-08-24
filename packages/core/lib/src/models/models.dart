@@ -537,3 +537,62 @@ class LocationSample extends Equatable {
 
 DateTime? _date(Object? value) =>
     value == null ? null : DateTime.parse(value as String);
+
+/// Why someone opened a dispute.
+///
+/// The wire values are the server's `reason_code` enum
+/// (`services/api/src/http/schemas.ts`). Sending anything else is a 422, so the
+/// set is closed rather than a free string — a typo here would be a rejection
+/// the user cannot act on.
+enum DisputeReason {
+  fareWrong('FARE_WRONG'),
+  driverNoShow('DRIVER_NO_SHOW'),
+  riderNoShow('RIDER_NO_SHOW'),
+  unsafe('UNSAFE'),
+  other('OTHER');
+
+  const DisputeReason(this.wire);
+
+  final String wire;
+
+  static DisputeReason fromWire(String value) => DisputeReason.values.firstWhere(
+        (reason) => reason.wire == value,
+        orElse: () => DisputeReason.other,
+      );
+}
+
+/// A complaint about a ride, as the server recorded it.
+///
+/// Carries the id back so the app can show a reference the user can quote to
+/// support. A complaint that vanishes without a receipt is one the user has no
+/// reason to believe was filed.
+class Dispute {
+  const Dispute({
+    required this.id,
+    required this.rideId,
+    required this.status,
+    required this.reasonCode,
+    required this.description,
+    required this.createdAt,
+  });
+
+  factory Dispute.fromJson(Map<String, dynamic> json) => Dispute(
+        id: json['id'] as String,
+        rideId: json['rideId'] as String,
+        status: json['status'] as String,
+        reasonCode: DisputeReason.fromWire(json['reasonCode'] as String),
+        description: (json['description'] as String?) ?? '',
+        createdAt: DateTime.parse(json['createdAt'] as String).toUtc(),
+      );
+
+  final String id;
+  final String rideId;
+  final String status;
+  final DisputeReason reasonCode;
+  final String description;
+  final DateTime createdAt;
+
+  /// The short form shown to the user, matching how a ride id is shortened on
+  /// the receipt.
+  String get reference => id.split('-').first.toUpperCase();
+}

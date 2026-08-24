@@ -304,6 +304,32 @@ class ApiClient {
   /// reissues tokens on reinstall and after a data clear. A device that is
   /// never registered silently receives no ride offers at all, which is
   /// indistinguishable from there being no demand.
+  /// Open a dispute on a ride.
+  ///
+  /// Available to the rider and the driver on rides they were part of; the
+  /// server answers 404 rather than 403 for anyone else, so that the endpoint
+  /// cannot be used to discover which ride ids exist.
+  ///
+  /// The path is `/admin/disputes` because that is where the collection lives
+  /// in the contract — the POST itself is deliberately not admin-only.
+  Future<Dispute> openDispute({
+    required String rideId,
+    required DisputeReason reason,
+    String? description,
+  }) async =>
+      Dispute.fromJson(
+        await _send<Map<String, dynamic>>(
+          'POST',
+          '/admin/disputes',
+          body: {
+            'rideId': rideId,
+            'reasonCode': reason.wire,
+            if (description != null && description.isNotEmpty)
+              'description': description,
+          },
+        ),
+      );
+
   Future<void> registerDevice({
     required String token,
     String platform = 'ANDROID',

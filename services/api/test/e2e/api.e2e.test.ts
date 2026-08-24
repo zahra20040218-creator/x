@@ -26,8 +26,8 @@ import { FakeDatabase } from '../fakes/fake-database.js';
  * The database and Redis are fakes, so this proves the HTTP layer, the guards,
  * validation, status codes and the wiring - NOT the schema. The schema-level
  * guarantees (append-only triggers, the balance trigger, partial unique
- * indexes) need a real Postgres and are covered in test/integration, which has
- * not run on this host. See BLOCKED.md.
+ * indexes) need a real Postgres and are covered in test/integration, which
+ * runs against PostgreSQL 17.11 and Redis 8.0.5.
  */
 
 const RIDER_PHONE = '+9647700000001';
@@ -95,10 +95,14 @@ describe('API end to end', () => {
 
   // -------------------------------------------------------------------------
 
-  async function signInRider(): Promise<string> {
+  // The Firebase token identifies the user, so two calls with the default
+  // return the SAME rider. Pass a distinct token for a genuinely different
+  // person - a test that means to use a stranger and quietly reuses the owner
+  // asserts nothing.
+  async function signInRider(firebaseIdToken = 'rider-token'): Promise<string> {
     const response = await http
       .post('/v1/auth/otp/verify')
-      .send({ firebaseIdToken: 'rider-token', role: 'RIDER', displayName: 'راكب' })
+      .send({ firebaseIdToken, role: 'RIDER', displayName: 'راكب' })
       .expect(200);
     return response.body.accessToken;
   }
@@ -743,6 +747,132 @@ describe('API end to end', () => {
         .set('X-Signature', 'sha256=deadbeef')
         .send({})
         .expect(404);
+    });
+  });
+  // -------------------------------------------------------------------------
+
+  describe('disputes', () => {
+    async function completedRide(): Promise<{
+      rideId: string;
+      riderToken: string;
+      driverToken: string;
+    }> {
+      const riderToken = await signInRider();
+      seedDriverRow('driver-1', DRIVER_PHONE, '12345');
+      const driverToken = await signInDriver('driver-token');
+
+      await http
+        .put('/v1/driver/availability')
+        .set(auth(driverToken))
+        .send({ availability: 'ONLINE', position: KARRADA })
+        .expect(200);
+
+      const created = await http
+        .post('/v1/rides')
+        .set(auth(riderToken))
+        .set('Idempotency-Key', randomUUID())
+        .send({ pickup: TAHRIR, dropoff: KARRADA })
+        .expect(201);
+
+      const rideId = created.body.id;
+
+      // The driver is not a party to the ride until they accept it, and the
+      // endpoint checks exactly that. Without this the driver's own dispute
+      // is correctly refused with a 404.
+      const matching = app.get(
+        (await import('../../src/matching/matching.service.js')).MatchingService,
+      );
+      await matching.dispatch(rideId);
+      await http.post(`/v1/rides/${rideId}/accept`).set(auth(driverToken)).expect(200);
+
+      return { rideId, riderToken, driverToken };
+    }
+
+    it('lets the rider open one on their own ride', async () => {
+      const { rideId, riderToken } = await completedRide();
+
+      const response = await http
+        .post('/v1/admin/disputes')
+        .set(auth(riderToken))
+        .send({ rideId, reasonCode: 'FARE_WRONG', description: 'الأجرة أعلى من المقدرة' })
+        .expect(201);
+
+      expect(response.body.status).toBe('OPEN');
+      expect(response.body.reasonCode).toBe('FARE_WRONG');
+      // The id is what the app shows back as a reference number.
+      expect(response.body.id).toBeTruthy();
+    });
+
+    it('lets the driver open one too', async () => {
+      const { rideId, driverToken } = await completedRide();
+
+      await http
+        .post('/v1/admin/disputes')
+        .set(auth(driverToken))
+        .send({ rideId, reasonCode: 'RIDER_NO_SHOW' })
+        .expect(201);
+    });
+
+    it('description is optional', async () => {
+      const { rideId, riderToken } = await completedRide();
+
+      const response = await http
+        .post('/v1/admin/disputes')
+        .set(auth(riderToken))
+        .send({ rideId, reasonCode: 'OTHER' })
+        .expect(201);
+
+      expect(response.body.description).toBe('');
+    });
+
+    it('answers 404, not 403, to someone who was not on the ride', async () => {
+      const { rideId } = await completedRide();
+
+      // A genuinely different person: the fake verifier maps token -> identity,
+      // so an unregistered token is a 401 and a reused one is the rider again.
+      firebase.register('stranger-token', {
+        uid: 'fb-stranger',
+        phoneNumber: '+9647700000009',
+      });
+      const strangerToken = await signInRider('stranger-token');
+
+      // 403 would confirm the ride exists. Same reasoning as GET /rides/{id}.
+      await http
+        .post('/v1/admin/disputes')
+        .set(auth(strangerToken))
+        .send({ rideId, reasonCode: 'UNSAFE' })
+        .expect(404);
+    });
+
+    it('answers 404 for a ride id that does not exist', async () => {
+      const riderToken = await signInRider();
+
+      await http
+        .post('/v1/admin/disputes')
+        .set(auth(riderToken))
+        .send({ rideId: randomUUID(), reasonCode: 'OTHER' })
+        .expect(404);
+    });
+
+    it('rejects a reason code outside the enum', async () => {
+      const { rideId, riderToken } = await completedRide();
+
+      // The Dart client sends `DisputeReason.wire`, so this is the check that
+      // keeps the two enums from drifting apart silently.
+      await http
+        .post('/v1/admin/disputes')
+        .set(auth(riderToken))
+        .send({ rideId, reasonCode: 'NOT_A_REASON' })
+        .expect(422);
+    });
+
+    it('requires authentication', async () => {
+      const { rideId } = await completedRide();
+
+      await http
+        .post('/v1/admin/disputes')
+        .send({ rideId, reasonCode: 'OTHER' })
+        .expect(401);
     });
   });
 });
@@ -1401,4 +1531,14 @@ describe('session revocation', () => {
 
     await http.get('/v1/me').set(as(access)).expect(401);
   });
+
+  // -------------------------------------------------------------------------
+  // Disputes
+  //
+  // The POST lives under /admin/disputes because that is where the collection
+  // sits in the contract, but it is NOT admin-only: it is how a rider says the
+  // fare was wrong and how a driver reports a rider who never appeared. It had
+  // no test and no caller in either app, which meant the admin queue behind it
+  // could only ever be empty.
+
 });

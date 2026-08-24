@@ -82,6 +82,35 @@ class _TripScreenState extends State<TripScreen> {
     }
   }
 
+  /// A driver's complaints are their own: a rider who never appeared, or
+  /// unsafe behaviour. `driverNoShow` is absent because it is a report about
+  /// themselves.
+  static const _driverReasons = [
+    DisputeReason.riderNoShow,
+    DisputeReason.unsafe,
+    DisputeReason.fareWrong,
+    DisputeReason.other,
+  ];
+
+  Future<void> _report() async {
+    final strings = AppStrings.of(context);
+    final dispute = await showReportProblemSheet(
+      context: context,
+      api: widget.api,
+      rideId: _ride.id,
+      reasons: _driverReasons,
+    );
+    if (dispute == null || !mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '${strings.reportReceived} — ${strings.reportReference} ${dispute.reference}',
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final strings = AppStrings.of(context);
@@ -155,6 +184,18 @@ class _TripScreenState extends State<TripScreen> {
                 strings.cancelRide,
                 style: const TextStyle(color: AppColors.danger),
               ),
+            ),
+          ],
+
+          // Offered from the moment the driver has arrived, because that is
+          // when a rider who never appears becomes a real cost to them. Before
+          // arrival there is nothing yet to report.
+          if (_ride.status == RideStatus.driverArrived ||
+              _ride.status == RideStatus.inProgress) ...[
+            TextButton.icon(
+              onPressed: _busy ? null : _report,
+              icon: const Icon(Icons.flag_outlined, size: 18),
+              label: Text(strings.reportProblem),
             ),
           ],
         ],
