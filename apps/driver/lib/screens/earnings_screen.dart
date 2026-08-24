@@ -25,6 +25,12 @@ class EarningsScreen extends StatefulWidget {
 class _EarningsScreenState extends State<EarningsScreen> {
   ViewState<_Earnings> _state = const ViewState<_Earnings>.loading();
 
+  /// Accumulated across pages, so the summary is computed over everything
+  /// loaded rather than only the newest page.
+  final List<LedgerEntry> _entries = [];
+  String? _cursor;
+  bool _loadingMore = false;
+
   @override
   void initState() {
     super.initState();
@@ -32,23 +38,26 @@ class _EarningsScreenState extends State<EarningsScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _state = const ViewState<_Earnings>.loading());
+    setState(() {
+      _state = const ViewState<_Earnings>.loading();
+      _entries.clear();
+      _cursor = null;
+    });
+
     try {
       // Balance and statement together: a balance with no entries behind it is
       // a number the driver cannot check.
       final balance = await widget.api.wallet();
-      final entries = await widget.api.walletEntries(limit: 100);
+      final page = await widget.api.walletEntries(limit: 50);
 
       if (!mounted) return;
-      final earnings = _Earnings(
-        balance: balance.balanceIqd,
-        summary: EarningsSummary.from(entries),
-        entries: entries,
-      );
+      _entries.addAll(page.items);
+      _cursor = page.nextCursor;
+      _balance = balance.balanceIqd;
 
-      setState(() => _state = entries.isEmpty
+      setState(() => _state = _entries.isEmpty
           ? const ViewState<_Earnings>.empty()
-          : ViewState<_Earnings>.success(earnings));
+          : ViewState<_Earnings>.success(_snapshot()));
     } on ApiException catch (error) {
       if (!mounted) return;
       setState(() => _state = ViewState<_Earnings>.error(
@@ -57,6 +66,44 @@ class _EarningsScreenState extends State<EarningsScreen> {
           ));
     }
   }
+
+  /// Fetch the next page.
+  ///
+  /// Without this the statement stops at the first page with nothing to say so
+  /// — the driver sees a plausible list and no sign that anything is missing.
+  Future<void> _loadMore() async {
+    final cursor = _cursor;
+    if (cursor == null || _loadingMore) return;
+
+    setState(() => _loadingMore = true);
+    try {
+      final page = await widget.api.walletEntries(limit: 50, cursor: cursor);
+      if (!mounted) return;
+      setState(() {
+        _entries.addAll(page.items);
+        _cursor = page.nextCursor;
+        _state = ViewState<_Earnings>.success(_snapshot());
+      });
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      // Inline, not a screen replacement: the pages already loaded are still
+      // correct and still worth reading.
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.detail ?? error.problem.slug)),
+      );
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
+    }
+  }
+
+  IqdAmount _balance = const IqdAmount(0);
+
+  _Earnings _snapshot() => _Earnings(
+        balance: _balance,
+        summary: EarningsSummary.from(_entries),
+        entries: List.unmodifiable(_entries),
+        hasMore: _cursor != null,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -97,6 +144,14 @@ class _EarningsScreenState extends State<EarningsScreen> {
               const SizedBox(height: AppSpacing.sm),
 
               ...data.entries.map((entry) => _EntryTile(entry: entry)),
+
+              if (data.hasMore) ...[
+                const SizedBox(height: AppSpacing.sm),
+                OutlinedButton(
+                  onPressed: _loadingMore ? null : _loadMore,
+                  child: Text(_loadingMore ? strings.loading : strings.loadMore),
+                ),
+              ],
             ],
           ),
         ),
@@ -115,6 +170,7 @@ class _Earnings {
     required this.balance,
     required this.summary,
     required this.entries,
+    required this.hasMore,
   });
 
   /// Authoritative, from the server, which sums the WHOLE ledger.
@@ -124,6 +180,9 @@ class _Earnings {
   final EarningsSummary summary;
 
   final List<LedgerEntry> entries;
+
+  /// Whether the server has more pages behind this one.
+  final bool hasMore;
 }
 
 class _Stat extends StatelessWidget {

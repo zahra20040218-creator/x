@@ -172,6 +172,7 @@ abstract class AppStrings {
       Localizations.of<AppStrings>(context, AppStrings) ?? const ArabicStrings();
 
   // Disputes. A rider or driver reporting a problem with a finished ride.
+  String get loadMore;
   String get reportProblem;
   String get reportProblemPrompt;
   String get describeProblemOptional;
@@ -461,6 +462,8 @@ class ArabicStrings implements AppStrings {
   @override
   String get bufferedLocations => 'مواقع بانتظار الإرسال';
 
+  @override
+  String get loadMore => 'تحميل المزيد';
   @override
   String get reportProblem => 'الإبلاغ عن مشكلة';
   @override
@@ -758,6 +761,8 @@ class EnglishStrings implements AppStrings {
   @override
   String get bufferedLocations => 'Locations waiting to send';
 
+  @override
+  String get loadMore => 'Load more';
   @override
   String get reportProblem => 'Report a problem';
   @override

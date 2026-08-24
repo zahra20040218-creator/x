@@ -255,18 +255,23 @@ export class RideRepository {
   async listForRider(
     q: Queryable,
     riderId: string,
-    options: { limit: number; before?: Date; status?: RideStatus },
+    options: { limit: number; after?: string; status?: RideStatus },
   ): Promise<RideRecord[]> {
     const result = await q.query<RideRow>(
       // The rider id comes from the token, never from a query parameter, so
       // there is no input that widens this filter (ACCEPTANCE_CHECKLIST check 5).
       `SELECT ${RIDE_COLUMNS} FROM rides
         WHERE rider_id = $1
-          AND ($2::timestamptz IS NULL OR created_at < $2)
+          -- Keyset on (created_at, id): created_at alone is not a total
+          -- order, and a timestamp cannot round-trip through a JavaScript
+          -- Date without losing microseconds. See http/cursor.ts.
+          AND ($2::uuid IS NULL OR (created_at, id) < (
+                SELECT created_at, id FROM rides WHERE id = $2
+              ))
           AND ($3::ride_status IS NULL OR status = $3)
-        ORDER BY created_at DESC
+        ORDER BY created_at DESC, id DESC
         LIMIT $4`,
-      [riderId, options.before ?? null, options.status ?? null, options.limit],
+      [riderId, options.after ?? null, options.status ?? null, options.limit],
     );
     return result.rows.map(toRideRecord);
   }
@@ -274,16 +279,21 @@ export class RideRepository {
   async listForDriver(
     q: Queryable,
     driverId: string,
-    options: { limit: number; before?: Date; status?: RideStatus },
+    options: { limit: number; after?: string; status?: RideStatus },
   ): Promise<RideRecord[]> {
     const result = await q.query<RideRow>(
       `SELECT ${RIDE_COLUMNS} FROM rides
         WHERE driver_id = $1
-          AND ($2::timestamptz IS NULL OR created_at < $2)
+          -- Keyset on (created_at, id): created_at alone is not a total
+          -- order, and a timestamp cannot round-trip through a JavaScript
+          -- Date without losing microseconds. See http/cursor.ts.
+          AND ($2::uuid IS NULL OR (created_at, id) < (
+                SELECT created_at, id FROM rides WHERE id = $2
+              ))
           AND ($3::ride_status IS NULL OR status = $3)
-        ORDER BY created_at DESC
+        ORDER BY created_at DESC, id DESC
         LIMIT $4`,
-      [driverId, options.before ?? null, options.status ?? null, options.limit],
+      [driverId, options.after ?? null, options.status ?? null, options.limit],
     );
     return result.rows.map(toRideRecord);
   }

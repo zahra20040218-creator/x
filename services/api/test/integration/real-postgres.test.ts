@@ -1,6 +1,8 @@
+import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { PgDatabase } from '../../src/db/pg-database.js';
+import { LedgerService } from '../../src/ledger/ledger.service.js';
 import {
   assertRealDatabase,
   createRealDatabase,
@@ -47,12 +49,14 @@ const TRANSACTION = 'cccccccc-1111-4111-8111-111111111111';
 
 describeReal('real PostgreSQL', () => {
   let db: PgDatabase;
+  let ledger: LedgerService;
 
   beforeAll(() => {
     db = createRealDatabase(10);
     // If this run is not actually against Postgres, fail here rather than
     // report green.
     assertRealDatabase(db);
+    ledger = new LedgerService();
   });
 
   afterAll(async () => {
@@ -334,4 +338,122 @@ describeReal('real PostgreSQL', () => {
       expect(index.rows).toHaveLength(1);
     });
   });
+
+  // -------------------------------------------------------------------------
+  // Statement pagination
+  //
+  // The cursor was the last row's `created_at`, and the next page asked for
+  // `created_at < cursor`. In PostgreSQL `now()` is the TRANSACTION timestamp,
+  // so every wallet row a transaction writes carries an identical
+  // `created_at` - and `ORDER BY created_at DESC` alone is not a total order.
+  // A page boundary landing inside such a group therefore dropped the rest of
+  // it, silently, off a driver's money statement.
+  //
+  // Only a real PostgreSQL shows this: it needs `now()`'s real semantics and a
+  // real non-deterministic tie order.
+  // -------------------------------------------------------------------------
+
+  describe('wallet statement pagination', () => {
+    /**
+     * Six wallet credits sharing one timestamp, written by one transaction -
+     * exactly what a settlement batch looks like.
+     */
+    async function seedSameInstant(count: number): Promise<void> {
+      // Balanced PAIRS, not bare credits: the deferred trigger rejects a
+      // transaction whose rows do not sum to zero, and it was right to reject
+      // the first version of this seed. One INSERT means one transaction,
+      // which is what makes every created_at identical - the condition the
+      // bug needs.
+      const values = Array.from({ length: count }, (_, i) => {
+        const tx = `$${i + 2}`;
+        return `(${tx}, 'DRIVER_WALLET',    $1, 'CREDIT', ${1000 + i}, 'batch'),
+                (${tx}, 'DRIVER_CASH_HELD', $1, 'DEBIT',  ${1000 + i}, 'cash')`;
+      }).join(',');
+
+      const txIds = await db.query<{ id: string }>(
+        `SELECT gen_random_uuid() AS id FROM generate_series(1, $1)`,
+        [count],
+      );
+
+      await db.query(
+        `INSERT INTO ledger_entries
+           (transaction_id, account_type, account_id, direction, amount_iqd, description)
+         VALUES ${values}`,
+        [DRIVER_A, ...txIds.rows.map((r) => r.id)],
+      );
+    }
+
+    async function pageThrough(pageSize: number): Promise<string[]> {
+      const seen: string[] = [];
+      let cursor: string | undefined;
+
+      // Bounded so a cursor that fails to advance ends the test rather than
+      // hanging it.
+      for (let page = 0; page < 20; page++) {
+        const rows = await ledger.entriesFor(db, DRIVER_A, {
+          limit: pageSize,
+          ...(cursor ? { after: cursor } : {}),
+        });
+        if (rows.length === 0) break;
+        seen.push(...rows.map((r) => r.id));
+        if (rows.length < pageSize) break;
+        cursor = rows.at(-1)!.id;
+      }
+      return seen;
+    }
+
+    it('every row appears exactly once when a page boundary splits one instant', async () => {
+      await seedSameInstant(6);
+
+      // The wallet side only - the balancing DRIVER_CASH_HELD rows are not
+      // part of the statement this query serves.
+      const all = await db.query<{ id: string }>(
+        `SELECT id FROM ledger_entries
+          WHERE account_id = $1 AND account_type = 'DRIVER_WALLET'`,
+        [DRIVER_A],
+      );
+      expect(all.rows).toHaveLength(6);
+
+      // Page size 2 across 6 rows that all share created_at: boundaries fall
+      // inside the group twice.
+      const seen = await pageThrough(2);
+
+      expect(new Set(seen).size).toBe(seen.length); // no row served twice
+      expect(new Set(seen)).toEqual(new Set(all.rows.map((r) => r.id))); // none lost
+    });
+
+    it('a driver is never shown less than they earned', async () => {
+      await seedSameInstant(6);
+
+      const expected = 1000 + 1001 + 1002 + 1003 + 1004 + 1005;
+      const seen = await pageThrough(2);
+
+      const rows = await db.query<{ total: string }>(
+        `SELECT COALESCE(SUM(amount_iqd), 0) AS total
+           FROM ledger_entries WHERE id = ANY($1::uuid[])`,
+        [seen],
+      );
+
+      // The failure this guards is money the driver earned and never saw.
+      expect(Number(rows.rows[0]!.total)).toBe(expected);
+    });
+
+    it('paginates correctly when timestamps do differ', async () => {
+      for (let i = 0; i < 5; i++) {
+        // Separate statements, so each pair lands at its own instant.
+        await db.query(
+          `INSERT INTO ledger_entries
+             (transaction_id, account_type, account_id, direction, amount_iqd, created_at)
+           VALUES ($3, 'DRIVER_WALLET',    $1, 'CREDIT', 500, now() - ($2 || ' minutes')::interval),
+                  ($3, 'DRIVER_CASH_HELD', $1, 'DEBIT',  500, now() - ($2 || ' minutes')::interval)`,
+          [DRIVER_A, String(i), randomUUID()],
+        );
+      }
+
+      const seen = await pageThrough(2);
+      expect(seen).toHaveLength(5);
+      expect(new Set(seen).size).toBe(5);
+    });
+  });
+
 });

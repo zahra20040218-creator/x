@@ -596,3 +596,20 @@ class Dispute {
   /// the receipt.
   String get reference => id.split('-').first.toUpperCase();
 }
+
+
+/// One page of ledger entries.
+///
+/// Carries `nextCursor` because dropping it is how a statement silently stops
+/// at the first page — the driver sees a plausible list and no indication that
+/// anything is missing.
+class LedgerPage {
+  const LedgerPage({required this.items, required this.nextCursor});
+
+  final List<LedgerEntry> items;
+
+  /// Opaque. Pass it back verbatim; null means this was the last page.
+  final String? nextCursor;
+
+  bool get hasMore => nextCursor != null;
+}

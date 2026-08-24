@@ -32,6 +32,7 @@ import {
   RateRideSchema,
   UuidSchema,
 } from './schemas.js';
+import { decodeKeysetCursor, nextKeysetCursor } from './cursor.js';
 import { zodBody } from './zod.pipe.js';
 
 /**
@@ -126,7 +127,7 @@ export class RidesController {
     const rides = await this.rides.listMyRides(actor, {
       limit: query.limit,
       ...(query.status ? { status: query.status } : {}),
-      ...(query.cursor ? { before: new Date(query.cursor) } : {}),
+      ...(query.cursor ? { after: decodeKeysetCursor(query.cursor) } : {}),
     });
 
     const items = await Promise.all(rides.map((ride) => this.withCounterparties(ride, actor)));
@@ -134,7 +135,7 @@ export class RidesController {
 
     return {
       items,
-      nextCursor: rides.length === query.limit && last ? last.requestedAt.toISOString() : null,
+      nextCursor: nextKeysetCursor(rides, query.limit),
     };
   }
 

@@ -30,6 +30,7 @@ import {
   SetAvailabilitySchema,
 } from './schemas.js';
 import { requireUuid } from './rides.controller.js';
+import { decodeKeysetCursor, nextKeysetCursor } from './cursor.js';
 import { zodBody } from './zod.pipe.js';
 
 /** Driver-side endpoints. Every path is in `docs/api-contract.yaml`. */
@@ -268,13 +269,14 @@ export class DriverController {
   ) {
     const entries = await this.ledger.entriesFor(this.db, user.id, {
       limit: query.limit,
-      ...(query.cursor ? { before: new Date(query.cursor) } : {}),
+      ...(query.cursor ? { after: decodeKeysetCursor(query.cursor) } : {}),
     });
-    const last = entries.at(-1);
 
     return {
       items: entries.map(presentLedgerEntry),
-      nextCursor: entries.length === query.limit && last ? last.createdAt.toISOString() : null,
+      // The id of the last row, not its timestamp: see http/cursor.ts for the
+      // three ways the timestamp version lost a driver's entries.
+      nextCursor: nextKeysetCursor(entries, query.limit),
     };
   }
 

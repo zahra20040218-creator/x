@@ -280,22 +280,32 @@ class ApiClient {
     return Ride.fromJson(json['ride'] as Map<String, dynamic>);
   }
 
-/// The driver's ledger, newest first.
+  /// One page of the driver's ledger, newest first.
   ///
   /// Returns BOTH sides of every transaction, exactly as the server stores
   /// them. Summing `amountIqd` here would double-count; sum `signedIqd`.
-  Future<List<LedgerEntry>> walletEntries({int limit = 50, DateTime? before}) async {
+  ///
+  /// `cursor` is opaque — the value the previous page returned as
+  /// `nextCursor`, and nothing else. It used to be built here from a
+  /// `DateTime`, which silently lost entries: `timestamptz` is microsecond
+  /// precision and a Dart `DateTime` sent as ISO-8601 is not, so the value
+  /// never matched the row it came from. The server resolves the position
+  /// itself now. See services/api/src/http/cursor.ts.
+  Future<LedgerPage> walletEntries({int limit = 50, String? cursor}) async {
     final json = await _send<Map<String, dynamic>>(
       'GET',
       '/driver/wallet/entries',
       query: {
         'limit': limit,
-        if (before != null) 'cursor': before.toUtc().toIso8601String(),
+        if (cursor != null) 'cursor': cursor,
       },
     );
-    return (json['items'] as List<dynamic>)
-        .map((item) => LedgerEntry.fromJson(item as Map<String, dynamic>))
-        .toList();
+    return LedgerPage(
+      items: (json['items'] as List<dynamic>)
+          .map((item) => LedgerEntry.fromJson(item as Map<String, dynamic>))
+          .toList(),
+      nextCursor: json['nextCursor'] as String?,
+    );
   }
 
   /// Register this device for push notifications.

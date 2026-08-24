@@ -87,6 +87,8 @@ describe('the real migration set', () => {
       '0005_audit_log',
       '0006_sessions',
       '0007_device_tokens',
+      '0008_ledger_keyset',
+      '0009_keyset_indexes',
     ]);
   });
 

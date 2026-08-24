@@ -277,10 +277,24 @@ export class LedgerService {
     return parseSignedIqdFromDb(result.rows[0]?.balance_iqd ?? 0);
   }
 
+  /**
+   * One page of a driver's statement, newest first.
+   *
+   * `after` is the ID of the last row already served, and the query resolves
+   * its position itself. It is not a timestamp for two reasons that both cost
+   * a driver money: `now()` is the transaction timestamp, so a settlement's
+   * rows share a `created_at` and `created_at < cursor` skips the rest of the
+   * group; and `timestamptz` is microsecond precision while a JavaScript Date
+   * is millisecond, so a timestamp that round-trips through JSON no longer
+   * matches the row it came from. See http/cursor.ts.
+   *
+   * Served by `ledger_account_keyset_idx`
+   * (account_type, account_id, created_at DESC, id DESC) - migration 0008.
+   */
   async entriesFor(
     q: Queryable,
     driverId: string,
-    options: { limit?: number; before?: Date } = {},
+    options: { limit?: number; after?: string } = {},
   ): Promise<LedgerEntry[]> {
     const limit = Math.min(Math.max(options.limit ?? 30, 1), 100);
 
@@ -300,10 +314,12 @@ export class LedgerService {
          FROM ledger_entries
         WHERE account_type = 'DRIVER_WALLET'
           AND account_id = $1
-          AND ($2::timestamptz IS NULL OR created_at < $2)
-        ORDER BY created_at DESC
+          AND ($2::uuid IS NULL OR (created_at, id) < (
+                SELECT created_at, id FROM ledger_entries WHERE id = $2
+              ))
+        ORDER BY created_at DESC, id DESC
         LIMIT $3`,
-      [driverId, options.before ?? null, limit],
+      [driverId, options.after ?? null, limit],
     );
 
     return result.rows.map((row) => ({

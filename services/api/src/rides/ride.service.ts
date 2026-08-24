@@ -154,7 +154,7 @@ export class RideService {
 
   async listMyRides(
     actor: Actor,
-    options: { limit?: number; before?: Date; status?: RideStatus } = {},
+    options: { limit?: number; after?: string; status?: RideStatus } = {},
   ): Promise<RideRecord[]> {
     if (!actor.id) throw new NotFoundProblem('Ride');
 
@@ -163,7 +163,7 @@ export class RideService {
     // back on top and let a client ask for 100,000 rides.
     const query = {
       limit: Math.min(Math.max(options.limit ?? 20, 1), 50),
-      ...(options.before !== undefined ? { before: options.before } : {}),
+      ...(options.after !== undefined ? { after: options.after } : {}),
       ...(options.status !== undefined ? { status: options.status } : {}),
     };
 

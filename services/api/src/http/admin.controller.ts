@@ -39,6 +39,7 @@ import {
   UpdateConfigSchema,
   UpdateDriverSchema,
 } from './schemas.js';
+import { decodeKeysetCursor, nextKeysetCursor } from './cursor.js';
 import { zodBody } from './zod.pipe.js';
 
 /**
@@ -82,10 +83,12 @@ export class AdminController {
          JOIN drivers d ON d.user_id = u.id
          LEFT JOIN driver_wallet_balances w ON w.driver_id = u.id
         WHERE u.role = 'DRIVER'
-          AND ($1::timestamptz IS NULL OR u.created_at < $1)
-        ORDER BY u.created_at DESC
+          AND ($1::uuid IS NULL OR (u.created_at, u.id) < (
+                SELECT created_at, id FROM users WHERE id = $1
+              ))
+        ORDER BY u.created_at DESC, u.id DESC
         LIMIT $2`,
-      [query.cursor ? new Date(query.cursor) : null, query.limit],
+      [query.cursor ? decodeKeysetCursor(query.cursor) : null, query.limit],
     );
 
     const items = result.rows.map(presentAdminDriver);
@@ -93,8 +96,7 @@ export class AdminController {
 
     return {
       items,
-      nextCursor:
-        result.rows.length === query.limit && last ? last.created_at.toISOString() : null,
+      nextCursor: nextKeysetCursor(result.rows, query.limit),
     };
   }
 
@@ -364,9 +366,11 @@ export class AdminController {
     // Served by rides_status_created_at_idx (CLAUDE.md §3.4).
     const result = await this.db.query<{ id: string }>(
       `SELECT id FROM rides
-        WHERE ($1::timestamptz IS NULL OR created_at < $1)
-        ORDER BY created_at DESC LIMIT $2`,
-      [query.cursor ? new Date(query.cursor) : null, query.limit],
+        WHERE ($1::uuid IS NULL OR (created_at, id) < (
+                SELECT created_at, id FROM rides WHERE id = $1
+              ))
+        ORDER BY created_at DESC, id DESC LIMIT $2`,
+      [query.cursor ? decodeKeysetCursor(query.cursor) : null, query.limit],
     );
 
     const items = [];
@@ -375,10 +379,11 @@ export class AdminController {
       if (ride) items.push(presentRide(ride));
     }
 
-    const last = items.at(-1);
     return {
       items,
-      nextCursor: items.length === query.limit && last ? last.requestedAt : null,
+      // Was `last.requestedAt` while the query paged on `created_at` - a cursor
+      // that did not name the boundary it was taken from.
+      nextCursor: nextKeysetCursor(result.rows, query.limit),
     };
   }
 
@@ -458,16 +463,17 @@ export class AdminController {
       `SELECT id, ride_id, opened_by, status, reason_code, description,
               resolution, created_at, resolved_at
          FROM disputes
-        WHERE ($1::timestamptz IS NULL OR created_at < $1)
-        ORDER BY created_at DESC LIMIT $2`,
-      [query.cursor ? new Date(query.cursor) : null, query.limit],
+        WHERE ($1::uuid IS NULL OR (created_at, id) < (
+                SELECT created_at, id FROM disputes WHERE id = $1
+              ))
+        ORDER BY created_at DESC, id DESC LIMIT $2`,
+      [query.cursor ? decodeKeysetCursor(query.cursor) : null, query.limit],
     );
 
     const last = result.rows.at(-1);
     return {
       items: result.rows.map(presentDispute),
-      nextCursor:
-        result.rows.length === query.limit && last ? last.created_at.toISOString() : null,
+      nextCursor: nextKeysetCursor(result.rows, query.limit),
     };
   }
 
