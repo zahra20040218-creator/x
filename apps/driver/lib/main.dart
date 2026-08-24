@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:path_provider/path_provider.dart';
@@ -27,16 +28,28 @@ Future<void> main() async {
   // message, instead of failing later and less clearly at the sign-in screen.
   await Firebase.initializeApp();
 
+  // Validated before anything else runs. A release build with no
+  // --dart-define=API_BASE_URL used to fall back to the emulator's loopback
+  // over plaintext HTTP: it installs, it opens, and every request fails with
+  // something that looks like the user's connection. See EndpointConfig.
+  //
+  // Caught rather than allowed to propagate: an uncaught throw here is an
+  // Android launch crash, which gives whoever has to diagnose it nothing at
+  // all. This way the bundle says what is wrong with it.
+  final EndpointConfig endpoints;
+  try {
+    endpoints = EndpointConfig.resolve(
+      apiBaseUrl: kApiBaseUrlFromEnv,
+      realtimeUrl: kRealtimeUrlFromEnv,
+      isRelease: kReleaseMode,
+    );
+  } on EndpointConfigError catch (error) {
+    runApp(MisconfiguredApp(detail: error.message));
+    return;
+  }
+
   final tokens = SecureTokenStore();
-  final api = ApiClient(
-    // Injected at build time so a debug build cannot accidentally ship pointed
-    // at production, and a release build cannot point at localhost.
-    baseUrl: const String.fromEnvironment(
-      'API_BASE_URL',
-      defaultValue: 'http://10.0.2.2:3000/v1',
-    ),
-    tokens: tokens,
-  );
+  final api = ApiClient(baseUrl: endpoints.apiBaseUrl, tokens: tokens);
 
   final directory = await getApplicationSupportDirectory();
   final buffer = LocationBuffer(

@@ -56,10 +56,9 @@ class _TrackRideScreenState extends State<TrackRideScreen> {
 
     try {
       final socket = WebSocketChannel.connect(
-        Uri.parse(const String.fromEnvironment(
-          'WS_URL',
-          defaultValue: 'ws://10.0.2.2:3000/v1/realtime',
-        )),
+        // Validated at startup by EndpointConfig - in a release build this
+        // cannot be plaintext or a development host.
+        Uri.parse(kRealtimeUrlFromEnv),
       );
       _socket = socket;
 
