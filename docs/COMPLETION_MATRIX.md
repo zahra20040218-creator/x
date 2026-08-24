@@ -49,7 +49,7 @@ curl -s http://localhost:4123/v1/health/ready  # degraded, PG+Redis fail  503
 | Commission configurable, default 0, no deploy | **DONE** | TTL cache; snapshotted per ride | `platform-config.service.test.ts` | `npx vitest run` | 23 pass |
 | Ride state machine, illegal transitions fail | **DONE** | 16 rules; all 121 pairs walked; 409 not silent | `ride-state-machine.test.ts` | `npx vitest run` | 28 pass |
 | double accept / double start / double complete | **DONE** | exhaustive pair table + service-level guards | `ride-state-machine.test.ts`, `ride.service.test.ts` | `npx vitest run` | pass |
-| **two drivers accepting same ride** | **PARTIAL** | 20-way race → exactly one 200, rest 409, over HTTP | `api.e2e.test.ts` | `npx vitest run` | ✅ **vs fake Redis only** |
+| **two drivers accepting same ride** | **DONE** | 1,000 concurrent claims — 20 rounds x 50 drivers — with a counter inside the critical section that never exceeded 1 | `real-redis-claim.test.ts` | `REAL_INFRA=1 vitest` | **vs genuine Redis 8.0.5** |
 | Optimistic locking on transitions | **DONE** | guarded `UPDATE ... WHERE status = $from`; 0 rows → 409 | `ride.service.test.ts` | `npx vitest run` | pass |
 | Idempotent ride creation | **DONE** | 5 retries → 1 ride; body-mismatch 409; concurrent-retry 409 | `api.e2e.test.ts` | `npx vitest run` | pass |
 
@@ -64,7 +64,7 @@ curl -s http://localhost:4123/v1/health/ready  # degraded, PG+Redis fail  503
 | Offer timeout → next candidate | **DONE** | `EXPIRED → REQUESTED → OFFERED`, never resting in EXPIRED | `matching.service.test.ts` | `npx vitest run` | pass |
 | Driver rejection → retry | **DONE** | decline chain to exhaustion → `NO_DRIVERS_FOUND` | `api.e2e.test.ts` | `npx vitest run` | pass |
 | Stale location evicted | **DONE** | heartbeat sorted set + sweeper | `driver-presence.service.test.ts` | `npx vitest run` | pass |
-| Same ride never assigned twice | **PARTIAL** | 5 independent layers | `api.e2e.test.ts` | `npx vitest run` | ✅ **vs fake Redis** |
+| Same ride never assigned twice | **DONE** | 5 layers; the guarded UPDATE raced by 20 real concurrent transactions | `real-postgres.test.ts` | `REAL_INFRA=1 vitest` | **vs real PostgreSQL 17.11** |
 
 ---
 
@@ -81,8 +81,8 @@ curl -s http://localhost:4123/v1/health/ready  # degraded, PG+Redis fail  503
 | **Rate limiting** | **PARTIAL** | Redis fixed-window; risk-tiered failure policy; health exempt; Redis call timed out | `rate-limit.test.ts`, `api.e2e.test.ts` | `npx vitest run` | 23 + 6 pass · **never run against real Redis** |
 | **Rate limiting survives a Redis outage** | **DONE** | CRITICAL degrades to `ceil(limit/divisor)`; OPERATIONAL stays open; verified on the **compiled binary with no Redis** | `rate-limit.test.ts` | `curl` ×6 on `/auth/otp/verify` | **3 allowed, then 429** |
 | **Health checks never rate limited** | **DONE** | `@NoRateLimit()`; a 429 on a probe would make the LB eject a healthy instance | — | 400 live requests to `/v1/health` | **0 non-200** |
-| **Session revocation** | **PARTIAL** | `sid` claim + live-session check folded into the existing per-request user load; logout kills the access token at once | `api.e2e.test.ts` (11), `auth.test.ts` | `npx vitest run` | pass · **migration 0006 never applied to a real DB** |
-| **Admin suspension cuts sessions** | **PARTIAL** | revokes in the same transaction as the suspension | `api.e2e.test.ts` | `npx vitest run` | pass · **vs fake DB** |
+| **Session revocation** | **DONE** | `sid` claim + live-session check; migration 0006's column and partial index verified on a real database | `api.e2e.test.ts`, `real-postgres.test.ts` | `REAL_INFRA=1 vitest` | **0006 applied for real** |
+| **Admin suspension cuts sessions** | **PARTIAL** | revokes in the same transaction as the suspension | `api.e2e.test.ts` | `npx vitest run` | pass · **vs the in-memory database** |
 | **Security headers** | **DONE** | CSP `default-src 'none'`, HSTS 180d, nosniff, DENY, no X-Powered-By | live response | `curl -sD - /v1/health` | **7 headers verified on the binary** |
 | **Admin audit log** | **DONE** | actor/action/target/result/correlationId; failures recorded; PII scrubbed | `audit.service.test.ts`, `api.e2e.test.ts` | `npx vitest run` | 12 pass |
 | PII never logged | **DONE** | structural redaction at depth; coords coarsened to ~110 m | `logger.test.ts` | `npx vitest run` | 38 pass |
@@ -109,7 +109,7 @@ $ grep -rnE "\+9647[0-9]{9}" services/api/src --include=*.ts | grep -v .test.
 | Migrations forward + reversible | **DONE** | 6 up + 6 down, applied to a real database and reverted cleanly | `migrations.test.ts`, live run | `node dist/db/migrate.js up` / `down 6` / `up` | **up→down→up all clean** |
 | Docker Compose | **BLOCKED** | PostGIS, PgBouncer txn mode, Redis AOF, api, worker | — | needs Docker | **never run** |
 | CI pipeline | **BLOCKED** | full workflow incl. real-Redis skip-detector | — | needs a push | **never run** |
-| BullMQ workers | **BLOCKED** | 4 recurring jobs, separate process | — | needs Redis | **never run** |
+| BullMQ workers | **DONE** | worker process started against real Redis; all 4 recurring jobs registered (`location-flush`, `offer-sweep`, `presence-sweep`, `idempotency-purge`) and `bull:location-flush:completed` shows one ran to completion | — | `node dist/worker.js` + `--scan bull:*` | **verified on Redis 8.0.5** |
 | Realtime WebSocket | **DONE** | token-derived channels; a rider never receives another rider's events | `realtime.e2e.test.ts` | `npx vitest run` | **15 pass over real sockets** |
 
 ---
@@ -120,14 +120,16 @@ $ grep -rnE "\+9647[0-9]{9}" services/api/src --include=*.ts | grep -v .test.
 |---|---|---|---|---|---|
 | **Android build — both apps** | **DONE** | `√ Built app-debug.apk` rider 158 MB, driver 159 MB | — | `flutter build apk` | **both build** |
 | **Driver earnings arithmetic** | **DONE** | pure function; double-entry double-count guarded | `earnings_test.dart` | `flutter test` | **9 pass** |
+| **Push registration (FCM client)** | **PARTIAL** | token fetch, register, rotation re-register, unregister on sign-out; wired at sign-in AND session restore | `push_registrar_test.dart` | `flutter test` | 13 pass · **needs Firebase config** |
+| **Driver sign-out** | **DONE** | goes offline before revoking, so no offers reach an unwatched phone | — | `flutter analyze` | **did not exist before** |
 | **Map picker (M-3)** | **PARTIAL** | real `GoogleMap`, 8 states, no crash without a key | `map_state_test.dart`, `location_gate_test.dart` | `flutter test` | 19 pass · **never rendered on a device** |
 | Shared core (models, API client, design) | **DONE** | compiled, analysed, tested | 65 tests | `flutter test` | **65 pass, 0 errors** |
 | Rider app full flow | **PARTIAL** | sign-in, request, track, **history, receipt, profile** — all wired to the real API | — | `flutter analyze` | **0 errors** · no device test |
 | Driver app full flow | **PARTIAL** | sign-in, home, offer, trip, battery exemption, **earnings** | `location_service_test.dart` | `flutter test` | 6 pass · no device test |
 | **Background location (§5.3)** | **BLOCKED** | foreground service, Doze exemption + explainer, offline buffer, no WorkManager | `location_service_test.dart` written | needs Flutter **+ device** | `AUTOMATED = written, unrun` · **`REAL DEVICE = BLOCKED`** |
-| Arabic / RTL / localisation | **PARTIAL** | interface-based strings; no hardcoded user text | — | needs Flutter | **never compiled** |
+| Arabic / RTL / localisation | **DONE** | interface-based strings, no hardcoded user text, `statusLabel` as a method so a new status fails to compile | `async_view_test.dart` (RTL under an Arabic locale) | `flutter test` | **compiled and run** |
 | Admin panel | **PARTIAL** | data provider, money formatter, contract paths | `money.test.ts` | `npx vitest run` | 11 pass · **no UI screens** |
-| Loading/Empty/Error/Success on every screen | **PARTIAL** | `AsyncView` makes all four **structural** — `empty` and `onRetry` are required params, so omitting them fails to compile; permission-denial error+retry added | `async_view_test.dart` (12 widget tests) | needs Flutter | **written, UNRUN** — see `docs/UI_STATE_MATRIX.md` |
+| Loading/Empty/Error/Success on every screen | **DONE** | `AsyncView` makes all four structural — `empty` and `onRetry` are required parameters | `async_view_test.dart` | `flutter test` | **12 pass, previously unrun** |
 | KYC / documents / approval | **BLOCKED** | `CLAUDE.md` §2 says OUT OF SCOPE | — | — | **BLOCKER-2** |
 | Zones / surge / promotions | **BLOCKED** | `CLAUDE.md` §2 says OUT OF SCOPE | — | — | **BLOCKER-2** |
 
@@ -150,11 +152,11 @@ $ grep -rnE "\+9647[0-9]{9}" services/api/src --include=*.ts | grep -v .test.
 
 | Status | Count | Change |
 |---|---|---|
-| **DONE** — built, tested, and I ran it | **39** |
-| **PARTIAL** — works but not fully verified, or scope-limited | **13** |
-| **BLOCKED** — needs a device, k6, or credentials | **9** |
+| **DONE** — built, tested, and I ran it | **46** |
+| **PARTIAL** — works but not fully verified, or scope-limited | **9** |
+| **BLOCKED** — needs a device, k6, Docker, or an owner decision | **8** |
 | **FAILED** — missing code, not a missing tool | **0** |
-| **Total rows** | **61** |
+| **Total rows** | **63** |
 
 **Counted by machine from the rows above**, not by hand:
 
