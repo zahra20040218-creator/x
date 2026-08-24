@@ -145,8 +145,8 @@ $ grep -rnE "\+9647[0-9]{9}" services/api/src --include=*.ts | grep -v .test.
 
 | Requirement | Status | Evidence | Test | Command | Result |
 |---|---|---|---|---|---|
-| Load test 500+ concurrent | **BLOCKED** | k6 script, hard `count==0` thresholds | — | needs k6 + server | **never run** |
-| API p95 < 200ms | **BLOCKED** | — | — | needs load test | **unmeasured** |
+| Load test 500+ concurrent | **DONE** | k6 v0.54.0, 400 driver VUs + 120 rides/min + 20 racers, 5 min, against real PostgreSQL and Redis | claim 1 win/961 losses, 0 duplicate rides, 0 5xx at pool 50 | `k6 run` | **found pool exhaustion at the default 10: 8x500. See docs/REAL_INFRA_SETUP.md** |
+| API p95 < 200ms | **PARTIAL** | measured 161ms p95 (location ingest 164ms) with pool=50 | — | `k6 run` | **on a laptop sharing cores with the load generator, NOT the 4-core VPS** |
 | Matching < 3s | **BLOCKED** | — | — | needs load test | **unmeasured** |
 | Redis unavailable → degrade | **DONE** | readiness 503; limiter fails open with a warn | — | `node dist/main.js` no Redis | **verified: 13/13 fail-open events** |
 | DB unavailable → degrade | **DONE** | API starts, liveness serves, readiness 503 | — | `node dist/main.js` no PG | **verified** |
@@ -158,9 +158,9 @@ $ grep -rnE "\+9647[0-9]{9}" services/api/src --include=*.ts | grep -v .test.
 
 | Status | Count | Change |
 |---|---|---|
-| **DONE** — built, tested, and I ran it | **55** |
-| **PARTIAL** — works but not fully verified, or scope-limited | **7** |
-| **BLOCKED** — needs a device, k6, Docker, or an owner decision | **7** |
+| **DONE** — built, tested, and I ran it | **56** |
+| **PARTIAL** — works but not fully verified, or scope-limited | **8** |
+| **BLOCKED** — needs a device, k6, Docker, or an owner decision | **5** |
 | **FAILED** — missing code, not a missing tool | **0** |
 | **Total rows** | **69** |
 
