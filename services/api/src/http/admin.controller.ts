@@ -92,7 +92,6 @@ export class AdminController {
     );
 
     const items = result.rows.map(presentAdminDriver);
-    const last = result.rows.at(-1);
 
     return {
       items,
@@ -470,7 +469,6 @@ export class AdminController {
       [query.cursor ? decodeKeysetCursor(query.cursor) : null, query.limit],
     );
 
-    const last = result.rows.at(-1);
     return {
       items: result.rows.map(presentDispute),
       nextCursor: nextKeysetCursor(result.rows, query.limit),

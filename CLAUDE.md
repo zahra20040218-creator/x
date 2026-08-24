@@ -69,6 +69,8 @@ These four rules exist because the system must handle **500 concurrent users on 
 
 4. **Every query on a table with >10k rows must have a supporting index.** Composite index on `(status, created_at)` for rides. GiST on geometry columns. If you write a query, you state which index serves it in the PR description.
 
+5. **Pagination is keyset on `(created_at, id)`, and the cursor is an id.** Never `created_at < $cursor`. Three things break it, and all three cost real rows: `created_at` is not unique so the order is not total; `now()` is the *transaction* timestamp, so every row a transaction writes shares one, and a double-entry ledger writes its rows in one transaction by definition; and `timestamptz` is microsecond precision while a JavaScript `Date` is millisecond, so a timestamp that round-trips through JSON no longer matches the row it came from. The server resolves the cursor row itself — see `services/api/src/http/cursor.ts`. This was found losing four of six entries off a driver's statement.
+
 ---
 
 ## 4. Domain model — ride state machine

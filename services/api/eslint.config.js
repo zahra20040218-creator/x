@@ -11,7 +11,10 @@ import tseslint from 'typescript-eslint';
  */
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'node_modules/**', 'coverage/**'],
+    // test/load holds k6 scripts. They are plain JavaScript run by the k6
+    // binary, not by node and not through tsconfig, so the type-aware parser
+    // has no project for them and reports a parse error rather than a lint.
+    ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'test/load/**'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,

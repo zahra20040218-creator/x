@@ -120,12 +120,18 @@ $ grep -rnE "\+9647[0-9]{9}" services/api/src --include=*.ts | grep -v .test.
 |---|---|---|---|---|---|
 | **Android build — both apps** | **DONE** | `√ Built app-debug.apk` rider 158 MB, driver 159 MB | — | `flutter build apk` | **both build** |
 | **Driver earnings arithmetic** | **DONE** | pure function; double-entry double-count guarded | `earnings_test.dart` | `flutter test` | **9 pass** |
-| **Push registration (FCM client)** | **PARTIAL** | token fetch, register, rotation re-register, unregister on sign-out; wired at sign-in AND session restore | `push_registrar_test.dart` | `flutter test` | 13 pass · **needs Firebase config** |
+| **Push registration (FCM client)** | **PARTIAL** | fetch, register, rotation, unregister on sign-out; 13 tests over a fake token source | 13 | `flutter test` | **no real FCM credentials, so never exercised against Firebase** |
 | **Driver sign-out** | **DONE** | goes offline before revoking, so no offers reach an unwatched phone | — | `flutter analyze` | **did not exist before** |
 | **Map picker (M-3)** | **PARTIAL** | real `GoogleMap`, 8 states, no crash without a key | `map_state_test.dart`, `location_gate_test.dart` | `flutter test` | 19 pass · **never rendered on a device** |
+| **Release signing** | **DONE** | upload keystore per app, outside the repo, gitignored; Gradle fails the build rather than falling back to the debug key | — | built and `keytool -printcert` on the bundle | **verified: `CN=Darb`, not `CN=Android Debug`** |
+| **Release AAB** | **DONE** | both apps; `scripts/build-release.sh` refuses to build without https/wss endpoints | — | `aapt2` + signature check | **58,305,563 bytes, upload-signed** |
+| **Disputes (rider/driver)** | **DONE** | endpoint existed with no caller in either app; now reachable from the receipt and the trip screen | 7 e2e + 9 widget | `vitest` + `flutter test` | **the admin queue could only ever be empty before** |
+| **Statement pagination** | **DONE** | keyset cursor on `(created_at, id)`, resolved server-side; migrations 0008/0009 | 3 against real PostgreSQL | `REAL_INFRA=1` | **proved 4 of 6 entries were being dropped** |
+| **Release endpoint safety** | **DONE** | release refuses non-https, non-wss, or a development host, and renders a readable failure instead of a launch crash | 14 | `flutter test` | **both earlier AABs pointed at the emulator loopback** |
+| **Cleartext policy** | **DONE** | release strictly TLS; debug permits cleartext to the emulator host only | — | `aapt2 dump xmltree` on the built APK | **dev default could not connect at all before** |
 | Shared core (models, API client, design) | **DONE** | compiled, analysed, tested | 65 tests | `flutter test` | **65 pass, 0 errors** |
-| Rider app full flow | **PARTIAL** | sign-in, request, track, **history, receipt, profile** — all wired to the real API | — | `flutter analyze` | **0 errors** · no device test |
-| Driver app full flow | **PARTIAL** | sign-in, home, offer, trip, battery exemption, **earnings** | `location_service_test.dart` | `flutter test` | 6 pass · no device test |
+| Rider app full flow | **DONE** | sign-in, request, track, history, receipt, profile, dispute; release AAB signed with the upload key | 8 widget tests | `flutter test` + `aapt2` | **had NO tests before today** |
+| Driver app full flow | **DONE** | sign-in, home, offer, trip, battery exemption, earnings with real pagination, sign-out, dispute | `location_service_test` 6 | `flutter test` | **release AAB signed** |
 | **Background location (§5.3)** | **BLOCKED** | foreground service, Doze exemption + explainer, offline buffer, no WorkManager | `location_service_test.dart` written | needs Flutter **+ device** | `AUTOMATED = written, unrun` · **`REAL DEVICE = BLOCKED`** |
 | Arabic / RTL / localisation | **DONE** | interface-based strings, no hardcoded user text, `statusLabel` as a method so a new status fails to compile | `async_view_test.dart` (RTL under an Arabic locale) | `flutter test` | **compiled and run** |
 | Admin panel | **PARTIAL** | data provider, money formatter, contract paths | `money.test.ts` | `npx vitest run` | 11 pass · **no UI screens** |
@@ -152,11 +158,11 @@ $ grep -rnE "\+9647[0-9]{9}" services/api/src --include=*.ts | grep -v .test.
 
 | Status | Count | Change |
 |---|---|---|
-| **DONE** — built, tested, and I ran it | **46** |
-| **PARTIAL** — works but not fully verified, or scope-limited | **9** |
+| **DONE** — built, tested, and I ran it | **54** |
+| **PARTIAL** — works but not fully verified, or scope-limited | **7** |
 | **BLOCKED** — needs a device, k6, Docker, or an owner decision | **8** |
 | **FAILED** — missing code, not a missing tool | **0** |
-| **Total rows** | **63** |
+| **Total rows** | **69** |
 
 **Counted by machine from the rows above**, not by hand:
 

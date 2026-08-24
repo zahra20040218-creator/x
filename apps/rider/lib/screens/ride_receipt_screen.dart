@@ -129,7 +129,7 @@ class RideReceiptScreen extends StatelessWidget {
                   if (ride.actualDistanceM != null)
                     _Row(
                       label: strings.distance,
-                      value: '${(ride.actualDistanceM! / 1000).toStringAsFixed(1)} كم',
+                      value: strings.distanceKm(ride.actualDistanceM! / 1000),
                     ),
                 ],
                 const SizedBox(height: AppSpacing.xs),

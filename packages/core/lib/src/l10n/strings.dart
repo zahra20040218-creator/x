@@ -172,6 +172,12 @@ abstract class AppStrings {
       Localizations.of<AppStrings>(context, AppStrings) ?? const ArabicStrings();
 
   // Disputes. A rider or driver reporting a problem with a finished ride.
+  /// A distance, with its unit, in the user's language.
+  ///
+  /// A method because the unit is part of the translation: the receipt used to
+  /// interpolate 'كم' directly, so an English UI read "3.2 كم".
+  String distanceKm(double km);
+
   String get loadMore;
   String get reportProblem;
   String get reportProblemPrompt;
@@ -462,6 +468,8 @@ class ArabicStrings implements AppStrings {
   @override
   String get bufferedLocations => 'مواقع بانتظار الإرسال';
 
+  @override
+  String distanceKm(double km) => '${km.toStringAsFixed(1)} كم';
   @override
   String get loadMore => 'تحميل المزيد';
   @override
@@ -761,6 +769,8 @@ class EnglishStrings implements AppStrings {
   @override
   String get bufferedLocations => 'Locations waiting to send';
 
+  @override
+  String distanceKm(double km) => '${km.toStringAsFixed(1)} km';
   @override
   String get loadMore => 'Load more';
   @override

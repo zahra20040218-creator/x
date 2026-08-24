@@ -131,7 +131,6 @@ export class RidesController {
     });
 
     const items = await Promise.all(rides.map((ride) => this.withCounterparties(ride, actor)));
-    const last = rides.at(-1);
 
     return {
       items,
