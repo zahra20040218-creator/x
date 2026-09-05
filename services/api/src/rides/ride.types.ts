@@ -76,6 +76,19 @@ export interface RideSnapshot {
 }
 
 export interface RideRecord extends RideSnapshot {
+  /**
+   * The three fares a ride can carry, and they are three different facts.
+   *
+   * `estimatedFareIqd` is what the tariff says the trip is worth.
+   * `proposedFareIqd` is what the rider offered, when negotiating.
+   * `agreedFareIqd` is what a driver's accepted bid settled on.
+   * `finalFareIqd` is what was actually charged, at completion.
+   *
+   * None is derivable from another, and collapsing any two of them makes a
+   * fare dispute unanswerable.
+   */
+  proposedFareIqd: IqdAmount | null;
+  agreedFareIqd: IqdAmount | null;
   pickupLat: number;
   pickupLng: number;
   pickupAddress: string | null;

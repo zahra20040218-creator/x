@@ -23,6 +23,15 @@ export interface PaymentContext {
   /** Basis points, snapshotted onto the ride at creation (CLAUDE.md §6.5). */
   commissionBps: number;
   commissionIqd: IqdAmount;
+  /**
+   * When the transfer happened, from the caller's injected clock.
+   *
+   * Not `now()` in SQL. Time is a dependency in this codebase (see
+   * `common/clock.ts`) precisely so timeout and settlement paths can be tested
+   * without sleeping, and a provider that read the database clock would put one
+   * timestamp outside that discipline - the one on the money.
+   */
+  confirmedAt: Date;
 }
 
 export interface PaymentResult {
@@ -77,9 +86,9 @@ export class CashProvider implements PaymentProvider {
       // CONFIRMED immediately: the driver has the notes in hand by the time
       // this runs. There is no pending state for cash.
       `INSERT INTO payments (ride_id, provider, status, amount_iqd, confirmed_by, confirmed_at)
-       VALUES ($1, 'CASH', 'CONFIRMED', $2, $3, now())
+       VALUES ($1, 'CASH', 'CONFIRMED', $2, $3, $4)
        RETURNING id`,
-      [rideId, amountIqd, ctx.driverId],
+      [rideId, amountIqd, ctx.driverId, ctx.confirmedAt],
     );
 
     const ledgerTransactionId = await this.ledger.recordRideSettlement(q, {

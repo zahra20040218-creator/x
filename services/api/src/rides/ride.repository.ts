@@ -32,6 +32,8 @@ interface RideRow {
   dropoff_lng: number;
   dropoff_address: string | null;
   estimated_fare_iqd: string;
+  proposed_fare_iqd: string | null;
+  agreed_fare_iqd: string | null;
   final_fare_iqd: string | null;
   commission_bps_snapshot: number;
   commission_iqd: string | null;
@@ -52,7 +54,8 @@ const RIDE_COLUMNS = `
   id, rider_id, driver_id, status,
   pickup_lat, pickup_lng, pickup_address,
   dropoff_lat, dropoff_lng, dropoff_address,
-  estimated_fare_iqd, final_fare_iqd, commission_bps_snapshot, commission_iqd,
+  estimated_fare_iqd, proposed_fare_iqd, agreed_fare_iqd,
+  final_fare_iqd, commission_bps_snapshot, commission_iqd,
   estimated_distance_m, estimated_duration_s, actual_distance_m,
   payment_method, requested_at, accepted_at, driver_arrived_at,
   started_at, completed_at, cancelled_at, cancellation_reason
@@ -71,6 +74,13 @@ export function toRideRecord(row: RideRow): RideRecord {
     dropoffLng: row.dropoff_lng,
     dropoffAddress: row.dropoff_address,
     estimatedFareIqd: parseIqdFromDb(row.estimated_fare_iqd),
+    // Three fares, three different facts, and none derivable from another:
+    // `proposed` is what the rider offered, `agreed` is what a bid settled on,
+    // `final` is what was actually charged. Collapsing any two of them makes
+    // "the app said 7,000 and he charged 9,000" unanswerable.
+    proposedFareIqd:
+      row.proposed_fare_iqd === null ? null : parseIqdFromDb(row.proposed_fare_iqd),
+    agreedFareIqd: row.agreed_fare_iqd === null ? null : parseIqdFromDb(row.agreed_fare_iqd),
     finalFareIqd: row.final_fare_iqd === null ? null : parseIqdFromDb(row.final_fare_iqd),
     commissionBpsSnapshot: row.commission_bps_snapshot,
     commissionIqd: row.commission_iqd === null ? null : parseIqdFromDb(row.commission_iqd),
@@ -97,6 +107,15 @@ export interface CreateRideInput {
   dropoffLng: number;
   dropoffAddress: string | null;
   estimatedFareIqd: IqdAmount;
+  /**
+   * What the rider offered, when negotiation is enabled.
+   *
+   * Optional rather than `| null` required: every existing caller creates a
+   * direct-dispatch ride and should not have to say "no proposal" explicitly.
+   * A ride can never be created already AGREED, so there is no matching field
+   * for that - the agreed fare is written by the transition that accepts a bid.
+   */
+  proposedFareIqd?: IqdAmount | null;
   estimatedDistanceM: number;
   estimatedDurationS: number;
   commissionBpsSnapshot: number;
@@ -112,6 +131,8 @@ export interface TransitionSideEffects {
   cancelledAt?: Date;
   cancellationReason?: string | null;
   finalFareIqd?: IqdAmount;
+  /** Written when a rider accepts a bid; the fare both parties committed to. */
+  agreedFareIqd?: IqdAmount;
   commissionIqd?: IqdAmount;
   actualDistanceM?: number | null;
 }
@@ -122,9 +143,14 @@ export class RideRepository {
       `INSERT INTO rides (
          rider_id, pickup_lat, pickup_lng, pickup_address,
          dropoff_lat, dropoff_lng, dropoff_address,
-         estimated_fare_iqd, estimated_distance_m, estimated_duration_s,
+         estimated_fare_iqd, proposed_fare_iqd,
+         estimated_distance_m, estimated_duration_s,
          commission_bps_snapshot
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+       -- Twelve placeholders for twelve columns. Adding proposed_fare_iqd to
+       -- the list above without extending this line left eleven, and every
+       -- ride creation failed with a 500 - the failure mode of a positional
+       -- INSERT edited in the middle.
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
        RETURNING ${RIDE_COLUMNS}`,
       [
         input.riderId,
@@ -135,6 +161,7 @@ export class RideRepository {
         input.dropoffLng,
         input.dropoffAddress,
         input.estimatedFareIqd,
+        input.proposedFareIqd ?? null,
         input.estimatedDistanceM,
         input.estimatedDurationS,
         input.commissionBpsSnapshot,
@@ -212,6 +239,7 @@ export class RideRepository {
       push('cancellation_reason', effects.cancellationReason);
     }
     if (effects.finalFareIqd !== undefined) push('final_fare_iqd', effects.finalFareIqd);
+    if (effects.agreedFareIqd !== undefined) push('agreed_fare_iqd', effects.agreedFareIqd);
     if (effects.commissionIqd !== undefined) push('commission_iqd', effects.commissionIqd);
     if (effects.actualDistanceM !== undefined) push('actual_distance_m', effects.actualDistanceM);
 

@@ -5,14 +5,20 @@ import {
   InvalidRideTransitionError,
   NotFoundProblem,
 } from '../common/problem.js';
-import type { Database, Queryable } from '../db/db.port.js';
+import type { Database, Queryable, Transaction } from '../db/db.port.js';
 import { isUniqueViolationOn } from '../db/db.port.js';
 import { FareCalculator, type LatLng } from '../fare/fare-calculator.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { RideClaimService } from '../matching/ride-claim.service.js';
+import { iqd, type IqdAmount } from '../money/iqd.js';
+import {
+  CashProvider,
+  PaymentProviderRegistry,
+} from '../payments/payment-provider.js';
 import { PlatformConfigService } from '../platform-config/platform-config.service.js';
 import { RideStateMachine } from './ride-state-machine.js';
 import { RideRepository } from './ride.repository.js';
+import type { RideEventPublisher } from '../realtime/ride-event-publisher.js';
 import type { Actor, RideRecord, RideStatus } from './ride.types.js';
 
 /**
@@ -48,7 +54,65 @@ export class RideService {
     private readonly config: PlatformConfigService,
     private readonly clock: Clock,
     private readonly logger?: Logger,
+    /**
+     * Optional so every existing construction site keeps working unchanged.
+     * Absent means no realtime delivery - which is exactly what the system did
+     * before this existed, so its absence cannot break anything.
+     */
+    private readonly events?: RideEventPublisher,
+    /**
+     * Optional, and defaulted to a cash-only registry.
+     *
+     * Optional for the same reason `events` is: every existing construction
+     * site keeps working unchanged. The default is not a stub - it is a real
+     * `CashProvider` over the same ledger, so settlement behaves identically
+     * whether or not a caller supplies one.
+     */
+    private readonly payments: PaymentProviderRegistry = new PaymentProviderRegistry([
+      new CashProvider(ledger),
+    ]),
   ) {}
+
+  /**
+   * Record a transition and tell both parties about it.
+   *
+   * The publish is scheduled on COMMIT, never inside the transaction. A client
+   * told a ride is IN_PROGRESS by a transaction that then rolls back has no way
+   * to discover it was wrong - it would simply hold a state the server does not
+   * agree with until the next poll.
+   *
+   * Failures are swallowed: a rider not hearing about a status change is worse
+   * than the poll fallback, but it is not worth rolling back a committed ride
+   * transition for.
+   */
+  private notifyTransition(
+    tx: Transaction,
+    ride: { id: string; riderId: string; driverId: string | null },
+    to: RideStatus,
+  ): void {
+    if (!this.events) return;
+
+    const event = {
+      type: 'ride.status_changed' as const,
+      payload: { rideId: ride.id, status: to, at: new Date(this.clock.nowMs()).toISOString() },
+    };
+    const { riderId, driverId } = ride;
+
+    tx.onCommit(async () => {
+      // LOGGED, not swallowed. A silent catch here is how a realtime channel
+      // ends up carrying nothing while every test passes - which is the exact
+      // bug this method was written to fix.
+      try {
+        await this.events?.toRider(riderId, event);
+        if (driverId) await this.events?.toDriver(driverId, event);
+      } catch (error) {
+        this.logger?.error(
+          { event: 'realtime.publish_failed', ride_id: ride.id, err: error },
+          'could not publish a status change; clients fall back to polling',
+        );
+      }
+    });
+  }
 
   // -------------------------------------------------------------------------
   // Creation
@@ -64,11 +128,34 @@ export class RideService {
     pickupAddress?: string | null;
     dropoff: LatLng;
     dropoffAddress?: string | null;
+    /**
+     * What the rider offers to pay. Ignored unless negotiation is switched on.
+     *
+     * Without this the bid tables, the service and three documented endpoints
+     * had nothing to bid against: `placeBid` requires a ride carrying a
+     * proposal, and no caller could ever set one. The feature was unreachable
+     * through the API in the most literal sense.
+     */
+    proposedFareIqd?: number | null;
   }): Promise<RideRecord> {
     return this.db.transaction(async (tx) => {
       const tariff = await this.config.tariff(tx);
       const commissionBps = await this.config.commissionBps(tx);
       const quote = this.fare.quoteForTrip(tariff, input.pickup, input.dropoff);
+
+      // The proposal, bounded against the meter.
+      //
+      // Dropped silently when negotiation is off rather than rejected: a rider
+      // on a build that sends the field must still be able to request a ride
+      // the ordinary way, and 422 for a field the server simply does not use
+      // would strand them.
+      //
+      // The band is symmetric and enforced HERE, at creation, because it is the
+      // only point where the metered estimate and the rider's number exist
+      // together. A rider anchoring at 500 IQD on a 5,250 trip is not
+      // negotiating, and a driver holding out for ten times the meter is not
+      // either.
+      const proposedFareIqd = await this.boundedProposal(tx, input.proposedFareIqd, quote.totalIqd);
 
       try {
         const ride = await this.rides.create(tx, {
@@ -82,6 +169,7 @@ export class RideService {
           estimatedFareIqd: quote.totalIqd,
           estimatedDistanceM: quote.distanceM,
           estimatedDurationS: quote.durationS,
+          proposedFareIqd: proposedFareIqd,
           // Frozen here on purpose - see the class comment.
           commissionBpsSnapshot: commissionBps,
         });
@@ -93,7 +181,10 @@ export class RideService {
           actorType: 'RIDER',
           actorId: input.riderId,
           description: 'Ride requested.',
-          metadata: { estimatedFareIqd: quote.totalIqd },
+          metadata: {
+            estimatedFareIqd: quote.totalIqd,
+            ...(proposedFareIqd !== null ? { proposedFareIqd } : {}),
+          },
         });
 
         this.logger?.info(
@@ -210,6 +301,36 @@ export class RideService {
       if (!updated) throw new InvalidRideTransitionError(ride.status, 'OFFERED');
 
       await this.rides.insertEvent(tx, decision);
+      this.notifyTransition(tx, updated, 'OFFERED');
+
+      // The offer itself, to the driver who was chosen. This is the event the
+      // driver app was polling for every 5 seconds against a 15-second expiry.
+      if (this.events) {
+        const publisher = this.events;
+        tx.onCommit(async () => {
+          try {
+            await publisher.toDriver(driverId, {
+              type: 'ride.offer',
+              payload: {
+                rideId,
+                expiresAt: expiresAt.toISOString(),
+                distanceM: options.distanceM ?? 0,
+                // Lets a client measure its own end-to-end matching latency
+                // without correlating two separate requests.
+                requestedAt: updated.requestedAt.toISOString(),
+              },
+            });
+          } catch (error) {
+            // The driver still has the polling path, but this is the difference
+            // between a 5-second delay and an instant offer - it is worth an
+            // error line, not a silent catch.
+            this.logger?.error(
+              { event: 'realtime.offer_publish_failed', ride_id: rideId, err: error },
+              'could not publish the ride offer to the driver',
+            );
+          }
+        });
+      }
 
       await tx.query(
         // ON CONFLICT so that re-offering after an expiry reuses the row rather
@@ -490,13 +611,31 @@ export class RideService {
       }
       const driverId = ride.driverId;
 
+      // A negotiated price is a PRICE, not a floor.
+      //
+      // When rider and driver agreed a fare through bidding, that number is the
+      // contract and settlement is exactly it - no meter recompute, no
+      // higher-of. Running `settle()` over an agreed fare would take the larger
+      // of the bid and the meter, so a driver who bid 4,000 on a trip the meter
+      // prices at 5,250 would see the rider billed 5,250. That does not merely
+      // ignore the negotiation, it inverts it: bidding low would raise the
+      // fare, and the whole feature would be a lie told to both sides.
+      //
+      // This was live: settlement read `estimatedFareIqd` and never consulted
+      // `agreed_fare_iqd`, which the repository has selected and mapped since
+      // 0012. The column reached the domain object and stopped there. Nothing
+      // caught it because negotiation is not yet reachable through the API - so
+      // the defect was dormant, not absent, and would have shipped with the
+      // feature.
+      //
+      // D-004 is not weakened. It governs the ESTIMATE path, where the quote is
+      // a price the rider accepted and a short trip must not refund it. An
+      // agreed fare is that same principle applied to a number both parties
+      // chose explicitly, which is why it does not need a floor.
       const tariff = await this.config.tariff(tx);
-      const finalFareIqd = this.fare.settle(
-        tariff,
-        ride.estimatedFareIqd,
-        actualDistanceM ?? null,
-        null,
-      );
+      const finalFareIqd =
+        ride.agreedFareIqd ??
+        this.fare.settle(tariff, ride.estimatedFareIqd, actualDistanceM ?? null, null);
 
       // The SNAPSHOT, not the live rate. See the class comment.
       const { commissionIqd } = this.fare.splitCommission(
@@ -515,18 +654,33 @@ export class RideService {
 
       await this.rides.insertEvent(tx, decision);
 
-      await tx.query(
-        `INSERT INTO payments (ride_id, provider, status, amount_iqd, confirmed_by, confirmed_at)
-         VALUES ($1, 'CASH', 'CONFIRMED', $2, $3, $4)`,
-        [rideId, finalFareIqd, driverId, now],
+      // Through the §7 abstraction, not around it.
+      //
+      // This used to inline the INSERT with `'CASH'` as a hardcoded SQL literal
+      // and call the ledger directly - a line-for-line duplicate of
+      // `CashProvider.charge`. The consequence was not the duplication: it was
+      // that `PaymentProviderRegistry` was registered in DI and injected into
+      // nothing, so the seam §7 exists to prove had never carried a single real
+      // payment. Its promise - "adding ZainCash means implementing three
+      // methods" - was untested, and an untested seam is a guess.
+      //
+      // The provider is chosen from the ride's own `paymentMethod` rather than
+      // assumed, so the day a second one exists this line does not change.
+      const payment = await this.payments.get(ride.paymentMethod).charge(
+        tx,
+        rideId,
+        finalFareIqd,
+        {
+          rideId,
+          driverId,
+          riderId: ride.riderId,
+          commissionBps: ride.commissionBpsSnapshot,
+          commissionIqd,
+          confirmedAt: now,
+        },
       );
 
-      const ledgerTransactionId = await this.ledger.recordRideSettlement(tx, {
-        rideId,
-        driverId,
-        fareIqd: finalFareIqd,
-        commissionIqd,
-      });
+      const ledgerTransactionId = payment.ledgerTransactionId;
 
       await this.releaseDriver(tx, driverId);
 
@@ -551,6 +705,41 @@ export class RideService {
   // -------------------------------------------------------------------------
   // Helpers
   // -------------------------------------------------------------------------
+
+  /**
+   * The rider's proposal, clamped to the configured band around the meter.
+   *
+   * Returns null when negotiation is off, when no proposal was sent, or when
+   * the number is not a usable amount. Null means "an ordinary metered ride",
+   * which is the v1 default and the only shape that exists today.
+   *
+   * Clamped rather than rejected. A rider who typed 3,000 on a 5,250 trip meant
+   * "I want it cheaper", and answering with a validation error teaches them
+   * nothing about what IS allowed; clamping to the floor makes the boundary
+   * visible in the number they get back. The band is read from config so an
+   * owner can widen or close it without a deploy (CLAUDE.md §6.5's reasoning,
+   * applied to the same kind of knob).
+   */
+  private async boundedProposal(
+    q: Queryable,
+    proposed: number | null | undefined,
+    meteredIqd: IqdAmount,
+  ): Promise<IqdAmount | null> {
+    if (proposed === null || proposed === undefined) return null;
+    if (!(await this.config.negotiationEnabled(q))) return null;
+
+    // Through `iqd()` and not a cast: this arrives from JSON and a fractional
+    // amount must be refused rather than rounded (CLAUDE.md §6.1).
+    const amount = iqd(proposed);
+    if (amount <= 0) return null;
+
+    const bandBps = await this.config.negotiationBandBps(q);
+    const spread = Math.round((meteredIqd * bandBps) / 10_000);
+    const floor = Math.max(1, meteredIqd - spread);
+    const ceiling = meteredIqd + spread;
+
+    return iqd(Math.min(ceiling, Math.max(floor, amount)));
+  }
 
   private async releaseDriver(q: Queryable, driverId: string | null): Promise<void> {
     if (!driverId) return;

@@ -78,12 +78,22 @@ class FakePaymentsDb implements Queryable {
   }
 }
 
+/**
+ * A fixed timestamp, not `new Date()`.
+ *
+ * `confirmedAt` comes from the caller's injected clock rather than SQL `now()`,
+ * so the settlement timestamp stays inside the same testable discipline as
+ * every other time-dependent path in this codebase.
+ */
+const CONFIRMED_AT = new Date('2026-03-01T09:15:00.000Z');
+
 const context = (commissionIqd = 0): PaymentContext => ({
   rideId: RIDE,
   driverId: DRIVER,
   riderId: RIDER,
   commissionBps: 0,
   commissionIqd: iqd(commissionIqd),
+  confirmedAt: CONFIRMED_AT,
 });
 
 describe('CashProvider', () => {
