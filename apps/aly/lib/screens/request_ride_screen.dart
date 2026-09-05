@@ -1,28 +1,46 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart' as gmap;
 import 'package:rideapp_aly/screens/profile_screen.dart';
 import 'package:rideapp_aly/screens/ride_history_screen.dart';
 import 'package:rideapp_aly/screens/track_ride_screen.dart';
 import 'package:rideapp_core/rideapp_core.dart';
 
-/// Set a destination, see the fare, request the ride.
+/// The rider's home: a map, and a sheet that asks one question.
 ///
-/// The important behaviour here is the idempotency key. CLAUDE.md §5.2:
+/// ## Why this screen holds no layout
+///
+/// Everything visible is [AlyRiderHome] in `packages/core`. This class is the
+/// wiring: it owns the API calls, the location probe and the idempotency key,
+/// and it renders the result as a [RiderHomeState]. The design system screen
+/// takes that value and draws it.
+///
+/// The split is what makes the failure paths reachable. `AlyRiderHome` has
+/// tests for "location refused", "offline" and "no drivers" because none of
+/// them requires a server or a GPS fix — they are values. The screen this
+/// replaced fetched its own data inside `build`, which is why its error states
+/// had no tests at all.
+///
+/// ## The idempotency key, unchanged
+///
+/// CLAUDE.md §5.2:
 ///
 ///   "The rider app generates a UUID (Idempotency-Key header) per ride request
 ///    and retries with the same key on network failure."
 ///
-/// The key is generated when the user TAPS, and held for the whole retry
+/// The key is generated when the rider commits, and held for the whole retry
 /// sequence. Generating a fresh key per attempt is the single most likely way
-/// to get this wrong, and it would produce exactly the failure the rule exists
-/// to prevent: three taps through bad coverage, three rides, three drivers
-/// dispatched.
+/// to get this wrong, and it produces exactly the failure the rule exists to
+/// prevent: three taps through bad coverage, three rides, three drivers
+/// dispatched. That logic is carried over from the previous screen verbatim.
 class RequestRideScreen extends StatefulWidget {
   const RequestRideScreen({
     required this.api,
     required this.onSignedOut,
     super.key,
+    this.gate = const GeolocatorLocationGate(),
   });
 
   final ApiClient api;
@@ -32,20 +50,165 @@ class RequestRideScreen extends StatefulWidget {
   /// will now 401.
   final VoidCallback onSignedOut;
 
+  /// Injected so a test can decide what the OS says about location without a
+  /// device. See [LocationGate].
+  final LocationGate gate;
+
   @override
   State<RequestRideScreen> createState() => _RequestRideScreenState();
 }
 
 class _RequestRideScreenState extends State<RequestRideScreen> {
+  RiderHomeStage _stage = RiderHomeStage.idle;
+
   LatLng? _pickup;
   LatLng? _dropoff;
+  String? _pickupAddress;
+  String? _dropoffAddress;
   FareEstimate? _estimate;
   String? _error;
-  bool _busy = false;
+  bool _locationDenied = false;
+  List<SavedPlace> _recent = const [];
 
-  /// Held across retries of ONE user intent. Cleared only on success or when
-  /// the user changes the request.
-  String? _idempotencyKey;
+  /// Held across retries of ONE rider intent. See [RideIntent].
+  final RideIntent _intent = RideIntent();
+
+  /// Set with `--dart-define=MAPS_CONFIGURED=true` in any build that also
+  /// injects `-PMAPS_API_KEY`. Defaults to false so an unconfigured build says
+  /// so plainly instead of rendering a blank grey rectangle.
+  static const bool _mapsConfigured = bool.fromEnvironment('MAPS_CONFIGURED');
+
+  /// Baghdad. The map's opening camera only — never a submitted coordinate.
+  static const LatLng _baghdadCentre = LatLng(lat: 33.3152, lng: 44.3661);
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_locateRider());
+    unawaited(_loadRecentPlaces());
+  }
+
+  /// Where the rider is, so they do not have to tell us.
+  ///
+  /// A refusal is NOT an error: `locationDenied` renders the sheet's "we don't
+  /// know where you are" notice, which offers both settings and picking the
+  /// point by hand. The rider can still get a ride either way.
+  Future<void> _locateRider() async {
+    try {
+      final serviceEnabled = await widget.gate.isLocationServiceEnabled();
+      final permission = await widget.gate.requestPermission();
+
+      final state = stateForPermission(
+        serviceEnabled: serviceEnabled,
+        permission: permission,
+        hasApiKey: _mapsConfigured,
+      );
+
+      if (!mounted) return;
+
+      if (state is! MapReady) {
+        // Unavailable, disabled, denied and failed all land here. They differ
+        // in how they are fixed, and `MapPickerView` says which when the rider
+        // opens the picker; on the home sheet the one thing that matters is
+        // that the pickup has to be chosen by hand.
+        setState(() => _locationDenied = true);
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 15),
+        ),
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _locationDenied = false;
+        _pickup = LatLng(lat: position.latitude, lng: position.longitude);
+      });
+    } on Exception {
+      // A fix can time out indoors or with the radio off. Same outcome as a
+      // refusal: the rider picks the point themselves.
+      if (mounted) setState(() => _locationDenied = true);
+    }
+  }
+
+  /// Recent destinations, from the rider's own completed rides.
+  ///
+  /// No new endpoint and no saved-places store: `myRides` already carries the
+  /// dropoff of everywhere they have been, which is what the design's "وجهات
+  /// سابقة" list is. Deduplicated by address so three trips home are one row.
+  Future<void> _loadRecentPlaces() async {
+    try {
+      final rides = await widget.api.myRides();
+      final seen = <String>{};
+      final places = <SavedPlace>[];
+
+      for (final ride in rides) {
+        final address = ride.dropoffAddress;
+        if (address == null || address.isEmpty) continue;
+        if (!seen.add(address)) continue;
+        places.add(SavedPlace(label: address, address: address));
+        // Three, as the design caps it. A longer list pushes the sheet past
+        // half the screen and buries the map.
+        if (places.length == 3) break;
+      }
+
+      if (mounted) setState(() => _recent = places);
+    } on ApiException {
+      // An empty recents list is a normal first-run state, not a failure worth
+      // interrupting the one thing this screen is for.
+    }
+  }
+
+  /// Opens the map picker for the destination, then prices the trip.
+  Future<void> _pickDestination() async {
+    final picked = await Navigator.of(context).push<LatLng>(
+      MaterialPageRoute<LatLng>(
+        builder: (_) => MapPickerScreen(
+          title: AppStrings.of(context).setDestination,
+        ),
+      ),
+    );
+
+    if (picked == null || !mounted) return;
+
+    setState(() {
+      _dropoff = picked;
+      _dropoffAddress = null;
+    });
+
+    // No pickup yet means the rider refused location and has not set one, so
+    // the destination alone cannot be priced. Ask for the pickup next rather
+    // than silently doing nothing.
+    if (_pickup == null) {
+      await _pickPickup();
+      return;
+    }
+
+    await _estimateFare();
+  }
+
+  Future<void> _pickPickup() async {
+    final picked = await Navigator.of(context).push<LatLng>(
+      MaterialPageRoute<LatLng>(
+        builder: (_) => MapPickerScreen(
+          title: AppStrings.of(context).setPickup,
+        ),
+      ),
+    );
+
+    if (picked == null || !mounted) return;
+
+    setState(() {
+      _pickup = picked;
+      _pickupAddress = null;
+      _locationDenied = false;
+    });
+
+    if (_dropoff != null) await _estimateFare();
+  }
 
   Future<void> _estimateFare() async {
     final pickup = _pickup;
@@ -53,10 +216,10 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
     if (pickup == null || dropoff == null) return;
 
     setState(() {
-      _busy = true;
+      _stage = RiderHomeStage.estimating;
       _error = null;
-      // The request changed, so the previous intent is void.
-      _idempotencyKey = null;
+      // What is being asked for changed, so the previous intent is void.
+      _intent.abandon();
     });
 
     try {
@@ -64,11 +227,19 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
         pickup: pickup,
         dropoff: dropoff,
       );
-      if (mounted) setState(() => _estimate = estimate);
+      if (!mounted) return;
+      setState(() {
+        _estimate = estimate;
+        _stage = RiderHomeStage.readyToRequest;
+      });
     } on ApiException catch (error) {
-      if (mounted) setState(() => _error = _messageFor(error));
-    } finally {
-      if (mounted) setState(() => _busy = false);
+      if (!mounted) return;
+      setState(() {
+        _error = _messageFor(error);
+        // Back to idle, not stuck on a spinner: a fare that failed to price
+        // leaves nothing to commit to.
+        _stage = RiderHomeStage.idle;
+      });
     }
   }
 
@@ -78,10 +249,10 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
     if (pickup == null || dropoff == null) return;
 
     // ONE key per intent. Reused on every retry below.
-    _idempotencyKey ??= ApiClient.newIdempotencyKey();
+    final key = _intent.beginAttempt();
 
     setState(() {
-      _busy = true;
+      _stage = RiderHomeStage.searching;
       _error = null;
     });
 
@@ -89,29 +260,47 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
       final ride = await widget.api.createRide(
         pickup: pickup,
         dropoff: dropoff,
-        idempotencyKey: _idempotencyKey!,
+        idempotencyKey: key,
       );
 
       if (!mounted) return;
-      _idempotencyKey = null;
+      _intent.onSuccess();
 
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => TrackRideScreen(api: widget.api, ride: ride),
         ),
       );
+
+      // Back from the trip: this rider is looking for their next one.
+      if (mounted) _reset();
     } on ApiException catch (error) {
       if (!mounted) return;
 
       setState(() {
         _error = _messageFor(error);
+        // The fare is still known, so the rider returns to a screen they can
+        // commit from again rather than one they have to rebuild.
+        _stage = _estimate == null
+            ? RiderHomeStage.idle
+            : RiderHomeStage.readyToRequest;
         // The key is deliberately KEPT for a retryable failure: the next
         // attempt must carry the same one, or it creates a second ride.
-        if (!error.isRetryable) _idempotencyKey = null;
+        _intent.onFailure(retryable: error.isRetryable);
       });
-    } finally {
-      if (mounted) setState(() => _busy = false);
     }
+  }
+
+  void _reset() {
+    setState(() {
+      _stage = RiderHomeStage.idle;
+      _dropoff = null;
+      _dropoffAddress = null;
+      _estimate = null;
+      _error = null;
+      _intent.abandon();
+    });
+    unawaited(_loadRecentPlaces());
   }
 
   String _messageFor(ApiException error) {
@@ -127,164 +316,137 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
     };
   }
 
-  @override
-  Widget build(BuildContext context) {
+  /// The menu the floating control opens.
+  ///
+  /// The screen this replaced carried an AppBar with two icon buttons. An
+  /// AppBar takes a fixed strip off the top of the map in every state,
+  /// including the one where the rider is watching a car approach, so the
+  /// destinations move into a sheet reached from the single floating control.
+  Future<void> _openMenu() async {
     final strings = AppStrings.of(context);
-    final estimate = _estimate;
-    final ready = _pickup != null && _dropoff != null;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(strings.whereTo),
-        actions: [
-          IconButton(
-            tooltip: strings.rideHistory,
-            icon: const Icon(Icons.receipt_long_rounded),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => RideHistoryScreen(api: widget.api),
-              ),
-            ),
-          ),
-          IconButton(
-            tooltip: strings.profile,
-            icon: const Icon(Icons.person_rounded),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => ProfileScreen(
-                  api: widget.api,
-                  onSignedOut: widget.onSignedOut,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsetsDirectional.all(AppSpacing.md),
-        children: [
-          if (_error != null) ...[
-            StatusBanner(
-              message: _error!,
-              tone: BannerTone.danger,
-              onRetry: _busy ? null : _request,
-            ),
-            const SizedBox(height: AppSpacing.md),
-          ],
-
-          _LocationField(
-            label: strings.setPickup,
-            icon: Icons.trip_origin,
-            color: AppColors.primary,
-            value: _pickup,
-            onPicked: (value) {
-              setState(() => _pickup = value);
-              unawaited(_estimateFare());
-            },
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          _LocationField(
-            label: strings.setDestination,
-            icon: Icons.place,
-            color: AppColors.danger,
-            value: _dropoff,
-            onPicked: (value) {
-              setState(() => _dropoff = value);
-              unawaited(_estimateFare());
-            },
-          ),
-
-          if (estimate != null) ...[
-            const SizedBox(height: AppSpacing.lg),
-            Center(
-              child: Column(
-                children: [
-                  Text(
-                    strings.estimatedFare,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodyMedium
-                        ?.copyWith(color: AppColors.textSecondary),
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.receipt_long_rounded),
+              title: Text(strings.rideHistory),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => RideHistoryScreen(api: widget.api),
                   ),
-                  const SizedBox(height: AppSpacing.xs),
-                  FareText(estimate.estimatedFareIqd, large: true),
-                ],
-              ),
+                );
+              },
             ),
-            const SizedBox(height: AppSpacing.md),
-            FareBreakdownCard(
-              breakdown: estimate.breakdown,
-              total: estimate.estimatedFareIqd,
+            ListTile(
+              leading: const Icon(Icons.person_rounded),
+              title: Text(strings.profile),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => ProfileScreen(
+                      api: widget.api,
+                      onSignedOut: widget.onSignedOut,
+                    ),
+                  ),
+                );
+              },
             ),
           ],
-
-          const SizedBox(height: AppSpacing.lg),
-          AlyButton(
-            label: strings.requestRide,
-            onPressed: ready ? _request : null,
-            isLoading: _busy,
-          ),
-        ],
+        ),
       ),
     );
   }
-}
-
-/// Placeholder for the map picker.
-///
-/// The real implementation opens a `GoogleMap` and returns the centred
-/// coordinate. It is a separate widget so that the request flow above — which
-/// is where the idempotency behaviour lives — can be reasoned about and tested
-/// without a map SDK or an API key.
-class _LocationField extends StatelessWidget {
-  const _LocationField({
-    required this.label,
-    required this.icon,
-    required this.color,
-    required this.value,
-    required this.onPicked,
-  });
-
-  final String label;
-  final IconData icon;
-  final Color color;
-  final LatLng? value;
-  final ValueChanged<LatLng> onPicked;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: ListTile(
-        leading: Icon(icon, color: color),
-        title: Text(label),
-        subtitle: value == null
-            ? null
-            : Text(
-                '${value!.lat.toStringAsFixed(4)}, ${value!.lng.toStringAsFixed(4)}',
-                textDirection: TextDirection.ltr,
-              ),
-        trailing: const Icon(Icons.map_rounded),
-        onTap: () async {
-          final picked = await Navigator.of(context).push<LatLng>(
-            MaterialPageRoute(builder: (_) => MapPickerScreen(title: label)),
-          );
-          if (picked != null) onPicked(picked);
-        },
+    return AlyRiderHome(
+      state: RiderHomeState(
+        stage: _stage,
+        // Coordinates are the fallback, not the goal. There is no reverse
+        // geocoder in this build, and a blank line where an address belongs
+        // tells the rider less than the numbers do.
+        pickupAddress: _pickupAddress ?? _describe(_pickup),
+        dropoffAddress: _dropoffAddress ?? _describe(_dropoff),
+        estimate: _estimate,
+        errorMessage: _error,
+        locationDenied: _locationDenied,
+        recentPlaces: _recent,
       ),
+      mapLayer: const _MapLayer(
+        centre: _baghdadCentre,
+        hasApiKey: _mapsConfigured,
+      ),
+      onSearchDestination: () => unawaited(_pickDestination()),
+      onRequestRide: () => unawaited(_request()),
+      onCancel: _reset,
+      onRetry: () => unawaited(
+        _estimate == null ? _estimateFare() : _request(),
+      ),
+      onEnableLocation: () => unawaited(_pickPickup()),
+      onOpenMenu: () => unawaited(_openMenu()),
+      // A recent row names a place, not a coordinate. Until there is a
+      // geocoder to turn one back into the other, tapping one opens the picker
+      // rather than pretending to know where it was.
+      onPickRecent: (_) => unawaited(_pickDestination()),
+    );
+  }
+
+  String? _describe(LatLng? point) => point == null
+      ? null
+      : '${point.lat.toStringAsFixed(4)}, ${point.lng.toStringAsFixed(4)}';
+}
+
+/// The map behind the sheet.
+///
+/// Read-only: the home map is context, not a control. Picking a point happens
+/// in [MapPickerScreen], which is a separate screen with a confirm step,
+/// because a coordinate the rider is about to be charged for should never be
+/// set by an accidental pan.
+class _MapLayer extends StatelessWidget {
+  const _MapLayer({required this.centre, required this.hasApiKey});
+
+  final LatLng centre;
+  final bool hasApiKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AlyColors.of(context);
+
+    if (!hasApiKey) {
+      // Not an error the rider can fix, and not worth an alarming colour: the
+      // sheet in front of this still does everything. A plain surface reads as
+      // "no map here", which is true, where a red failure would read as "the
+      // app is broken", which is not.
+      return ColoredBox(color: c.surfaceSunken);
+    }
+
+    return gmap.GoogleMap(
+      initialCameraPosition: gmap.CameraPosition(
+        target: gmap.LatLng(centre.lat, centre.lng),
+        zoom: 15,
+      ),
+      myLocationEnabled: true,
+      myLocationButtonEnabled: false,
+      // The sheet sits over the bottom half, so Google's own controls would be
+      // behind it.
+      zoomControlsEnabled: false,
+      mapToolbarEnabled: false,
     );
   }
 }
 
-/// Map picker screen.
+/// Picks one coordinate on a full-screen map.
 ///
-/// A thin wrapper over `MapPickerView` in `packages/core` — the map itself is
-/// shared with the driver app, because CLAUDE.md §1 treats duplicated widget
-/// code between the two as a defect.
-///
-/// `hasApiKey` comes from a compile-time define rather than being probed at
-/// runtime: the key lives in the Android manifest and Dart cannot read it.
-/// Passing it in keeps the "no key" path honest instead of rendering a blank
-/// grey tile the user cannot distinguish from a network failure.
+/// Kept as its own screen so the request flow above — which is where the
+/// idempotency behaviour lives — can be reasoned about and tested without a
+/// map SDK or an API key.
 class MapPickerScreen extends StatelessWidget {
   const MapPickerScreen({required this.title, super.key});
 
@@ -293,8 +455,7 @@ class MapPickerScreen extends StatelessWidget {
   /// Set with `--dart-define=MAPS_CONFIGURED=true` in any build that also
   /// injects `-PMAPS_API_KEY`. Defaults to false so an unconfigured build
   /// says so plainly.
-  static const bool _mapsConfigured =
-      bool.fromEnvironment('MAPS_CONFIGURED');
+  static const bool _mapsConfigured = bool.fromEnvironment('MAPS_CONFIGURED');
 
   /// Baghdad. A starting camera position only, never a submitted coordinate —
   /// the user must move the map and confirm.
@@ -307,4 +468,45 @@ class MapPickerScreen extends StatelessWidget {
         hasApiKey: _mapsConfigured,
         onConfirm: (picked) => Navigator.of(context).pop(picked),
       );
+}
+
+/// One rider intent, and the key that makes retrying it safe.
+///
+/// CLAUDE.md §5.2 in a form a test can reach. The rule is three lines and all
+/// three matter:
+///
+/// - The key is minted once, on the first attempt, and returned unchanged by
+///   every later attempt. A fresh key per attempt is the mistake the rule
+///   exists to prevent: three taps through bad coverage become three rides and
+///   three drivers dispatched.
+/// - A RETRYABLE failure keeps it. The next attempt must carry the same key or
+///   the server has no way to recognise it as the same request.
+/// - Success, and any failure that is not retryable, clears it. The next tap
+///   is then a genuinely new request rather than a duplicate of a dead one.
+///
+/// It lived inside the screen's State, where nothing could test it. It is the
+/// most consequential rule on this screen and it now has its own tests.
+class RideIntent {
+  RideIntent({String Function()? mintKey})
+      : _mint = mintKey ?? ApiClient.newIdempotencyKey;
+
+  final String Function() _mint;
+
+  String? _key;
+
+  /// The key for this attempt: the existing one, or a new one if this is the
+  /// first attempt of a fresh intent.
+  String beginAttempt() => _key ??= _mint();
+
+  /// True while an intent is live and its key must be reused.
+  bool get isLive => _key != null;
+
+  void onSuccess() => _key = null;
+
+  void onFailure({required bool retryable}) {
+    if (!retryable) _key = null;
+  }
+
+  /// The rider changed what they are asking for, so the old intent is void.
+  void abandon() => _key = null;
 }
