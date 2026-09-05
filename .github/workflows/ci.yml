@@ -46,6 +46,23 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 20
 
     env:
+      # REAL_INFRA is the switch, and it was never set.
+      #
+      # `isRealInfraRequested()` (test/support/real-infra.ts) reads exactly
+      # `REAL_INFRA === '1'`. Supplying TEST_DATABASE_URL and TEST_REDIS_URL is
+      # not opting in - without this line every real-infrastructure test in the
+      # repository skipped on every run, while the job went green.
+      #
+      # What was skipping is not a corner: the atomic-claim proof that
+      # CLAUDE.md §5.1 rests on, the capability/subscription gate, the real
+      # Postgres migration checks, and the Redis pub/sub reconnect suite. The
+      # guard step below was written to catch exactly this and could not,
+      # because the string it greps for only appears once the suite runs.
+      #
+      # Setting this makes the helpers THROW when a service is missing rather
+      # than fall back to a fake, which is the intended contract - a red build
+      # for absent infrastructure, never a green one for untested code.
+      REAL_INFRA: '1'
       TEST_DATABASE_URL: postgresql://rideapp:rideapp@localhost:5432/rideapp_test
       DATABASE_MIGRATION_URL: postgresql://rideapp:rideapp@localhost:5432/rideapp_test
       TEST_REDIS_URL: redis://localhost:6379
@@ -90,18 +107,35 @@ jobs:
       # A green integration run that actually skipped everything is worse than a
       # red one, because it reads as verification. This step fails the build if
       # the conformance suite did not really execute.
-      - name: Assert the real-Redis conformance suite did NOT skip
+      # A green integration run that actually skipped everything is worse than a
+      # red one, because it reads as verification.
+      #
+      # This step used to re-run the whole suite to grep its output, which
+      # doubled the slowest job in CI to check a fact the first run already
+      # knew. It now asserts on the run above, and asserts the stronger thing:
+      # that ZERO tests were skipped, not merely that one named suite appeared.
+      # The old grep passed only because it never ran - REAL_INFRA was unset, so
+      # the string was absent and the build should have failed. It did not,
+      # because the step was added after the skip was already universal and
+      # nobody saw a passing baseline.
+      - name: Assert no integration test skipped
         run: |
-          OUT=$(pnpm --filter @rideapp/api test:integration 2>&1)
+          OUT=$(pnpm --filter @rideapp/api test:integration --reporter=basic 2>&1)
           echo "$OUT"
-          if echo "$OUT" | grep -qE "IoRedisAdapter \(real Redis\)"; then
-            echo "OK: real-Redis conformance executed."
-          else
+          if echo "$OUT" | grep -qE "[1-9][0-9]* skipped"; then
+            echo "FAIL: integration tests were skipped."
+            echo "REAL_INFRA is set for this job, so a skip means a helper opted"
+            echo "out rather than connecting. A skipped concurrency proof is an"
+            echo "unproven concurrency guarantee. Refusing to pass."
+            exit 1
+          fi
+          if ! echo "$OUT" | grep -qE "IoRedisAdapter \(real Redis\)"; then
             echo "FAIL: the real-Redis conformance suite did not run."
             echo "The in-memory Redis is therefore unverified, and every"
             echo "concurrency guarantee in this repo rests on it. Refusing to pass."
             exit 1
           fi
+          echo "OK: real-Redis conformance executed and nothing skipped." 
 
       - name: Upload coverage
         if: always()
@@ -123,7 +157,7 @@ jobs:
       - name: Detect Flutter packages
         id: detect
         run: |
-          if ls packages/core/pubspec.yaml apps/rider/pubspec.yaml apps/driver/pubspec.yaml >/dev/null 2>&1; then
+          if ls packages/core/pubspec.yaml apps/aly/pubspec.yaml apps/rider/pubspec.yaml apps/driver/pubspec.yaml >/dev/null 2>&1; then
             echo "found=true" >> "$GITHUB_OUTPUT"
           else
             echo "found=false" >> "$GITHUB_OUTPUT"
@@ -138,7 +172,11 @@ jobs:
       - name: Analyze and test
         if: steps.detect.outputs.found == 'true'
         run: |
-          for dir in packages/core apps/rider apps/driver; do
+          # apps/aly is the merged app (CLAUDE.md §1.1). apps/rider and
+          # apps/driver are still built because they still ship - the merge is
+          # additive until the owner cuts over, and a package that is not built
+          # is a package that silently rots.
+          for dir in packages/core apps/aly apps/rider apps/driver; do
             [ -f "$dir/pubspec.yaml" ] || continue
             (cd "$dir" && flutter pub get && flutter analyze && flutter test)
           done

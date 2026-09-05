@@ -15,8 +15,12 @@
 #     in app/build.gradle.kts, which fails the build outright.
 #
 # Usage:
+#   scripts/build-release.sh aly    https://api.example.iq/v1 wss://api.example.iq/v1/realtime
 #   scripts/build-release.sh rider  https://api.example.iq/v1 wss://api.example.iq/v1/realtime
 #   scripts/build-release.sh driver https://api.example.iq/v1 wss://api.example.iq/v1/realtime
+#
+# `aly` is the one that ships (CLAUDE.md 1.1). `rider` and `driver` still build
+# because they still exist - the merge is additive until the owner cuts over.
 #
 # The Maps key comes from MAPS_API_KEY in the environment or from
 # apps/<app>/android/local.properties. Neither is in the repository.
@@ -27,8 +31,8 @@ APP="${1:-}"
 API_BASE_URL="${2:-}"
 WS_URL="${3:-}"
 
-if [[ "$APP" != "rider" && "$APP" != "driver" ]]; then
-  echo "usage: $0 <rider|driver> <https://api-base/v1> <wss://realtime-url>" >&2
+if [[ "$APP" != "aly" && "$APP" != "rider" && "$APP" != "driver" ]]; then
+  echo "usage: $0 <aly|rider|driver> <https://api-base/v1> <wss://realtime-url>" >&2
   exit 2
 fi
 
