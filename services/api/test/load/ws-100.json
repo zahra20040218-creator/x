@@ -1,0 +1,13 @@
+{
+  "vus": 100,
+  "opened": 100,
+  "readied": 100,
+  "refused": 0,
+  "dropped_after_ready": 0,
+  "ready_rate": 1,
+  "time_to_ready_p50_ms": 110,
+  "time_to_ready_p95_ms": 123,
+  "time_to_ready_p99_ms": 0,
+  "closed_clean": 100,
+  "closed_abnormal": 0
+}

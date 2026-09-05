@@ -1,0 +1,125 @@
+time="2026-08-25T10:54:35+03:00" level=warning msg="Error from API server" error="listen tcp 127.0.0.1:6565: bind: Only one usage of each socket address (protocol/network address/port) is normally permitted."
+time="2026-08-25T11:02:36+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:55007->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:09+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:55053->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:09+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:55030->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:09+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54859->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:09+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:55034->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:09+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:55043->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:09+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54872->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:09+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54865->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:09+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54871->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:09+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:55038->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:09+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54870->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:09+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54862->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:09+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:55031->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:09+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54855->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:09+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:55051->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:09+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54857->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:09+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54853->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:09+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54856->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:09+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:55040->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:09+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54860->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:09+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54867->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:09+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54854->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:09+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:55049->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:09+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54873->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:09+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54876->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:09+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54866->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:09+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:55044->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:09+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54858->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:41+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54903->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:41+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54914->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:41+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54927->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:41+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54936->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:41+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54943->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:41+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54929->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:41+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54901->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:41+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54899->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:41+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54911->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:41+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54881->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:41+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54941->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:41+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54934->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:41+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54955->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:41+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54933->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:41+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54920->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:41+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54915->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:41+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54930->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:41+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54958->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:41+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54883->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:03:41+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54877->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:04:42+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:55020->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:04:53+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54916->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:04:59+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:57805->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:04+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54951->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:04+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:57634->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:04+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:55011->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:04+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54999->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:04+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54925->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:04+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:55018->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:04+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54968->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:04+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:55046->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:04+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54928->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:04+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:57802->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:04+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:55008->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:04+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54969->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:04+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:55024->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:04+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:55010->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:04+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:55039->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:04+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:57799->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:04+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:57796->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:04+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:50075->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:04+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:55026->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:04+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:55037->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:04+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54964->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:04+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:55045->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:41+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:55016->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:41+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:55015->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:41+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:55017->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:41+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54878->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:41+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54894->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:41+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54891->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:41+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:55013->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:41+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:57814->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:41+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:50117->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:41+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:57810->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:41+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:57639->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:41+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:54947->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:05:41+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:49995->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:06:29+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:62699->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+time="2026-08-25T11:06:31+03:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:3000/v1/driver/location\": read tcp 127.0.0.1:57637->127.0.0.1:3000: wsarecv: An existing connection was forcibly closed by the remote host."
+
+=== Load test summary ===
+
+Claim race (CLAUDE.md 5.1)
+  wins   : 1
+  losses : 941
+  verdict: exactly one winner, as required
+
+Idempotency (CLAUDE.md 5.2)
+  duplicate rides from one key : 0   (must be 0)
+
+Throughput and failures
+  requests            : 35952
+  server errors (5xx) : 17   (threshold == 0)
+  script errors       : 0.0535   (threshold < 0.02)
+  checks passed       : 0.9463
+
+  Note: a large 4xx count is EXPECTED here and is not in any threshold. Every
+  losing driver in the race gets a 409, and so does a rider who already holds
+  an active ride. Both are the system working.
+
+Latency
+  http_req_duration p50 : 33 ms
+  http_req_duration p95 : 1886 ms
+  http_req_duration max : 9887 ms
+  accept            p95 : 161 ms
+  location ingest   p95 : 1996 ms   (threshold < 200)
+  location ingest   p99 : n/a ms   (threshold < 500)
+
+Thresholds broken: server_errors, location_ingest_ms, errors
+
+These numbers came from a machine running k6, the API, PostgreSQL and Redis at
+once. The load generator competes with the server for the same cores, so treat
+the latencies as a pessimistic floor - they are NOT a measurement of the 4-core
+VPS the 500-user target is written against.
+time="2026-08-25T11:08:41+03:00" level=error msg="thresholds on metrics 'errors, location_ingest_ms, server_errors' have been crossed"

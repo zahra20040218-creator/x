@@ -1,0 +1,14 @@
+{
+  "vus": 500,
+  "opened": 500,
+  "readied": 285,
+  "refused": 215,
+  "dropped_after_ready": 0,
+  "ready_rate": 0.57,
+  "time_to_ready_p50_ms": 8,
+  "time_to_ready_p95_ms": 467.4000000000001,
+  "time_to_ready_p99_ms": 0,
+  "handshake_failed": 0,
+  "closed_clean": 285,
+  "closed_abnormal": 215
+}

@@ -729,6 +729,114 @@ describe('API end to end', () => {
   });
 
   // -------------------------------------------------------------------------
+  // Fare negotiation — CLAUDE.md §2 SCOPE EXPANSION, 2026-08-25
+  //
+  // The point of these is narrow and important: the three bid paths are in
+  // docs/api-contract.yaml and, until this change, `NegotiationService` was
+  // registered in no module and exposed by no controller, so every one of them
+  // answered 404. A published contract promising endpoints that do not exist is
+  // the failure being guarded against here.
+  //
+  // They answer 501 rather than 200 because `negotiation_enabled` ships FALSE.
+  // That is the correct disabled behaviour, and asserting it is what
+  // distinguishes "wired and switched off" from "not wired at all" - the two
+  // states that looked identical from the outside before.
+  // -------------------------------------------------------------------------
+
+  describe('fare negotiation, switched off', () => {
+    // How these prove the routes are MOUNTED, which is the whole point.
+    //
+    // `NegotiationService.requireEnabled` throws `NotFoundProblem` when the
+    // feature is off - deliberately, so a disabled feature does not advertise
+    // itself. That makes "wired but switched off" and "not wired at all"
+    // indistinguishable by status code: both answer 404. Asserting 404 would
+    // therefore have passed just as happily against the broken state this
+    // change fixes, which is worse than no test.
+    //
+    // Validation is the discriminator. `zodBody` runs at the HTTP boundary,
+    // BEFORE the handler and so before `requireEnabled`, so a malformed body
+    // can only produce 422 on a route that is actually bound. An unmounted path
+    // answers 404 whatever you send it.
+    //
+    // The flow itself - bidding, superseding, accepting, the band - is covered
+    // in test/integration/real-negotiation.test.ts against real Postgres, where
+    // the partial indexes and FOR UPDATE locking are real. Re-testing it here
+    // against FakeDatabase would assert the fake's behaviour, not the schema's.
+
+    it('has POST /rides/{id}/bids bound, proved by boundary validation', async () => {
+      seedDriverRow('driver-1', DRIVER_PHONE, '12345');
+      const driverToken = await signInDriver('driver-token');
+
+      // CLAUDE.md §6.1: a fractional bid becomes `agreed_fare_iqd` and then a
+      // ledger amount, so it must be refused at the boundary, never rounded.
+      await http
+        .post(`/v1/rides/${randomUUID()}/bids`)
+        .set(auth(driverToken))
+        .send({ amountIqd: 5000.5 })
+        .expect(422);
+    });
+
+    it('refuses a bid of zero', async () => {
+      seedDriverRow('driver-1', DRIVER_PHONE, '12345');
+      const driverToken = await signInDriver('driver-token');
+
+      await http
+        .post(`/v1/rides/${randomUUID()}/bids`)
+        .set(auth(driverToken))
+        .send({ amountIqd: 0 })
+        .expect(422);
+    });
+
+    it('keeps the bid paths off a rider, and the list off a driver', async () => {
+      seedDriverRow('driver-1', DRIVER_PHONE, '12345');
+      const driverToken = await signInDriver('driver-token');
+      const riderToken = await signInRider();
+
+      // 403 and not 404: the route exists, and the caller is the wrong kind of
+      // account. A rider must not be able to bid on their own ride, and a
+      // driver must not see what other drivers offered - that turns an auction
+      // into a race to undercut.
+      await http
+        .post(`/v1/rides/${randomUUID()}/bids`)
+        .set(auth(riderToken))
+        .send({ amountIqd: 5000 })
+        .expect(403);
+
+      await http
+        .get(`/v1/rides/${randomUUID()}/bids`)
+        .set(auth(driverToken))
+        .expect(403);
+    });
+
+    it('ignores a proposed fare while negotiation is off, rather than refusing the ride', async () => {
+      const riderToken = await signInRider();
+
+      // A rider on a build that sends the field must still be able to request a
+      // ride the ordinary way. 422 here would strand them for a field the
+      // server simply does not use yet.
+      const created = await http
+        .post('/v1/rides')
+        .set(auth(riderToken))
+        .set('Idempotency-Key', randomUUID())
+        .send({ pickup: TAHRIR, dropoff: KARRADA, proposedFareIqd: 4000 })
+        .expect(201);
+
+      expect(created.body.id).toBeDefined();
+    });
+
+    it('still refuses a fractional proposed fare', async () => {
+      const riderToken = await signInRider();
+
+      await http
+        .post('/v1/rides')
+        .set(auth(riderToken))
+        .set('Idempotency-Key', randomUUID())
+        .send({ pickup: TAHRIR, dropoff: KARRADA, proposedFareIqd: 4000.5 })
+        .expect(422);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // Gateway webhook — CLAUDE.md §7
   // -------------------------------------------------------------------------
 

@@ -4,6 +4,7 @@ import { AuthService, type AuthenticatedUser } from '../auth/auth.service.js';
 import { DATABASE, type Database } from '../db/db.port.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { PushService } from '../push/push.service.js';
+import { CapabilityService } from '../capabilities/capability.service.js';
 import { CurrentUser, Public } from './auth.guard.js';
 import { RateLimit } from './rate-limit.js';
 import {
@@ -22,6 +23,9 @@ export class AuthController {
     private readonly ledger: LedgerService,
     @Inject(DATABASE) private readonly db: Database,
     private readonly push: PushService,
+    // Named with a trailing underscore only because `capabilities` is also the
+    // handler name below; the property is the service.
+    private readonly capabilities_: CapabilityService,
   ) {}
 
   @Post('auth/otp/verify')
@@ -104,6 +108,41 @@ export class AuthController {
     @Body(zodBody(UnregisterDeviceSchema)) body: { token: string },
   ): Promise<void> {
     await this.push.unregister(user.id, body.token);
+  }
+
+  /**
+   * What this account may do, decided by the server.
+   *
+   * CLAUDE.md §1.1: ALY is one app with a Rider mode and a Driver mode, and the
+   * app must not decide which it may enter. This is the authoritative answer,
+   * and it is the SAME object the server enforces with - `requireDriver` calls
+   * the same `evaluate`. If this endpoint and the guard could disagree, the app
+   * would be offering a mode the server is about to refuse.
+   *
+   * Deliberately returns the full blocker list rather than the first failure. A
+   * driver who is unapproved AND missing a licence needs to see both, or they
+   * fix one, try again, and learn the second only by failing again.
+   *
+   * No rate limit tier beyond the default: the app calls this on launch, on
+   * resume, and after any change to its own state, and throttling it would make
+   * the UI show a stale entitlement.
+   */
+  @Get('me/capabilities')
+  async capabilities(@CurrentUser() user: AuthenticatedUser) {
+    const result = await this.capabilities_.evaluate(user.id);
+    return {
+      userId: result.userId,
+      canRide: result.canRide,
+      driver: {
+        allowed: result.driver.allowed,
+        blockers: result.driver.blockers,
+        suspendedReason: result.driver.suspendedReason,
+        missingDocuments: result.driver.missingDocuments,
+        expiredDocuments: result.driver.expiredDocuments,
+        rejectedDocuments: result.driver.rejectedDocuments,
+        subscriptionExpiresAt: result.driver.subscriptionExpiresAt?.toISOString() ?? null,
+      },
+    };
   }
 
   /** The caller's OWN profile — the only shape that carries their phone. */

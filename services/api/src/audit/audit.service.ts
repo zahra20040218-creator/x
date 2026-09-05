@@ -38,6 +38,10 @@ export const AUDIT_ACTIONS = {
   driverSuspend: 'driver.suspend',
   driverUnsuspend: 'driver.unsuspend',
   walletTopUp: 'wallet.topup',
+  // Its own verb rather than a config or wallet event: this is the row that
+  // answers "who sold this driver a period, for how much, and when" - the
+  // exact question a billing dispute opens with.
+  subscriptionGrant: 'subscription.grant',
   disputeResolve: 'dispute.resolve',
   configUpdate: 'config.update',
   rideCancelByAdmin: 'ride.cancel_by_admin',

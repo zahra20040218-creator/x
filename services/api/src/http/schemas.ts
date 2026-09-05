@@ -52,6 +52,25 @@ export const CreateRideSchema = z.object({
   dropoffAddress: z.string().max(400).optional(),
   // GATEWAY exists in the schema but is rejected in v1 (CLAUDE.md §7).
   paymentMethod: z.literal('CASH').default('CASH'),
+  // What the rider offers. Ignored unless negotiation is switched on, and
+  // clamped to the configured band around the meter by RideService - not here,
+  // because the boundary has no access to the metered estimate.
+  proposedFareIqd: z.number().int().min(1).max(100_000_000).optional(),
+});
+
+/**
+ * A driver's bid on a ride.
+ *
+ * `.int()` is load-bearing: this becomes `agreed_fare_iqd` and then the amount
+ * settled to the ledger, so a fractional bid must be refused at the boundary
+ * rather than rounded (CLAUDE.md §6.1).
+ */
+export const PlaceBidSchema = z.object({
+  amountIqd: z.number().int().min(1).max(100_000_000),
+  // Seconds, not minutes: the client measures it and the server stores it
+  // without a unit conversion nobody would notice getting wrong.
+  etaSeconds: z.number().int().min(0).max(7_200).optional(),
+  distanceM: z.number().int().min(0).max(1_000_000).optional(),
 });
 
 export const ListRidesQuerySchema = z.object({
@@ -140,6 +159,23 @@ export const TopUpWalletSchema = z.object({
   reference: z.string().max(200).optional(),
 });
 
+/**
+ * Granting a subscription period.
+ *
+ * `chargeIqd` is optional and defaults to the plan price at the service, not
+ * here: a default written at the boundary would silently go stale the day an
+ * owner changes a plan's price, and the two would disagree with no error.
+ *
+ * `.int()` is the whole point of the field. CLAUDE.md §6.1 makes money whole
+ * dinars, and a gateway or an operator sending 25000.5 must be refused with a
+ * 422 rather than rounded into the ledger.
+ */
+export const GrantSubscriptionSchema = z.object({
+  planCode: z.string().min(1).max(64),
+  chargeIqd: z.number().int().min(0).max(100_000_000).optional(),
+  note: z.string().max(200).optional(),
+});
+
 export const UpdateConfigSchema = z
   .object({
     commission_bps: z.number().int().min(0).max(10_000).optional(),
@@ -150,6 +186,13 @@ export const UpdateConfigSchema = z
     fare_rounding_iqd: z.number().int().min(1).max(100_000).optional(),
     offer_timeout_seconds: z.number().int().min(5).max(120).optional(),
     search_radius_meters: z.number().int().min(500).max(50_000).optional(),
+    // Policy switches. Booleans, stored as the strings 'true'/'false', and
+    // routed to PlatformConfigService.setFlag rather than update() - which is
+    // typed to numbers and throws on these as unknown keys. Before this,
+    // `subscription_required` could be changed only by hand with psql against
+    // production, so the subscription gate had no way to be switched on.
+    subscription_required: z.boolean().optional(),
+    negotiation_enabled: z.boolean().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, {
     message: 'At least one configuration key must be supplied.',

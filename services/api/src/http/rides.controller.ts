@@ -33,6 +33,7 @@ import {
   UuidSchema,
 } from './schemas.js';
 import { decodeKeysetCursor, nextKeysetCursor } from './cursor.js';
+import { RideDispatcher } from '../matching/ride-dispatcher.js';
 import { zodBody } from './zod.pipe.js';
 
 /**
@@ -50,6 +51,7 @@ export class RidesController {
     private readonly fare: FareCalculator,
     private readonly config: PlatformConfigService,
     private readonly idempotency: IdempotencyService,
+    private readonly dispatcher: RideDispatcher,
     @Inject(DATABASE) private readonly db: Database,
   ) {}
 
@@ -110,10 +112,24 @@ export class RidesController {
           pickupAddress: body.pickupAddress ?? null,
           dropoff: body.dropoff,
           dropoffAddress: body.dropoffAddress ?? null,
+          proposedFareIqd: body.proposedFareIqd ?? null,
         });
         return { status: 201, value: presentRide(ride) };
       },
     );
+
+    // Dispatch the ride.
+    //
+    // Nothing did this. `POST /rides` created a ride, returned 201, and no
+    // driver was ever offered it - the ride sat in REQUESTED while the rider's
+    // screen polled "searching" forever. MatchingService.dispatch was called
+    // only from matching's own re-dispatch path and from tests.
+    //
+    // Only on a FRESH ride: an idempotent replay must not dispatch a second
+    // time, which would offer one ride to two drivers.
+    if (outcome.fresh) {
+      await this.dispatcher.dispatch(outcome.value.id);
+    }
 
     response.status(outcome.fresh ? 201 : 200);
     return outcome.value;
@@ -271,6 +287,7 @@ interface CreateRideBody {
   dropoff: LatLng;
   dropoffAddress?: string | undefined;
   paymentMethod: 'CASH';
+  proposedFareIqd?: number | undefined;
 }
 
 interface ListRidesQuery {

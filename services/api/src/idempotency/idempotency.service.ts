@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 
+import type { Logger } from '../common/logger.js';
 import type { Clock } from '../common/clock.js';
 import type { Queryable } from '../db/db.port.js';
 import { isPgError, PgErrorCode } from '../db/db.port.js';
@@ -49,6 +50,7 @@ export class IdempotencyService {
   constructor(
     private readonly clock: Clock,
     private readonly ttlSeconds: number,
+    private readonly logger?: Logger,
   ) {
     if (!Number.isInteger(ttlSeconds) || ttlSeconds <= 0) {
       throw new Error(`ttlSeconds must be a positive integer, got ${ttlSeconds}`);
@@ -125,13 +127,29 @@ export class IdempotencyService {
       // The work failed, so the key must NOT stay claimed - otherwise a retry
       // of a request that never succeeded would replay a response that does not
       // exist, and the rider could never create that ride.
-      await q
-        .query(
+      // The release is best-effort - the ORIGINAL error is what the caller
+      // needs - but its failure has a real and otherwise invisible cost: the
+      // key stays claimed, and every retry of it answers "still being
+      // processed" forever. The rider can never create that ride again.
+      try {
+        await q.query(
           `DELETE FROM idempotency_keys
             WHERE user_id = $1 AND endpoint = $2 AND key = $3 AND response_status IS NULL`,
           [params.userId, params.endpoint, params.key],
-        )
-        .catch(() => undefined);
+        );
+      } catch (releaseError) {
+        this.logger?.error(
+          {
+            event: 'idempotency.release_failed',
+            endpoint: params.endpoint,
+            // The key itself, not the user: enough to find the stuck row
+            // without putting a user id in an error log.
+            key: params.key,
+            err: releaseError,
+          },
+          'could not release a claimed idempotency key; retries of it will block',
+        );
+      }
 
       throw error;
     }

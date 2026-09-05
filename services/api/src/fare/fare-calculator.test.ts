@@ -217,17 +217,35 @@ describe('FareCalculator.splitCommission', () => {
   // to sum to the fare, the double-entry rows would not balance and the DB
   // trigger would reject the whole settlement.
   it('always splits into two parts that sum exactly to the fare', () => {
+    // Violations are COLLECTED and asserted once, rather than asserted inside
+    // the loop. The coverage is identical - every fare and rate below is still
+    // checked against all five properties - but the loop was making roughly
+    // 29,000 `expect` calls, and each one carries matcher setup and error
+    // message construction. That cost, not the arithmetic, made this the
+    // slowest test in the suite; it timed out at 5s whenever the machine was
+    // also building an APK.
+    //
+    // The failure message is better too: it names the exact fare and rate that
+    // broke rather than stopping at the first one.
+    const broken: string[] = [];
+
     for (let fare = 250; fare <= 100_000; fare += 137) {
       for (const bps of [0, 1, 333, 500, 1_500, 2_575, 9_999, 10_000]) {
-        const split = calc.splitCommission(iqd(fare), bps);
+        const { commissionIqd, driverEarningsIqd } = calc.splitCommission(iqd(fare), bps);
 
-        expect(split.commissionIqd + split.driverEarningsIqd).toBe(fare);
-        expect(Number.isInteger(split.commissionIqd)).toBe(true);
-        expect(Number.isInteger(split.driverEarningsIqd)).toBe(true);
-        expect(split.commissionIqd).toBeGreaterThanOrEqual(0);
-        expect(split.driverEarningsIqd).toBeGreaterThanOrEqual(0);
+        if (commissionIqd + driverEarningsIqd !== fare) {
+          broken.push(`fare ${fare} @ ${bps}bps: ${commissionIqd}+${driverEarningsIqd} != ${fare}`);
+        }
+        if (!Number.isInteger(commissionIqd) || !Number.isInteger(driverEarningsIqd)) {
+          broken.push(`fare ${fare} @ ${bps}bps: not whole dinars`);
+        }
+        if (commissionIqd < 0 || driverEarningsIqd < 0) {
+          broken.push(`fare ${fare} @ ${bps}bps: negative half`);
+        }
       }
     }
+
+    expect(broken).toEqual([]);
   });
 
   it('takes the whole fare at 100%', () => {

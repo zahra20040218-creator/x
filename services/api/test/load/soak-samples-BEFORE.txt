@@ -1,0 +1,17 @@
+ 1m sockets=497   mem=158   redis=259   health=200
+ 2m sockets=497   mem=211   redis=259   health=200
+ 3m sockets=498   mem=211   redis=259   health=200
+ 4m sockets=497   mem=213   redis=259   health=200
+ 5m sockets=497   mem=214   redis=259   health=200
+ 6m sockets=497   mem=215   redis=259   health=200
+ 7m sockets=497   mem=215   redis=259   health=200
+ 8m sockets=496   mem=217   redis=259   health=200
+ 9m sockets=505   mem=227   redis=259   health=200
+10m sockets=497   mem=137   redis=259   health=200
+11m sockets=285   mem=138   redis=259   health=200
+12m sockets=285   mem=109   redis=259   health=200
+13m sockets=0     mem=108   redis=259   health=200
+14m sockets=0     mem=108   redis=259   health=200
+15m sockets=0     mem=108   redis=259   health=200
+16m sockets=0     mem=108   redis=259   health=200
+SOAK COMPLETE

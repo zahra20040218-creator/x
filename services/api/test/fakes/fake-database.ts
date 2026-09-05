@@ -60,6 +60,7 @@ export class FakeDatabase implements Database {
       'payments',
       'drivers',
       'platform_config',
+      'driver_subscriptions',
       'idempotency_keys',
       'users',
       'riders',
@@ -452,6 +453,48 @@ export class FakeDatabase implements Database {
       return this.ok(rows.map((r) => ({ ...r })) as Row[]);
     }
 
+    // ---- capabilities (CLAUDE.md §1.1) ----
+    //
+    // The fake matches SQL by shape, so a new query in the application is
+    // invisible here until it is taught - and an unmatched SELECT returns no
+    // rows, which the capability service correctly reads as "this account does
+    // not exist". That turned into 17 e2e failures with a 403 and no clue why.
+    // These four keep the double in step with what the service actually asks.
+    if (/^SELECT is_active FROM users WHERE id = \$1/i.test(s)) {
+      const found = this.rows('users').find((u) => u['id'] === params[0]);
+      return this.ok(found ? ([{ is_active: found['is_active'] !== false }] as Row[]) : []);
+    }
+    if (/^SELECT approval_status, is_suspended, suspended_reason\s+FROM drivers WHERE user_id = \$1/i.test(s)) {
+      const found = this.rows('drivers').find((d) => d['user_id'] === params[0]);
+      if (!found) return this.ok([]);
+      return this.ok([
+        {
+          // Matches the migration's default: drivers created before approval
+          // existed are approved, not silently put out of work.
+          approval_status: found['approval_status'] ?? 'APPROVED',
+          is_suspended: found['is_suspended'] === true,
+          suspended_reason: found['suspended_reason'] ?? null,
+        },
+      ] as Row[]);
+    }
+    if (/^SELECT expires_at FROM driver_subscriptions/i.test(s)) {
+      const live = this.rows('driver_subscriptions')
+        .filter((r) => r['driver_id'] === params[0] && r['status'] === 'ACTIVE')
+        .sort(
+          (a, b) =>
+            new Date(b['expires_at'] as string).getTime() -
+            new Date(a['expires_at'] as string).getTime(),
+        );
+      const first = live[0];
+      return this.ok(first ? ([{ expires_at: first['expires_at'] }] as Row[]) : []);
+    }
+    if (/^SELECT value FROM platform_config WHERE key = 'subscription_required'/i.test(s)) {
+      const row = this.rows('platform_config').find(
+        (r) => r['key'] === 'subscription_required',
+      );
+      return this.ok(row ? ([{ value: row['value'] }] as Row[]) : []);
+    }
+
     // ---- users / auth ----
     if (/^SELECT id, role, display_name, phone_e164, is_active FROM users WHERE id = \$1/i.test(s)) {
       const found = this.rows('users').find((u) => u['id'] === params[0]);
@@ -732,11 +775,16 @@ export class FakeDatabase implements Database {
           code: '23505', constraint: 'payments_ride_uq',
         });
       }
+      const id = randomUUID();
       this.rows('payments').push({
-        ride_id: rideId, provider: 'CASH', status: 'CONFIRMED',
+        id, ride_id: rideId, provider: 'CASH', status: 'CONFIRMED',
         amount_iqd: String(params[1]), confirmed_by: params[2], confirmed_at: params[3],
       });
-      return this.ok([], 1);
+      // RETURNING id, because settlement now goes through `CashProvider` rather
+      // than an inline INSERT, and the provider's contract is to hand back a
+      // payment id. Returning nothing here made the fake disagree with Postgres
+      // about a column that exists in both.
+      return this.ok(/RETURNING/i.test(s) ? ([{ id }] as Row[]) : [], 1);
     }
 
     if (/^UPDATE drivers SET availability = 'ON_TRIP'/i.test(s)) {
@@ -868,12 +916,22 @@ export class FakeDatabase implements Database {
       status: 'REQUESTED',
       pickup_lat: params[1], pickup_lng: params[2], pickup_address: params[3],
       dropoff_lat: params[4], dropoff_lng: params[5], dropoff_address: params[6],
+      // Positional, and therefore coupled to the column order in
+      // `RideRepository.create`. Adding `proposed_fare_iqd` there shifted
+      // every index after it by one, and this mapping silently wrote the
+      // distance into the commission column until it was updated too.
+      //
+      // That coupling is the fake's real weakness: it restates the SQL's
+      // positional contract without being checked against it. The integration
+      // suite is what catches the drift, which is why both exist.
       estimated_fare_iqd: String(params[7]),
+      proposed_fare_iqd: params[8] === null ? null : String(params[8]),
+      agreed_fare_iqd: null,
       final_fare_iqd: null,
-      commission_bps_snapshot: params[10],
+      commission_bps_snapshot: params[11],
       commission_iqd: null,
-      estimated_distance_m: params[8],
-      estimated_duration_s: params[9],
+      estimated_distance_m: params[9],
+      estimated_duration_s: params[10],
       actual_distance_m: null,
       payment_method: 'CASH',
       requested_at: new Date(), accepted_at: null, driver_arrived_at: null,

@@ -57,7 +57,32 @@ const serverErrors = new Counter('server_errors');
 const claimLosses = new Counter('claim_losses');
 const duplicateRides = new Counter('duplicate_rides_created');
 
+/**
+ * Accept latency, split three ways, because one number was measuring three
+ * different things and reporting the worst of them.
+ *
+ * A claim race of 20 VUs x 50 iterations produces ~1000 accepts of which
+ * exactly ONE wins. `accept_latency_ms` averaged all of them, so its p95 was
+ * always the tail of the LOSING path - and the two losing paths are not even
+ * the same shape:
+ *
+ *   win     - claim acquired, transaction commits, ride assigned. One sample.
+ *   lose_fast - the claim key is held by the winner, so `SET NX` fails and the
+ *             request returns 409 without touching Postgres.
+ *   lose_slow - the winner's claim has since expired (30s TTL), so `SET NX`
+ *             SUCCEEDS, the request opens a transaction, takes a FOR UPDATE
+ *             row lock, finds no pending offer, rolls back and releases the
+ *             claim. Strictly more work than a win that fails at the end.
+ *
+ * Reporting them together made a healthy system look slower than a broken one:
+ * a degraded run where Redis was timing out returned `lose_fast` for almost
+ * everything and scored 161 ms, while a healthy run does the real work and
+ * scores 748 ms. The number went up because the system started working.
+ */
 const acceptLatency = new Trend('accept_latency_ms');
+const acceptWin = new Trend('accept_win_ms');
+const acceptLoseFast = new Trend('accept_lose_fast_ms');
+const acceptLoseSlow = new Trend('accept_lose_slow_ms');
 const locationLatency = new Trend('location_ingest_ms');
 const errorRate = new Rate('errors');
 
@@ -124,21 +149,39 @@ function authHeaders(token) {
 }
 
 /**
- * Tokens are read from the environment rather than minted here.
+ * Tokens come from `scripts/load-fixtures.mjs`, not from a sign-in inside the
+ * test - signing in here would measure Firebase's latency instead of ours.
  *
- * Seed them with `pnpm --filter @rideapp/api seed` and export
- * K6_DRIVER_TOKENS / K6_RIDER_TOKENS as comma-separated lists. Signing in
- * inside the test would measure Firebase's latency instead of ours.
+ * Set FIXTURES to the file that script wrote. The comma-separated environment
+ * variables still work and take precedence, but they stop scaling: a JWT is
+ * about 300 characters and Windows caps an environment variable at 32 KB, so
+ * anything past ~100 drivers silently truncates the list. The file has no such
+ * limit, and the same file feeds `realtime.load.js`.
  */
-const DRIVER_TOKENS = (__ENV.K6_DRIVER_TOKENS || '').split(',').filter(Boolean);
-const RIDER_TOKENS = (__ENV.K6_RIDER_TOKENS || '').split(',').filter(Boolean);
-const RACE_RIDE_ID = __ENV.K6_RACE_RIDE_ID || '';
+function fromFixtures() {
+  if (!__ENV.FIXTURES) return {};
+  try {
+    return JSON.parse(open(__ENV.FIXTURES));
+  } catch (error) {
+    throw new Error(`could not read FIXTURES at ${__ENV.FIXTURES}: ${error}`);
+  }
+}
+const FIXTURES = fromFixtures();
+
+const DRIVER_TOKENS = (__ENV.K6_DRIVER_TOKENS || '').split(',').filter(Boolean).length
+  ? (__ENV.K6_DRIVER_TOKENS || '').split(',').filter(Boolean)
+  : (FIXTURES.driverTokens || []);
+const RIDER_TOKENS = (__ENV.K6_RIDER_TOKENS || '').split(',').filter(Boolean).length
+  ? (__ENV.K6_RIDER_TOKENS || '').split(',').filter(Boolean)
+  : (FIXTURES.riderTokens || []);
+const RACE_RIDE_ID = __ENV.K6_RACE_RIDE_ID || FIXTURES.raceRideId || '';
 
 export function setup() {
   if (DRIVER_TOKENS.length === 0 || RIDER_TOKENS.length === 0) {
     throw new Error(
-      'K6_DRIVER_TOKENS and K6_RIDER_TOKENS must be set. Seed the database ' +
-        'first: pnpm --filter @rideapp/api seed',
+      'No tokens. Either set FIXTURES to the file written by ' +
+        'scripts/load-fixtures.mjs, or export K6_DRIVER_TOKENS and ' +
+        'K6_RIDER_TOKENS as comma-separated lists.',
     );
   }
   return {};
@@ -236,14 +279,31 @@ export function raceForRide() {
       authHeaders(token),
     );
 
-    acceptLatency.add(response.timings.duration);
+    const elapsed = response.timings.duration;
+    acceptLatency.add(elapsed);
     if (response.status >= 500) serverErrors.add(1);
 
     if (response.status === 200) {
       // Summed across all VUs; the threshold above requires the total to be 1.
       claimWins.add(1);
+      acceptWin.add(elapsed);
     } else if (response.status === 409) {
       claimLosses.add(1);
+      // `ride-already-claimed` means the claim key was held and the request
+      // never reached Postgres. Anything else - a transition conflict, an
+      // active-ride conflict - means it did. Read from the problem `type`
+      // rather than inferred from the timing, so the split does not depend on
+      // the thing being measured.
+      const problem = response.body || '';
+      if (problem.indexOf('ride-already-claimed') !== -1) {
+        acceptLoseFast.add(elapsed);
+      } else {
+        acceptLoseSlow.add(elapsed);
+      }
+    } else if (response.status === 404) {
+      // The offer is gone: the claim had expired, so this request DID open a
+      // transaction before being refused.
+      acceptLoseSlow.add(elapsed);
     }
 
     check(response, {
@@ -309,8 +369,13 @@ Throughput and failures
   an active ride. Both are the system working.
 
 Latency
+  http_req_duration p50 : ${num('http_req_duration', 'med')} ms
   http_req_duration p95 : ${num('http_req_duration', 'p(95)')} ms
-  accept            p95 : ${num('accept_latency_ms', 'p(95)')} ms
+  http_req_duration max : ${num('http_req_duration', 'max')} ms
+  accept  (all)     p95 : ${num('accept_latency_ms', 'p(95)')} ms
+  accept  win       p95 : ${num('accept_win_ms', 'p(95)')} ms
+  accept  lose fast p95 : ${num('accept_lose_fast_ms', 'p(95)')} ms
+  accept  lose slow p95 : ${num('accept_lose_slow_ms', 'p(95)')} ms
   location ingest   p95 : ${num('location_ingest_ms', 'p(95)')} ms   (threshold < 200)
   location ingest   p99 : ${num('location_ingest_ms', 'p(99)')} ms   (threshold < 500)
 

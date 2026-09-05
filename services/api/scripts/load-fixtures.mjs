@@ -65,9 +65,15 @@ const tokens = new TokenService(SECRET, new SystemClock(), 3600, 86_400);
 const driverIds = Array.from({ length: DRIVERS }, (_, i) => idFor('driver', i));
 const riderIds = Array.from({ length: RIDERS }, (_, i) => idFor('rider', i));
 
-// Phone numbers stay inside the +96477000001xx block the tests use. A load
-// fixture is exactly where somebody's real mobile ends up committed.
-const phone = (n) => `+9647700001${String(n).padStart(3, '0')}`;
+// Phone numbers stay inside the reserved test block. A load fixture is exactly
+// where somebody's real mobile ends up committed.
+//
+// Four trailing digits, not three. Drivers and riders share this counter, and
+// the three-digit form gave the pair only 1000 slots between them - past that
+// it produced an eleven-digit number and every INSERT failed the E.164 CHECK
+// with an error that named the constraint rather than the cause. The WebSocket
+// load test needs 1000 drivers on its own.
+const phone = (n) => `+964770001${String(n).padStart(4, '0')}`;
 
 let n = 0;
 for (const id of driverIds) {

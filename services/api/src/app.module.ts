@@ -20,6 +20,7 @@ import { AuthController } from './http/auth.controller.js';
 import { AuthGuard } from './http/auth.guard.js';
 import { RateLimitGuard } from './http/rate-limit.js';
 import { DriverController } from './http/driver.controller.js';
+import { NegotiationController } from './http/negotiation.controller.js';
 import { OpsController } from './http/ops.controller.js';
 import { RidesController } from './http/rides.controller.js';
 import { IdempotencyService } from './idempotency/idempotency.service.js';
@@ -38,8 +39,12 @@ import {
 } from './payments/payment-provider.js';
 import { DriverComplianceService } from './compliance/driver-compliance.service.js';
 import { PlatformConfigService } from './platform-config/platform-config.service.js';
+import { CapabilityService } from './capabilities/capability.service.js';
+import { NegotiationService } from './negotiation/negotiation.service.js';
+import { SubscriptionService } from './subscriptions/subscription.service.js';
 import { IoRedisAdapter } from './redis/ioredis-adapter.js';
 import { REDIS, type RedisPort } from './redis/redis.port.js';
+import { RideDispatcher } from './matching/ride-dispatcher.js';
 import { RealtimeGateway } from './realtime/realtime.gateway.js';
 import { RideStateMachine } from './rides/ride-state-machine.js';
 import { RideRepository } from './rides/ride.repository.js';
@@ -127,6 +132,23 @@ export class AppModule {
       config.DRIVER_PRESENCE_TTL_SECONDS,
     );
 
+    // Constructed BEFORE RideService so ride events have somewhere to go. It
+    // used to be built after, which is part of why nothing ever published to
+    // it: there was no way to hand it to the service that produces the events.
+    const realtime = new RealtimeGateway(tokens, redis, logger);
+
+    // Built BEFORE RideService, because settlement goes through it.
+    //
+    // It was constructed here and injected into nothing: the seam CLAUDE.md §7
+    // exists to prove had never carried a payment, because `RideService`
+    // inlined the cash path instead. Passing it in is what makes §7's promise -
+    // "adding ZainCash means implementing three methods" - a tested claim
+    // rather than an assertion in a comment.
+    const payments = new PaymentProviderRegistry([
+      new CashProvider(ledger),
+      new GatewayProvider(),
+    ]);
+
     const rideService = new RideService(
       database,
       rideRepository,
@@ -137,6 +159,8 @@ export class AppModule {
       platformConfig,
       clock,
       logger,
+      realtime,
+      payments,
     );
 
     // Document compliance. Reads its policy from platform_config, so an owner
@@ -155,6 +179,36 @@ export class AppModule {
       }),
     );
 
+    // The one place that answers "may this user drive" (CLAUDE.md §1.1).
+    //
+    // Built AFTER compliance because it composes it rather than repeating it:
+    // documents are one of six conditions, and the other five live in columns
+    // this service joins. Nothing else in the codebase should re-derive the
+    // answer - a second derivation is a second thing to keep in step.
+    const subscriptions = new SubscriptionService(ledger, clock);
+
+    const capabilities = new CapabilityService(database, compliance, clock, () =>
+      platformConfig.subscriptionRequired(database),
+    );
+
+    // Negotiation. Registered in no module until now, while
+    // docs/api-contract.yaml documented three endpoints for it - so the
+    // contract promised paths that answered 404 and 600 tested lines were
+    // unreachable. `negotiation_enabled` ships FALSE, so wiring it changes
+    // nothing for anyone until an owner switches it on; every method answers
+    // 501 before that.
+    const negotiation = new NegotiationService(
+      database,
+      rideRepository,
+      stateMachine,
+      claims,
+      platformConfig,
+      capabilities,
+      clock,
+      realtime,
+      logger,
+    );
+
     const matching = new MatchingService(
       database,
       rideRepository,
@@ -168,15 +222,12 @@ export class AppModule {
       compliance,
     );
 
-    const idempotency = new IdempotencyService(clock, config.IDEMPOTENCY_TTL_SECONDS);
+    const idempotency = new IdempotencyService(clock, config.IDEMPOTENCY_TTL_SECONDS, logger);
 
-    const payments = new PaymentProviderRegistry([
-      new CashProvider(ledger),
-      new GatewayProvider(),
-    ]);
-
-    const realtime = new RealtimeGateway(tokens, redis, logger);
     const queues = new QueueRegistry(createConnection(config.REDIS_URL));
+
+    // Wired at last: this is what turns a created ride into an offered one.
+    const dispatcher = new RideDispatcher(queues, logger);
 
     return {
       module: AppModule,
@@ -185,6 +236,7 @@ export class AppModule {
         RidesController,
         DriverController,
         AdminController,
+        NegotiationController,
         OpsController,
       ],
       providers: [
@@ -205,6 +257,9 @@ export class AppModule {
         { provide: FareCalculator, useValue: fare },
         { provide: PlatformConfigService, useValue: platformConfig },
         { provide: DriverComplianceService, useValue: compliance },
+        { provide: CapabilityService, useValue: capabilities },
+        { provide: SubscriptionService, useValue: subscriptions },
+        { provide: NegotiationService, useValue: negotiation },
         { provide: RideStateMachine, useValue: stateMachine },
         { provide: RideRepository, useValue: rideRepository },
         { provide: RideClaimService, useValue: claims },
@@ -214,6 +269,7 @@ export class AppModule {
         { provide: IdempotencyService, useValue: idempotency },
         { provide: PaymentProviderRegistry, useValue: payments },
         { provide: RealtimeGateway, useValue: realtime },
+        { provide: RideDispatcher, useValue: dispatcher },
         { provide: QueueRegistry, useValue: queues },
 
         AuthGuard,

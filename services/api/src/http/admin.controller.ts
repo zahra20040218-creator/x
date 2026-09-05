@@ -28,7 +28,15 @@ import { DATABASE, isUniqueViolationOn, type Database } from '../db/db.port.js';
 import { IdempotencyService } from '../idempotency/idempotency.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { iqd, signedIqd } from '../money/iqd.js';
-import { PlatformConfigService, type ConfigKey } from '../platform-config/platform-config.service.js';
+import {
+  PlatformConfigService,
+  type BooleanConfigKey,
+  type ConfigKey,
+} from '../platform-config/platform-config.service.js';
+import {
+  SubscriptionService,
+  type DriverSubscription,
+} from '../subscriptions/subscription.service.js';
 import { RideRepository } from '../rides/ride.repository.js';
 import { CurrentUser, Roles } from './auth.guard.js';
 import { RateLimit } from './rate-limit.js';
@@ -41,6 +49,7 @@ import {
   RecordDriverDocumentSchema,
   ResolveDisputeSchema,
   TopUpWalletSchema,
+  GrantSubscriptionSchema,
   UpdateConfigSchema,
   UpdateDriverSchema,
 } from './schemas.js';
@@ -68,6 +77,7 @@ export class AdminController {
     private readonly idempotency: IdempotencyService,
     private readonly audit: AuditService,
     private readonly tokens: TokenService,
+    private readonly subscriptions: SubscriptionService,
   ) {}
 
   // -------------------------------------------------------------------------
@@ -354,6 +364,92 @@ export class AdminController {
         });
 
         return { status: 201, value: wallet };
+      },
+    );
+
+    response.status(outcome.fresh ? 201 : 200);
+    return outcome.value;
+  }
+
+  /**
+   * Sell a driver a subscription period, collected in cash by the operator.
+   *
+   * This is the ONLY way a subscription comes into existence in v1, and it is
+   * deliberately an admin action. There is no live payment rail: CLAUDE.md §2
+   * keeps one out of scope, and DECISIONS.md D-019 records why it stays out
+   * until there are drivers already paying. The operator takes the notes and
+   * records the fact here.
+   *
+   * Idempotency, for the same reason the top-up above has it and with more at
+   * stake: the ledger is append-only (CLAUDE.md §6.3), so a duplicate charge
+   * could never be deleted, only offset by a second transaction that a driver
+   * reading their statement would have to be talked through.
+   *
+   * Everything below - expiring the outgoing period, inserting the new one,
+   * writing the balanced pair, and the audit row - happens in ONE transaction.
+   * A period with no charge, or a charge with no period, is not a state any
+   * retry can repair.
+   */
+  @Post('drivers/:driverId/subscription')
+  // Money movement, same bucket as a top-up. An operator sells a handful a day;
+  // anything faster is a stuck script or a compromised admin session.
+  @RateLimit({ limit: 30, windowSeconds: 60, by: 'user', tier: 'CRITICAL' })
+  async grantSubscription(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Param('driverId') driverId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body(zodBody(GrantSubscriptionSchema))
+    body: { planCode: string; chargeIqd?: number; note?: string },
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const id = requireUuid(driverId);
+    const key = IdempotencyKeySchema.safeParse(idempotencyKey);
+    if (!key.success) {
+      throw new ValidationProblem([
+        { path: 'Idempotency-Key', message: 'A UUID Idempotency-Key header is required.' },
+      ]);
+    }
+
+    const outcome = await this.idempotency.run(
+      this.db,
+      {
+        userId: admin.id,
+        endpoint: 'POST /admin/drivers/subscription',
+        key: key.data,
+        body: { id, ...body },
+      },
+      async () => {
+        const subscription = await this.db.transaction(async (tx) => {
+          const exists = await tx.query(`SELECT 1 FROM drivers WHERE user_id = $1`, [id]);
+          if (exists.rowCount === 0) throw new NotFoundProblem('Driver');
+
+          const granted = await this.subscriptions.grant(tx, {
+            driverId: id,
+            planCode: body.planCode,
+            ...(body.chargeIqd !== undefined ? { chargeIqd: body.chargeIqd } : {}),
+            ...(body.note ? { note: body.note } : {}),
+          });
+
+          await this.audit.record(tx, {
+            actorId: admin.id,
+            actorRole: 'ADMIN',
+            action: AUDIT_ACTIONS.subscriptionGrant,
+            targetType: 'driver',
+            targetId: id,
+            result: 'SUCCESS',
+            // Amounts and ids only (CLAUDE.md §9). No name, no phone.
+            metadata: {
+              planCode: granted.planCode,
+              chargedIqd: granted.chargedIqd,
+              expiresAt: granted.expiresAt.toISOString(),
+              ...(granted.transactionId ? { transactionId: granted.transactionId } : {}),
+            },
+          });
+
+          return granted;
+        });
+
+        return { status: 201, value: presentSubscription(subscription) };
       },
     );
 
@@ -700,10 +796,43 @@ export class AdminController {
   @RateLimit({ limit: 30, windowSeconds: 60, by: 'user', tier: 'CRITICAL' })
   async updateConfig(
     @CurrentUser() admin: AuthenticatedUser,
-    @Body(zodBody(UpdateConfigSchema)) body: Partial<Record<ConfigKey, number>>,
+    @Body(zodBody(UpdateConfigSchema))
+    body: Partial<Record<ConfigKey, number>> & Partial<Record<BooleanConfigKey, boolean>>,
   ) {
+    // Split the payload by kind. Numeric keys are bounded config read as one
+    // cached object on the fare path; the policy switches are independent
+    // 'true'/'false' rows, and `update()` throws on them as unknown keys - which
+    // is why `subscription_required` was reachable only through psql.
+    const flags: Partial<Record<BooleanConfigKey, boolean>> = {};
+    const numbers: Partial<Record<ConfigKey, number>> = {};
+    for (const [key, value] of Object.entries(body)) {
+      if (typeof value === 'boolean') {
+        flags[key as BooleanConfigKey] = value;
+      } else if (typeof value === 'number') {
+        numbers[key as ConfigKey] = value;
+      }
+    }
+
     const before = await this.config.read(this.db);
-    const after = await this.config.update(this.db, body, admin.id);
+    const beforeFlags: Partial<Record<BooleanConfigKey, boolean>> = {};
+    for (const key of Object.keys(flags) as BooleanConfigKey[]) {
+      // Read before writing so the audit row carries both sides. "Subscriptions
+      // were required" is not actionable; "went from off to on at 03:14 by this
+      // admin" is - and this switch can put every driver in the city offline.
+      beforeFlags[key] =
+        key === 'subscription_required'
+          ? await this.config.subscriptionRequired(this.db)
+          : await this.config.negotiationEnabled(this.db);
+    }
+
+    for (const [key, value] of Object.entries(flags) as Array<[BooleanConfigKey, boolean]>) {
+      await this.config.setFlag(this.db, key, value, admin.id);
+    }
+
+    const after =
+      Object.keys(numbers).length > 0
+        ? await this.config.update(this.db, numbers, admin.id)
+        : before;
 
     // Both values recorded. "Commission changed" is not actionable; "commission
     // went from 0 to 2500 bps at 03:14 by this admin" is.
@@ -715,16 +844,24 @@ export class AdminController {
       targetId: Object.keys(body).join(','),
       result: 'SUCCESS',
       metadata: {
-        changes: Object.fromEntries(
-          Object.keys(body).map((key) => [
-            key,
-            { from: before[key as ConfigKey], to: after[key as ConfigKey] },
-          ]),
-        ),
+        changes: {
+          ...Object.fromEntries(
+            Object.keys(numbers).map((key) => [
+              key,
+              { from: before[key as ConfigKey], to: after[key as ConfigKey] },
+            ]),
+          ),
+          ...Object.fromEntries(
+            Object.entries(flags).map(([key, value]) => [
+              key,
+              { from: beforeFlags[key as BooleanConfigKey], to: value },
+            ]),
+          ),
+        },
       },
     });
 
-    return after;
+    return { ...after, ...flags };
   }
 }
 
@@ -825,4 +962,23 @@ function toDateOnly(value: Date): string {
   const m = String(value.getMonth() + 1).padStart(2, '0');
   const d = String(value.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
+}
+
+/**
+ * Dates as ISO strings, amounts as plain integers.
+ *
+ * CLAUDE.md §8 stores UTC and displays Asia/Baghdad - the wire format is UTC
+ * ISO-8601 and the client localises. Serialising the domain object directly
+ * would leak `Date` objects whose JSON shape depends on the serialiser.
+ */
+function presentSubscription(s: DriverSubscription) {
+  return {
+    id: s.id,
+    planCode: s.planCode,
+    status: s.status,
+    chargedIqd: s.chargedIqd,
+    startedAt: s.startedAt.toISOString(),
+    expiresAt: s.expiresAt.toISOString(),
+    transactionId: s.transactionId,
+  };
 }

@@ -13,7 +13,9 @@ import {
 import type { Response } from 'express';
 
 import type { AuthenticatedUser } from '../auth/auth.service.js';
-import { ConflictProblem, DriverNotCompliantProblem, NotFoundProblem } from '../common/problem.js';
+import { ConflictProblem, DriverNotCompliantProblem, NotFoundProblem,
+  DriverModeUnavailableProblem,
+} from '../common/problem.js';
 import { DATABASE, type Database } from '../db/db.port.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { DriverPresenceService } from '../matching/driver-presence.service.js';
@@ -32,6 +34,8 @@ import {
 import { requireUuid } from './rides.controller.js';
 import { decodeKeysetCursor, nextKeysetCursor } from './cursor.js';
 import { DriverComplianceService } from '../compliance/driver-compliance.service.js';
+import { CapabilityService } from '../capabilities/capability.service.js';
+import { SubscriptionService } from '../subscriptions/subscription.service.js';
 import { zodBody } from './zod.pipe.js';
 
 /** Driver-side endpoints. Every path is in `docs/api-contract.yaml`. */
@@ -44,6 +48,8 @@ export class DriverController {
     private readonly presence: DriverPresenceService,
     private readonly ledger: LedgerService,
     private readonly compliance: DriverComplianceService,
+    private readonly capabilities: CapabilityService,
+    private readonly subscriptions: SubscriptionService,
     @Inject(DATABASE) private readonly db: Database,
   ) {}
 
@@ -96,14 +102,28 @@ export class DriverController {
       // afterwards would leave the driver in the Redis geo set - matchable, and
       // holding a slot no dispatch can use.
       //
-      // No-op unless an owner has configured a document policy; see
-      // DriverComplianceService.
-      const verdict = await this.compliance.evaluate(this.db, user.id);
-      if (!verdict.compliant) {
-        throw new DriverNotCompliantProblem(
-          verdict.missing,
-          verdict.expired,
-          verdict.rejected,
+      // The full capability check, not documents alone (CLAUDE.md §1.1). With
+      // rider and driver in one app, "may this account drive" has six
+      // conditions - banned, driver row, approval, suspension, documents,
+      // subscription - and this endpoint is where a client that flipped its own
+      // mode arrives. Checking only documents here was correct while the driver
+      // app was a separate binary that only approved drivers were given; it is
+      // not correct now.
+      //
+      // DOCUMENTS_INCOMPLETE keeps its existing 422 shape so the driver app's
+      // current handling still works; everything else is a 403.
+      const capability = await this.capabilities.evaluate(user.id, this.db);
+      if (!capability.driver.allowed) {
+        if (capability.driver.blockers.includes('DOCUMENTS_INCOMPLETE')) {
+          throw new DriverNotCompliantProblem(
+            capability.driver.missingDocuments,
+            capability.driver.expiredDocuments,
+            capability.driver.rejectedDocuments,
+          );
+        }
+        throw new DriverModeUnavailableProblem(
+          capability.driver.blockers,
+          capability.driver.suspendedReason,
         );
       }
 
@@ -197,13 +217,37 @@ export class DriverController {
     };
   }
 
-  /** CLAUDE.md §5.1 - exactly one concurrent caller can succeed. */
+  /**
+   * CLAUDE.md §5.1 - exactly one concurrent caller can succeed.
+   *
+   * ## The capability check, and where it deliberately stops
+   *
+   * §1.1 says the server checks on every driver-scoped call. That was true of
+   * two: going online, and placing a bid. Accepting a ride - the moment a
+   * driver takes on new work and a rider starts waiting for them - was not
+   * checked at all, so a client that had gone online before a suspension, or
+   * one that never called `PUT /driver/availability` in the first place, could
+   * accept. Going online is not a gate a determined client has to pass through.
+   *
+   * The check does NOT extend to `arrived`, `start` or `complete`, and that is
+   * a decision rather than an omission. Those are transitions on work already
+   * accepted, with a rider in the car. Refusing `complete` because a
+   * subscription lapsed mid-trip would strand the rider AND block settlement,
+   * so the platform would lose the fare to enforce a rule about the next fare.
+   * The gate belongs where new work is taken on, not on the way out of work
+   * already underway.
+   *
+   * Checked BEFORE the Redis claim. Claiming first and refusing after would
+   * burn the claim on a driver who may not have it, and every other candidate
+   * would get 409 for a ride nobody won.
+   */
   @Post('rides/:rideId/accept')
   // A driver racing for a ride may legitimately tap more than once. The Redis
   // claim decides the winner; this only stops a scripted flood.
   @RateLimit({ limit: 60, windowSeconds: 60, by: 'user', tier: 'STANDARD' })
   @HttpCode(200)
   async accept(@CurrentUser() user: AuthenticatedUser, @Param('rideId') rideId: string) {
+    await this.capabilities.requireDriver(user.id);
     const ride = await this.rides.acceptRide(requireUuid(rideId), user.id);
     return presentRide(ride);
   }
@@ -318,6 +362,31 @@ export class DriverController {
         color: row.vehicle_color,
       },
     };
+  }
+
+  /**
+   * The plans a driver may buy.
+   *
+   * Readable whether or not `subscription_required` is on. A driver should be
+   * able to see what a subscription costs before it gates anything, and hiding
+   * the price until the moment it blocks them is how a gate reads as a
+   * punishment rather than a term.
+   */
+  @Get('driver/subscription/plans')
+  async listPlans(@CurrentUser() _user: AuthenticatedUser) {
+    return { plans: await this.subscriptions.listPlans(this.db) };
+  }
+
+  /**
+   * The caller's own live period, or null.
+   *
+   * Scoped to the authenticated user and not to a path parameter: there is no
+   * driver id to pass, so there is no id to tamper with. `@Roles('DRIVER')` on
+   * the class is what keeps a rider out.
+   */
+  @Get('driver/subscription')
+  async getMySubscription(@CurrentUser() user: AuthenticatedUser) {
+    return await this.subscriptions.currentFor(this.db, user.id);
   }
 }
 

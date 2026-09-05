@@ -90,6 +90,9 @@ describe('the real migration set', () => {
       '0008_ledger_keyset',
       '0009_keyset_indexes',
       '0010_driver_documents',
+      '0011_driver_approval_and_subscriptions',
+      '0012_fare_negotiation',
+      '0013_seed_subscription_plan',
     ]);
   });
 
@@ -128,10 +131,25 @@ describe('the real migration set', () => {
     // column a deliberate act: the new column has to be counted here, which
     // means someone re-read this test and confirmed the new column is BIGINT.
     //
-    // The six are: rides.estimated_fare_iqd, rides.final_fare_iqd,
+    // The nine are: rides.estimated_fare_iqd, rides.final_fare_iqd,
     // rides.commission_iqd, ledger_entries.amount_iqd, payments.amount_iqd,
-    // wallet_topups.amount_iqd.
-    expect(moneyColumns).toBe(6);
+    // wallet_topups.amount_iqd, and from 0011
+    // subscription_plans.price_iqd and driver_subscriptions.charged_iqd.
+    //
+    // The count moved from six to eight when subscriptions were added, which is
+    // exactly the review this pin exists to force: both new columns were read
+    // and both are BIGINT. A subscription price is money and obeys CLAUDE.md
+    // §6.1 like every other amount - whole dinars, never a decimal type.
+    //
+    // Nine after 0012 added ride_bids.amount_iqd. A bid is a price a driver
+    // committed to and is settled from, so it obeys the money rules exactly
+    // like a fare: BIGINT, whole dinars. Read and confirmed before this number
+    // was changed, which is the whole point of pinning it.
+    //
+    // Note what is NOT counted: rides.proposed_fare_iqd and
+    // rides.agreed_fare_iqd are added by ALTER TABLE, and the scan above only
+    // matches column definitions inside a CREATE. Both are BIGINT; see 0012.
+    expect(moneyColumns).toBe(9);
   });
 
   it('creates the composite index CLAUDE.md §3.4 mandates for rides', async () => {

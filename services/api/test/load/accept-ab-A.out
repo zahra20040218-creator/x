@@ -1,0 +1,41 @@
+
+=== Load test summary ===
+
+Claim race (CLAUDE.md 5.1)
+  wins   : 0
+  losses : 945
+  verdict: NO winner. Either the race ride was already accepted by an earlier
+           run - it is consumed once won, so regenerate fixtures - or
+           it is not in OFFERED state.
+
+Idempotency (CLAUDE.md 5.2)
+  duplicate rides from one key : 0   (must be 0)
+
+Throughput and failures
+  requests            : 11560
+  server errors (5xx) : 0   (threshold == 0)
+  script errors       : 0.0476   (threshold < 0.02)
+  checks passed       : 0.9517
+
+  Note: a large 4xx count is EXPECTED here and is not in any threshold. Every
+  losing driver in the race gets a 409, and so does a rider who already holds
+  an active ride. Both are the system working.
+
+Latency
+  http_req_duration p50 : 43 ms
+  http_req_duration p95 : 255 ms
+  http_req_duration max : 613 ms
+  accept  (all)     p95 : 111 ms
+  accept  win       p95 : n/a ms
+  accept  lose fast p95 : 108 ms
+  accept  lose slow p95 : 181 ms
+  location ingest   p95 : 274 ms   (threshold < 200)
+  location ingest   p99 : n/a ms   (threshold < 500)
+
+Thresholds broken: errors, location_ingest_ms, claim_wins
+
+These numbers came from a machine running k6, the API, PostgreSQL and Redis at
+once. The load generator competes with the server for the same cores, so treat
+the latencies as a pessimistic floor - they are NOT a measurement of the 4-core
+VPS the 500-user target is written against.
+time="2026-08-26T05:46:55+03:00" level=error msg="thresholds on metrics 'claim_wins, errors, location_ingest_ms' have been crossed"

@@ -342,6 +342,23 @@ paths:
                   enum: [CASH]
                   default: CASH
                   description: GATEWAY is defined in the schema but rejected in v1 (CLAUDE.md §7).
+                proposedFareIqd:
+                  type: integer
+                  minimum: 1
+                  maximum: 100000000
+                  description: |
+                    What the rider offers to pay, in whole IQD. Optional, and
+                    ignored entirely unless `negotiation_enabled` is on.
+
+                    Supplying it is what opens the ride to driver bids — without
+                    it `/rides/{rideId}/bids` has nothing to bid against, which
+                    is why bidding was unreachable through the API before this
+                    field existed.
+
+                    Bounded server-side to `negotiation_band_bps` around the
+                    metered estimate. A rider must not be able to anchor at 500
+                    IQD, and a driver must not be able to hold out for ten times
+                    the meter.
       responses:
         '201':
           description: New ride created and queued for matching.
@@ -700,6 +717,219 @@ paths:
         '409': { $ref: '#/components/responses/InvalidTransition' }
         '422': { $ref: '#/components/responses/ValidationError' }
 
+  # ---------------------------------------------------------------------------
+  # Fare negotiation
+  #
+  # Owner decision 2026-08-25, recorded in CLAUDE.md §2 SCOPE EXPANSION.
+  #
+  # This does NOT replace nearest-driver dispatch. §5.1's atomic claim still
+  # decides who gets a ride, and direct dispatch stays as the fallback when
+  # nobody bids. Negotiation adds a window, before dispatch, in which drivers
+  # commit to a price.
+  #
+  # The load-bearing idea: a driver's bid IS their acceptance. It is a binding
+  # commitment at that fare. When the rider selects one, the server takes the
+  # Redis claim on that driver's behalf and runs
+  # REQUESTED -> OFFERED -> ACCEPTED through RideStateMachine unchanged. No new
+  # transition rule, no bypass of the claim, and every existing guarantee about
+  # one-winner still holds by construction rather than by a second mechanism.
+  #
+  # Disabled by default: platform_config.negotiation_enabled is seeded 'false'.
+  # With it false these endpoints return 404 and ride creation behaves exactly
+  # as it does today.
+  # ---------------------------------------------------------------------------
+
+  /driver/ride-requests:
+    get:
+      tags: [driver]
+      operationId: listOpenRideRequests
+      summary: |
+        Open ride requests this driver may bid on.
+
+        Scoped by the driver's current Redis position and the configured search
+        radius, so a driver never sees a request they could not serve. Requires
+        the full capability check (CLAUDE.md §1.1) - a suspended, unapproved or
+        unsubscribed driver gets 403, not an empty list, so the app can say why.
+      responses:
+        '200':
+          description: Requests within range, nearest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [requests]
+                properties:
+                  requests:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/OpenRideRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: This account may not currently drive.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: Negotiation is disabled.
+
+  /rides/{rideId}/bids:
+    parameters:
+      - $ref: '#/components/parameters/RideId'
+    get:
+      tags: [rider]
+      operationId: listRideBids
+      summary: |
+        The bids on the caller's own ride, cheapest first.
+
+        Rider-only, and only their own ride - a driver reading this would learn
+        what their competitors offered.
+      responses:
+        '200':
+          description: Active bids.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [bids, proposedFareIqd]
+                properties:
+                  proposedFareIqd:
+                    type: integer
+                    description: What the rider asked for, for comparison.
+                  bids:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RideBid'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [driver]
+      operationId: placeRideBid
+      summary: |
+        Bid on a ride, or replace this driver's existing bid.
+
+        A driver has at most ONE active bid per ride, enforced by a partial
+        unique index. Bidding again supersedes the previous bid rather than
+        editing it: the history is what a fare dispute is argued from, and an
+        UPDATE destroys it.
+
+        Accepting the rider's own price is a bid at exactly that amount, not a
+        separate endpoint - one path to commit means one path to get wrong.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amountIqd]
+              properties:
+                amountIqd:
+                  type: integer
+                  description: |
+                    Whole Iraqi dinars (CLAUDE.md §6.1). Must be a multiple of
+                    fare_rounding_iqd and within the configured band around the
+                    rider's proposal, so a driver cannot bid 1 IQD to win the
+                    list and renegotiate in the car.
+                  example: 7500
+                etaSeconds:
+                  type: integer
+                  description: Driver's own estimate of time to pickup.
+      responses:
+        '201':
+          description: Bid placed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RideBid'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: This account may not currently drive.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: The ride is no longer open for bids.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The amount is outside the permitted band.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  /rides/{rideId}/bids/{bidId}/accept:
+    parameters:
+      - $ref: '#/components/parameters/RideId'
+      - name: bidId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      tags: [rider]
+      operationId: acceptRideBid
+      summary: |
+        The rider selects a bid. The ride is assigned at that fare.
+
+        Runs the driver's claim (§5.1) and then REQUESTED -> OFFERED -> ACCEPTED
+        through RideStateMachine. 409 if that driver has since taken another
+        ride, or if another of this rider's requests already resolved - the
+        existing rides_one_active_per_driver_uq index is the backstop.
+      responses:
+        '200':
+          description: Assigned. agreedFareIqd is now set on the ride.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ride'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: The bid or the driver is no longer available.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  /me/capabilities:
+    get:
+      tags: [auth]
+      operationId: getCapabilities
+      summary: |
+        What this account may do, decided by the server (CLAUDE.md §1.1).
+
+        ALY is one app with a Rider mode and a Driver mode, so the client must
+        not decide which it may enter. This returns the authoritative answer and
+        is the SAME evaluation the server enforces with - if this and the guard
+        could disagree, the app would offer a mode the server is about to
+        refuse.
+
+        Returns the FULL blocker list, not the first failure: a driver who is
+        unapproved and also missing a licence needs to see both, or they fix one
+        and learn the second only by failing again.
+      responses:
+        '200':
+          description: The caller's capabilities.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Capabilities'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /driver/wallet:
     get:
       tags: [driver]
@@ -733,6 +963,129 @@ paths:
               schema: { $ref: '#/components/schemas/LedgerEntryPage' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+
+  /driver/subscription/plans:
+    get:
+      tags: [driver]
+      operationId: listSubscriptionPlans
+      summary: |
+        The plans a driver may buy. Active plans only, cheapest first.
+
+        Readable whether or not `subscription_required` is on: a driver should
+        be able to see what a subscription costs before it gates anything, and
+        the same list is what the admin grant path charges against.
+      responses:
+        '200':
+          description: Active plans.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [plans]
+                properties:
+                  plans:
+                    type: array
+                    items: { $ref: '#/components/schemas/SubscriptionPlan' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /driver/subscription:
+    get:
+      tags: [driver]
+      operationId: getMySubscription
+      summary: |
+        The caller's live subscription, or null.
+
+        `expiresAt` is the authoritative date and is compared against the server
+        clock, not against the stored status - a status column is only as fresh
+        as the last sweep, and between two sweeps it would say ACTIVE for a
+        lapsed subscription.
+      responses:
+        '200':
+          description: The caller's subscription, or null when they have none.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DriverSubscriptionOrNull' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/drivers/{driverId}/subscription:
+    parameters:
+      - name: driverId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [admin]
+      operationId: adminGrantSubscription
+      summary: |
+        Sell a driver a subscription period, collected in cash by the operator.
+
+        This is the ONLY way a subscription is created in v1, and it is
+        deliberately an admin action rather than a self-service purchase: there
+        is no live payment rail (CLAUDE.md §2 keeps one OUT of scope, and
+        DECISIONS.md D-019 records why it stays out until there are drivers
+        paying). The operator takes the cash and records it here.
+
+        Writes, in ONE transaction: any current ACTIVE row is expired, the new
+        row is inserted, and — unless `chargeIqd` is 0 — a balanced ledger pair
+        is written DEBIT `DRIVER_WALLET` / CREDIT `PLATFORM_REVENUE`
+        (CLAUDE.md §6.2). The ledger transaction id is stored on the
+        subscription so a billing dispute can be traced to the money.
+
+        `Idempotency-Key` is REQUIRED. A retried grant must not charge twice,
+        and the ledger is append-only (CLAUDE.md §6.3) so a duplicate charge
+        could never be deleted, only offset.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [planCode]
+              properties:
+                planCode:
+                  type: string
+                  maxLength: 64
+                  description: Code of an ACTIVE plan.
+                chargeIqd:
+                  type: integer
+                  minimum: 0
+                  maximum: 100000000
+                  description: |
+                    Whole IQD actually collected. Defaults to the plan price.
+                    Pass 0 to grant a free period — no ledger rows are written,
+                    because the schema forbids a zero-amount entry and a
+                    transaction of one row could not balance.
+                note:
+                  type: string
+                  maxLength: 200
+      responses:
+        '201':
+          description: Granted.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DriverSubscription' }
+        '200':
+          description: Idempotency-Key replay; the original grant, not a second one.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DriverSubscription' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: Driver or plan not found.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '409':
+          description: Same Idempotency-Key reused with a different body.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '422': { $ref: '#/components/responses/ValidationError' }
 
   # ===========================================================================
   # ADMIN
@@ -1187,7 +1540,13 @@ paths:
               additionalProperties: true
       responses:
         '204':
-          description: Accepted (or ignored as a duplicate — both are 204 to the gateway).
+          description: |
+            Accepted. NOTE: duplicate suppression is NOT yet implemented — the
+            `payment_webhook_events` table and its unique `(provider, external_id)`
+            index exist but no code reads or writes them. A duplicate delivery is
+            therefore indistinguishable from a first one. This MUST be closed in
+            the same change that makes a gateway ledger write reachable, never
+            after it (see DECISIONS.md D-019).
         '400':
           description: Malformed payload.
           content:
@@ -1331,6 +1690,185 @@ components:
           type: array
           items: { $ref: '#/components/schemas/DriverDocumentType' }
 
+
+    RideBidStatus:
+      type: string
+      description: |
+        A bid's life. SUPERSEDED, not "edited": bidding again writes a new row
+        and marks the old one superseded, because the bid history is what a fare
+        dispute is argued from and an UPDATE destroys it.
+      enum: [ACTIVE, SUPERSEDED, WITHDRAWN, ACCEPTED, REJECTED, EXPIRED]
+
+    RideBid:
+      type: object
+      required: [id, rideId, driverId, amountIqd, status, createdAt, expiresAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        rideId:
+          type: string
+          format: uuid
+        driverId:
+          type: string
+          format: uuid
+        driver:
+          allOf:
+            - $ref: '#/components/schemas/PublicUser'
+          description: |
+            Present when a RIDER reads their own bids, so the list can be shown
+            without a second round trip. Absent when a driver reads back their
+            own bid - a driver has no business receiving another user's profile.
+        amountIqd:
+          type: integer
+          description: Whole Iraqi dinars (CLAUDE.md §6.1). Never a decimal.
+          example: 7500
+        deltaIqd:
+          type: integer
+          description: |
+            amountIqd minus the rider's proposal. Negative is cheaper than asked.
+            Computed server-side because it is the number the rider actually
+            compares against, and two clients computing it separately is two
+            chances to get the sign wrong.
+          example: -500
+        status:
+          $ref: '#/components/schemas/RideBidStatus'
+        etaSeconds:
+          type: integer
+          nullable: true
+          description: The driver's own estimate of time to pickup.
+        distanceM:
+          type: integer
+          description: Driver's distance to the pickup point when the bid was placed.
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+          description: |
+            After this the bid cannot be accepted. A price quoted twenty minutes
+            ago is not a price.
+
+    OpenRideRequest:
+      type: object
+      description: |
+        A ride a driver may bid on. Deliberately carries NO rider identity - a
+        driver decides on the trip and the price, not on who is asking, and
+        showing the rider before assignment invites exactly the discrimination
+        a marketplace should not have.
+      required:
+        [rideId, pickup, dropoff, proposedFareIqd, distanceToPickupM, estimatedDistanceM, expiresAt]
+      properties:
+        rideId:
+          type: string
+          format: uuid
+        pickup:
+          $ref: '#/components/schemas/LatLng'
+        pickupAddress:
+          type: string
+          nullable: true
+        dropoff:
+          $ref: '#/components/schemas/LatLng'
+        dropoffAddress:
+          type: string
+          nullable: true
+        proposedFareIqd:
+          type: integer
+          description: What the rider offered.
+        suggestedFareIqd:
+          type: integer
+          description: |
+            The tariff's own estimate for this trip. Shown beside the rider's
+            proposal so a driver can see at a glance whether it is fair, rather
+            than having to know the tariff by heart.
+        distanceToPickupM:
+          type: integer
+        estimatedDistanceM:
+          type: integer
+        estimatedDurationS:
+          type: integer
+        myBid:
+          allOf:
+            - $ref: '#/components/schemas/RideBid'
+          nullable: true
+          description: This driver's own active bid, if they have already placed one.
+        expiresAt:
+          type: string
+          format: date-time
+
+    CapabilityBlocker:
+      type: string
+      description: |
+        Why a mode is unavailable, machine-readable. The app localises these
+        (CLAUDE.md §8); the server never returns a translated sentence.
+
+        A client MUST tolerate an unknown value here rather than crashing - the
+        server may add a blocker before the app is updated, and the safe
+        degradation is a generic "contact support" row.
+      enum:
+        - ACCOUNT_DISABLED
+        - NOT_A_DRIVER
+        - APPROVAL_PENDING
+        - APPROVAL_REJECTED
+        - SUSPENDED
+        - DOCUMENTS_INCOMPLETE
+        - SUBSCRIPTION_REQUIRED
+
+    DriverCapability:
+      type: object
+      required: [allowed, blockers, missingDocuments, expiredDocuments, rejectedDocuments]
+      properties:
+        allowed:
+          type: boolean
+          description: True only when blockers is empty. Never set independently.
+        blockers:
+          type: array
+          items:
+            $ref: '#/components/schemas/CapabilityBlocker'
+        suspendedReason:
+          type: string
+          nullable: true
+          description: |
+            The only free text here, and the one deliberate exception to "no
+            prose from the server": it is what an administrator actually typed,
+            and a driver is entitled to read the reason they were given rather
+            than a generic refusal.
+        missingDocuments:
+          type: array
+          items:
+            $ref: '#/components/schemas/DriverDocumentType'
+        expiredDocuments:
+          type: array
+          items:
+            $ref: '#/components/schemas/DriverDocumentType'
+        rejectedDocuments:
+          type: array
+          items:
+            $ref: '#/components/schemas/DriverDocumentType'
+        subscriptionExpiresAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: |
+            Returned whether or not a subscription is currently required, so a
+            driver can see what they bought before the policy is switched on.
+
+    Capabilities:
+      type: object
+      required: [userId, canRide, driver]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        canRide:
+          type: boolean
+          description: |
+            True for any account that is not disabled. There is no "rider
+            approval" - refusing a banned account is the whole of the rider
+            rule, and inventing more would be inventing policy.
+        driver:
+          $ref: '#/components/schemas/DriverCapability'
 
     Problem:
       type: object
@@ -1542,6 +2080,47 @@ components:
           description: |
             Whole IQD. Derived as SUM(credits) - SUM(debits) over the ledger
             (CLAUDE.md §6.4). May be negative when a driver owes commission.
+
+    SubscriptionPlan:
+      type: object
+      required: [code, nameAr, nameEn, priceIqd, durationDays]
+      properties:
+        code:         { type: string, maxLength: 64 }
+        nameAr:       { type: string }
+        nameEn:       { type: string }
+        priceIqd:
+          type: integer
+          minimum: 0
+          description: Whole IQD (CLAUDE.md §6.1). Never a decimal type.
+        durationDays: { type: integer, minimum: 1 }
+
+    DriverSubscription:
+      type: object
+      required: [id, planCode, status, chargedIqd, startedAt, expiresAt]
+      properties:
+        id:         { type: string, format: uuid }
+        planCode:   { type: string }
+        status:     { type: string, enum: [ACTIVE, EXPIRED, CANCELLED] }
+        chargedIqd:
+          type: integer
+          minimum: 0
+          description: |
+            What this driver actually paid, copied at purchase. A plan's price
+            may change later; what was charged may not change with it.
+        startedAt:  { type: string, format: date-time }
+        expiresAt:  { type: string, format: date-time }
+        transactionId:
+          type: string
+          format: uuid
+          nullable: true
+          description: |
+            The ledger transaction that paid for it. Null only for a period an
+            administrator granted without charge.
+
+    DriverSubscriptionOrNull:
+      nullable: true
+      allOf:
+        - $ref: '#/components/schemas/DriverSubscription'
 
     LedgerEntry:
       type: object
