@@ -304,6 +304,66 @@ async function bootstrap(): Promise<void> {
     ),
 
     createWorker(
+      QUEUE_NAMES.locationRetention,
+      connection,
+      async () => {
+        const days = await platformConfig.locationRetentionDays(database);
+
+        // 0 means an operator explicitly chose to keep everything. Skipped
+        // without a query rather than translated into a no-op DELETE, so
+        // "retention is off" costs nothing and shows up in the logs as a
+        // decision rather than as a sweep that found nothing.
+        if (days <= 0) {
+          logger.debug(
+            { event: 'location.retention_disabled' },
+            'location retention is disabled; keeping all history',
+          );
+          return;
+        }
+
+        // Batched, and capped per run.
+        //
+        // One unbounded DELETE across a table that reaches millions of rows
+        // holds a lock long enough to stall the 30-second flush job writing to
+        // it - so the sweep would degrade exactly the thing it exists to keep
+        // healthy. 10k rows a batch, 100 batches a run: a million rows a day,
+        // which outpaces any plausible accumulation, and the run ends rather
+        // than grinding if it somehow does not.
+        const BATCH = 10_000;
+        const MAX_BATCHES = 100;
+        let deleted = 0;
+
+        for (let i = 0; i < MAX_BATCHES; i += 1) {
+          const result = await database.query(
+            `DELETE FROM driver_location_history
+              WHERE id IN (
+                SELECT id FROM driver_location_history
+                 WHERE recorded_at < now() - ($1 || ' days')::interval
+                 ORDER BY recorded_at
+                 LIMIT $2
+              )`,
+            [String(days), BATCH],
+          );
+
+          const rows = result.rowCount ?? 0;
+          deleted += rows;
+          if (rows < BATCH) break;
+        }
+
+        if (deleted > 0) {
+          // The COUNT is logged, never the rows. CLAUDE.md §9 - no exact
+          // coordinates in a log line, which is the whole reason this job
+          // exists.
+          logger.info(
+            { event: 'location.retention_swept', count: deleted, retention_days: days },
+            'deleted location history past the retention window',
+          );
+        }
+      },
+      logger,
+    ),
+
+    createWorker(
       QUEUE_NAMES.push,
       connection,
       async (job) => {

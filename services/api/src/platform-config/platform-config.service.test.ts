@@ -38,6 +38,25 @@ class FakeConfigDb implements Queryable {
       return { rows, rowCount: rows.length };
     }
 
+    // A single policy row, which is how every flag getter reads
+    // (`readBooleanFlag` / `readNumericFlag`). The fake did not model this
+    // shape at all, so every flag test silently exercised the fallback path
+    // and would have passed against a getter that ignored the database.
+    if (normalised.startsWith('SELECT VALUE FROM PLATFORM_CONFIG')) {
+      this.queries++;
+      const key = params[0] as string;
+      const value = this.rows.get(key);
+      return value === undefined
+        ? { rows: [], rowCount: 0 }
+        : { rows: [{ value } as R], rowCount: 1 };
+    }
+
+    if (normalised.startsWith('INSERT INTO PLATFORM_CONFIG')) {
+      const [key, value] = params as [string, string];
+      this.rows.set(key, value);
+      return { rows: [], rowCount: 1 };
+    }
+
     if (normalised.startsWith('UPDATE PLATFORM_CONFIG')) {
       const [value, , , key] = params as [string, Date, string, string];
       this.rows.set(key, value);
@@ -229,5 +248,59 @@ describe('PlatformConfigService', () => {
         ),
       ).resolves.toBeDefined();
     });
+  });
+});
+
+describe('location retention', () => {
+  /**
+   * `driver_location_history` is written every 30 seconds per online driver and
+   * was never deleted from. These pin the two ends of the policy, because both
+   * are dangerous in opposite directions: too short silently destroys evidence
+   * for a route dispute, and 0 restores the unbounded retention of the most
+   * sensitive data the system holds (CLAUDE.md §9).
+   */
+
+  it('defaults to 90 days when the row is absent', async () => {
+    const db = new FakeConfigDb(new Map());
+    const config = new PlatformConfigService(new FakeClock());
+
+    // Not 0. Every other policy in this repo ships disabled; this one must not,
+    // because an absent retention policy is how data accumulates forever by
+    // omission rather than by decision.
+    expect(await config.locationRetentionDays(db)).toBe(90);
+  });
+
+  it('reads an operator-set window', async () => {
+    const db = new FakeConfigDb(new Map([['location_retention_days', '30']]));
+    const config = new PlatformConfigService(new FakeClock());
+    expect(await config.locationRetentionDays(db)).toBe(30);
+  });
+
+  it('treats 0 as "keep everything", which the sweep skips entirely', async () => {
+    const db = new FakeConfigDb(new Map([['location_retention_days', '0']]));
+    const config = new PlatformConfigService(new FakeClock());
+    expect(await config.locationRetentionDays(db)).toBe(0);
+  });
+
+  it('clamps a negative value up rather than deleting the future', async () => {
+    // A negative interval would make `recorded_at < now() - (-5 days)` match
+    // rows recorded up to five days from now - which is every row in the table.
+    // Clamping, not rejecting: this is read on a background job and a bad value
+    // typed into an admin form must not become a catastrophic DELETE.
+    const db = new FakeConfigDb(new Map([['location_retention_days', '-5']]));
+    const config = new PlatformConfigService(new FakeClock());
+    expect(await config.locationRetentionDays(db)).toBe(0);
+  });
+
+  it('clamps an absurd value down to ten years', async () => {
+    const db = new FakeConfigDb(new Map([['location_retention_days', '999999']]));
+    const config = new PlatformConfigService(new FakeClock());
+    expect(await config.locationRetentionDays(db)).toBe(3650);
+  });
+
+  it('falls back to the default on a non-numeric value', async () => {
+    const db = new FakeConfigDb(new Map([['location_retention_days', 'forever']]));
+    const config = new PlatformConfigService(new FakeClock());
+    expect(await config.locationRetentionDays(db)).toBe(90);
   });
 });

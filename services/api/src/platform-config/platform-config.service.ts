@@ -241,6 +241,38 @@ export class PlatformConfigService {
    * sorts to the top of the rider's list, and renegotiates in the car with a
    * passenger who has nowhere else to go.
    */
+  /**
+   * How many days of driver location history to keep.
+   *
+   * `driver_location_history` is written every 30 seconds for every online
+   * driver and, until this existed, was never deleted. A driver working eight
+   * hours produces about 960 rows a day; fifty drivers produce 17 million rows
+   * a year, each carrying a GEOGRAPHY point.
+   *
+   * Volume is the smaller half. This is the most sensitive data the system
+   * holds - precise coordinates tied to a named person over time - and
+   * CLAUDE.md §9 will not even let it into a LOG. Keeping it forever in a table
+   * is a worse version of the thing that rule forbids, and the forthcoming PDPL
+   * (docs/IRAQ_REGULATORY.md) makes unbounded retention a legal exposure rather
+   * than only an ethical one.
+   *
+   * 90 days by default: comfortably longer than any dispute a rider or driver
+   * is going to open about a route, and short enough that the table stays a
+   * working set rather than an archive. Configurable because the right number
+   * is a policy question an owner may need to answer differently once a lawyer
+   * has looked at it.
+   *
+   * 0 disables the sweep entirely, for an operator who has been told to retain
+   * everything. It is not the default, because "keep forever" should be a
+   * decision somebody makes rather than the thing that happens by omission.
+   */
+  async locationRetentionDays(q: Queryable): Promise<number> {
+    return this.readNumericFlag(q, 'location_retention_days', 90, {
+      min: 0,
+      max: 3_650,
+    });
+  }
+
   async negotiationBandBps(q: Queryable): Promise<number> {
     return this.readNumericFlag(q, 'negotiation_band_bps', 3_000, {
       min: 0,

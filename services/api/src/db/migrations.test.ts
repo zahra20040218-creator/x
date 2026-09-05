@@ -93,6 +93,7 @@ describe('the real migration set', () => {
       '0011_driver_approval_and_subscriptions',
       '0012_fare_negotiation',
       '0013_seed_subscription_plan',
+      '0014_location_retention',
     ]);
   });
 

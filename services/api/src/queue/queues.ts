@@ -50,6 +50,16 @@ export const QUEUE_NAMES = {
    * rider has no way to have predicted.
    */
   bidExpiry: 'bid-expiry',
+  /**
+   * Delete driver location history past the retention window.
+   *
+   * Daily, not hourly: the window is measured in months, so a sweep that runs
+   * more often only competes with the flush job for the same table. Batched
+   * inside the handler for the same reason - a single unbounded DELETE over a
+   * table with millions of rows takes a lock long enough to stall the very
+   * writes that produced them.
+   */
+  locationRetention: 'location-retention',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
@@ -143,6 +153,12 @@ export class QueueRegistry {
       'sweep',
       {},
       { repeat: { every: 30_000 }, jobId: 'bid-expiry' },
+    );
+
+    await this.get(QUEUE_NAMES.locationRetention).add(
+      'sweep',
+      {},
+      { repeat: { every: 86_400_000 }, jobId: 'location-retention' },
     );
   }
 
