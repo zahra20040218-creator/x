@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, HttpCode, Inject, Patch, Post } from '@nestjs/common';
 
+import { AccountDeletionService } from '../auth/account-deletion.service.js';
 import { AuthService, type AuthenticatedUser } from '../auth/auth.service.js';
 import { DATABASE, type Database } from '../db/db.port.js';
 import { LedgerService } from '../ledger/ledger.service.js';
@@ -26,6 +27,7 @@ export class AuthController {
     // Named with a trailing underscore only because `capabilities` is also the
     // handler name below; the property is the service.
     private readonly capabilities_: CapabilityService,
+    private readonly accountDeletion: AccountDeletionService,
   ) {}
 
   @Post('auth/otp/verify')
@@ -186,6 +188,24 @@ export class AuthController {
       },
       walletBalanceIqd: await this.ledger.balanceFor(this.db, user.id),
     };
+  }
+
+  /**
+   * Erase this account, at the user's own request.
+   *
+   * Google Play requires an in-app path to account deletion, and there was
+   * none - which blocks publication on its own, independently of how finished
+   * anything else is.
+   *
+   * Rate limited hard and keyed to the user. This is destructive and
+   * irreversible, and nobody deletes their account thirty times a minute; a
+   * burst is a stuck client or a hijacked session, and either deserves a 429.
+   */
+  @Post('me/delete')
+  @RateLimit({ limit: 3, windowSeconds: 3_600, by: 'user', tier: 'CRITICAL' })
+  @HttpCode(204)
+  async deleteMe(@CurrentUser() user: AuthenticatedUser): Promise<void> {
+    await this.accountDeletion.deleteOwnAccount(user.id);
   }
 
   @Patch('me')

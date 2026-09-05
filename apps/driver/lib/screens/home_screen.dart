@@ -6,6 +6,7 @@ import 'package:rideapp_core/rideapp_core.dart';
 import 'package:rideapp_driver/location/location_service.dart';
 import 'package:rideapp_driver/screens/earnings_screen.dart';
 import 'package:rideapp_driver/screens/offer_sheet.dart';
+import 'package:rideapp_driver/screens/profile_screen.dart';
 import 'package:rideapp_driver/screens/subscription_screen.dart';
 import 'package:rideapp_driver/screens/trip_screen.dart';
 
@@ -359,6 +360,18 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => EarningsScreen(api: widget.api),
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: strings.profile,
+            icon: const Icon(Icons.person_outline),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => ProfileScreen(
+                  api: widget.api,
+                  onSignedOut: widget.onSignedOut,
+                ),
               ),
             ),
           ),

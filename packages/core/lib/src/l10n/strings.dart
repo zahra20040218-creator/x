@@ -77,6 +77,22 @@ abstract class AppStrings {
   String get displayName;
   String get save;
   String get signOut;
+
+  // --- Account deletion (Google Play requires an in-app path) --------------
+
+  String get deleteAccount;
+
+  /// The confirmation prompt. Deliberately explicit about what survives:
+  /// a user consenting to "delete everything" and later discovering their
+  /// rides are still on file has been misled, even though retaining them is
+  /// both necessary and disclosed.
+  String get deleteAccountWarning;
+
+  String get deleteAccountConfirm;
+
+  /// Shown when a ride is in progress. The server refuses, and the reason is
+  /// something the user can act on immediately.
+  String get deleteAccountBlockedByRide;
   String get earnings;
   String get todayEarnings;
   String get totalEarnings;
@@ -360,6 +376,22 @@ class ArabicStrings implements AppStrings {
   String get save => 'حفظ';
   @override
   String get signOut => 'تسجيل الخروج';
+
+  @override
+  String get deleteAccount => 'حذف الحساب';
+
+  @override
+  String get deleteAccountWarning =>
+      'سيُحذف رقم هاتفك واسمك نهائياً ولن تتمكن من استعادة الحساب. '
+      'تبقى سجلات رحلاتك ومعاملاتك المالية محفوظة بدون اسمك، '
+      'لأن القانون يلزمنا بحفظ السجلات المالية.';
+
+  @override
+  String get deleteAccountConfirm => 'نعم، احذف حسابي';
+
+  @override
+  String get deleteAccountBlockedByRide =>
+      'لا يمكن حذف الحساب أثناء رحلة جارية. أنهِ الرحلة أو ألغِها أولاً.';
   @override
   String get earnings => 'الأرباح';
   @override
@@ -767,6 +799,22 @@ class EnglishStrings implements AppStrings {
   String get save => 'Save';
   @override
   String get signOut => 'Sign out';
+
+  @override
+  String get deleteAccount => 'Delete account';
+
+  @override
+  String get deleteAccountWarning =>
+      'Your phone number and name will be permanently erased and the account '
+      'cannot be recovered. Your ride and payment records are kept without '
+      'your name, because we are required to retain financial records.';
+
+  @override
+  String get deleteAccountConfirm => 'Yes, delete my account';
+
+  @override
+  String get deleteAccountBlockedByRide =>
+      'An account cannot be deleted during a ride. Finish or cancel it first.';
   @override
   String get earnings => 'Earnings';
   @override

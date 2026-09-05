@@ -40,6 +40,7 @@ import {
 import { DriverComplianceService } from './compliance/driver-compliance.service.js';
 import { PlatformConfigService } from './platform-config/platform-config.service.js';
 import { CapabilityService } from './capabilities/capability.service.js';
+import { AccountDeletionService } from './auth/account-deletion.service.js';
 import { NegotiationService } from './negotiation/negotiation.service.js';
 import { SubscriptionService } from './subscriptions/subscription.service.js';
 import { IoRedisAdapter } from './redis/ioredis-adapter.js';
@@ -187,6 +188,11 @@ export class AppModule {
     // answer - a second derivation is a second thing to keep in step.
     const subscriptions = new SubscriptionService(ledger, clock);
 
+    // Play requires an in-app account-deletion path. It anonymises rather than
+    // deletes, because eighteen ON DELETE RESTRICT foreign keys and an
+    // append-only ledger make a real DELETE impossible by design.
+    const accountDeletion = new AccountDeletionService(database, tokens, clock);
+
     const capabilities = new CapabilityService(database, compliance, clock, () =>
       platformConfig.subscriptionRequired(database),
     );
@@ -260,6 +266,7 @@ export class AppModule {
         { provide: CapabilityService, useValue: capabilities },
         { provide: SubscriptionService, useValue: subscriptions },
         { provide: NegotiationService, useValue: negotiation },
+        { provide: AccountDeletionService, useValue: accountDeletion },
         { provide: RideStateMachine, useValue: stateMachine },
         { provide: RideRepository, useValue: rideRepository },
         { provide: RideClaimService, useValue: claims },

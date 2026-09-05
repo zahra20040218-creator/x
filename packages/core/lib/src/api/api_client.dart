@@ -369,6 +369,32 @@ class ApiClient {
         await _send<Map<String, dynamic>>('GET', '/driver/wallet'),
       );
 
+  /// Erase this account, at the user's own request.
+  ///
+  /// Google Play requires an in-app path to account deletion. It anonymises
+  /// rather than deletes - the money and the audit trail survive, pointing at
+  /// an anonymous id - and `docs/PLAY_LISTING.md` discloses exactly that.
+  ///
+  /// Throws `ApiProblem.conflict` when a ride is in progress, with `rideId` in
+  /// the problem body so the caller can offer to open it. Idempotent
+  /// otherwise: a retry after a dropped response succeeds rather than failing.
+  ///
+  /// The caller MUST clear the local session afterwards. Every token for this
+  /// account is revoked server-side by the time this returns, so a client that
+  /// keeps using its stored one will simply start getting 401s.
+  Future<void> deleteAccount() async {
+    await _send<void>('POST', '/me/delete', expectNoContent: true);
+
+    // Cleared only on success, and NOT in a `finally`.
+    //
+    // `logout` swallows its error and clears anyway, because the local clear is
+    // what protects a user on a shared handset. This is the opposite case: a
+    // 409 means the account still exists and still has a ride in progress, and
+    // wiping the session then would strand the user signed out of an account
+    // they were told was not deleted, mid-trip.
+    await _tokens.clear();
+  }
+
   /// What this account may do, decided on the server (CLAUDE.md §1.1).
   ///
   /// Called on sign-in and whenever a driver-scoped action is refused, so the

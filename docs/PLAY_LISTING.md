@@ -113,12 +113,20 @@ somebody adds the SDK.
 | Encrypted in transit? | **Yes** — `usesCleartextTraffic="false"`, and the app refuses to start on a build pointing at `http://` |
 | Can users request deletion? | **See below** |
 
-⚠️ **Account deletion is not implemented.** Play requires an in-app path OR a
-web form for account deletion, and there is neither. This blocks publication
-and it is not a documentation problem — it needs building. The cheapest
-compliant answer today is a published web form plus a manual operator process;
-the correct answer is an endpoint. Whoever submits this must not tick the box
-until one exists.
+**Account deletion: yes, in-app.** `POST /me/delete`, reachable from the
+profile screen in both Rider and Driver mode.
+
+Answer the Play question as **"users can request account deletion in the
+app"**, and disclose the retention honestly: it ANONYMISES. Phone number,
+name, Firebase identity, device tokens, sessions and driver location history
+are erased. Rides, ride events, payments and ledger entries survive, pointing
+at an anonymous id, because 18 foreign keys to `users(id)` are
+`ON DELETE RESTRICT` and `ledger_entries` is append-only with database
+triggers (CLAUDE.md §6.3). Play permits retaining what is required for
+legitimate financial purposes when it is disclosed — this is that disclosure.
+
+The in-app confirmation says the same thing in the user's own language before
+they proceed, rather than only here.
 
 ---
 
@@ -149,7 +157,6 @@ it against the real onboarding flow, not a mock.
       the single most commonly missed step.
 - [ ] Upload to **internal testing** first, never production.
 - [ ] Privacy policy URL — required, and must be live before submission.
-- [ ] Account deletion path (see the warning above).
 - [ ] Check **Android Developer Verification** status for Iraq and for your
       distribution channel. Enforcement began 2026-09-30 in four countries and
       is expanding; confirm what applies rather than trusting any summary,
@@ -161,7 +168,6 @@ Recorded here so nobody discovers it during a submission window:
 
 | Item | State |
 |---|---|
-| Account deletion | **Not built.** Blocks publication. |
 | Privacy policy | Not written. Needs a URL before submission. |
 | Firebase App Check | Not implemented — `docs/EXTERNAL_SETUP.md` §5 |
 | Crashlytics | Not integrated, so the Diagnostics answer above is currently "none" |

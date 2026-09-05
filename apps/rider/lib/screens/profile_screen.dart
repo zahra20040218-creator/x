@@ -29,6 +29,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _nameController = TextEditingController();
   bool _saving = false;
   bool _signingOut = false;
+  bool _deleting = false;
   String? _saveError;
 
   @override
@@ -105,6 +106,62 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  /// Erase this account.
+  ///
+  /// Google Play requires an in-app path to account deletion, and requires it
+  /// to be REACHABLE - an endpoint nobody can press does not satisfy the
+  /// policy. This is that path.
+  ///
+  /// Behind a confirmation that spells out what survives. A user who consents
+  /// to "delete everything" and later finds their rides still on file has been
+  /// misled, even though retaining them is both necessary (an append-only
+  /// ledger, CLAUDE.md §6.3) and disclosed.
+  Future<void> _deleteAccount() async {
+    final strings = AppStrings.of(context);
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(strings.deleteAccount),
+        content: Text(strings.deleteAccountWarning),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(strings.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            child: Text(strings.deleteAccountConfirm),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _deleting = true);
+    try {
+      await widget.api.deleteAccount();
+      if (mounted) widget.onSignedOut();
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() => _deleting = false);
+      // NOT swallowed, unlike sign-out. A 409 means the account still exists
+      // and still has a ride in progress, and treating that as success would
+      // sign the user out of an account they were told was deleted and is not.
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error.problem == ApiProblem.conflict
+                ? strings.deleteAccountBlockedByRide
+                : error.detail ?? strings.somethingWentWrong,
+          ),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final strings = AppStrings.of(context);
@@ -167,6 +224,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 // action that is hard to hit is also hard to hit on purpose.
                 minimumSize: const Size.fromHeight(48),
               ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+
+            // Below sign-out and visually quieter than it. Play requires the
+            // path to exist and be reachable; it does not require it to
+            // compete with the action almost everyone actually wants.
+            TextButton(
+              onPressed: _deleting ? null : _deleteAccount,
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.danger,
+                minimumSize: const Size.fromHeight(48),
+              ),
+              child: Text(_deleting ? strings.loading : strings.deleteAccount),
             ),
           ],
         ),

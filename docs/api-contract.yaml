@@ -284,6 +284,48 @@ paths:
   # RIDER
   # ===========================================================================
 
+  /me/delete:
+    post:
+      tags: [auth]
+      operationId: deleteOwnAccount
+      summary: |
+        Erase this account, at the user's own request.
+
+        Google Play requires an in-app path to account deletion. This is it.
+
+        **It anonymises; it does not DELETE a row.** Eighteen foreign keys point
+        at `users(id)`, all `ON DELETE RESTRICT`, and `ledger_entries` is
+        append-only with database triggers (CLAUDE.md §6.3) — a hard delete is
+        refused by the schema, and correctly, because a completed ride and its
+        ledger rows must not come to reference a person who no longer exists.
+
+        ERASED: phone number, display name, Firebase identity, device tokens,
+        refresh tokens, and the driver's location history.
+
+        RETAINED, now unattributable: ledger entries, rides, ride events and
+        payments — the money and the audit trail. Disclosed in
+        `docs/PLAY_LISTING.md`, which is what makes retaining it permissible.
+
+        Idempotent: deleting an already-deleted account returns 204, because a
+        client retrying after a dropped response must not be told it failed.
+
+        POST rather than DELETE on `/me`: the operation is not a resource
+        removal and the distinction matters to anyone reading the log.
+      responses:
+        '204':
+          description: Erased. Every session for this account is now invalid.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: |
+            A ride is in progress. Erasing a rider mid-trip leaves a driver
+            carrying a passenger the system cannot name; erasing a driver
+            mid-trip leaves a rider in a car nobody is tracking. `rideId` is in
+            the problem body so the app can offer to open it.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
   /fare/estimate:
     post:
       tags: [rider]
