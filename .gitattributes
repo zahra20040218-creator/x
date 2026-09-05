@@ -1,3 +1,8 @@
 * text=auto eol=lf
 *.png binary
 *.jpg binary
+
+# Shell scripts must stay LF. A CRLF script fails under bash with
+# "set: pipefail: invalid option name", which reads as a bash version problem
+# and is not one - it is the trailing  on the shebang line.
+*.sh text eol=lf
