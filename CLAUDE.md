@@ -18,16 +18,45 @@ If a rule here is ambiguous for the task at hand, **ask one question** rather th
 
 ## 1. Project identity
 
-**Product:** Ride-hailing platform for Baghdad, Iraq. Single city, single vehicle class, cash-first.
+**Product:** **ALY** (Arabic: **الي**) — ride-hailing platform for Baghdad, Iraq.
+Single city, single vehicle class, cash-first.
+
+> **Naming, decided 2026-08-25.** ALY is the product name in the UI, the
+> launcher, notifications, logs, README and store listings. **Package names do
+> NOT change**: `iq.rideapp.rideapp_rider` and `iq.rideapp.rideapp_driver` are
+> already registered as Firebase apps with SHA fingerprints and downloaded
+> configs. Renaming them would invalidate that work and cannot be undone after
+> the first Play upload. The merged app (§1.1) inherits the RIDER package id;
+> the driver package is retired.
 
 **Components:**
 | Component | Stack | Directory |
 |---|---|---|
-| Rider app | Flutter (Dart) | `apps/rider` |
-| Driver app | Flutter (Dart), same codebase, role flag | `apps/driver` |
+| ALY app | Flutter (Dart), rider + driver modes | `apps/aly` |
+| Rider app *(being merged into `apps/aly`)* | Flutter (Dart) | `apps/rider` |
+| Driver app *(being merged into `apps/aly`)* | Flutter (Dart) | `apps/driver` |
 | Backend API | NestJS (TypeScript) | `services/api` |
 | Admin panel | Refine (React) | `apps/admin` |
 | Infra | Docker Compose | `infra/` |
+
+### 1.1 One app, two modes — decided 2026-08-25
+
+ALY ships as **one** application with a Rider mode and a Driver mode, not two
+binaries. This reverses the original two-app split; `apps/rider` and
+`apps/driver` are being merged into `apps/aly`.
+
+**The mode is a server decision, never a client flag.** A client may not enter
+Driver mode unless the server says it may. The server checks, on every
+driver-scoped call:
+
+- driver account approved
+- required documents verified
+- vehicle verified
+- subscription valid, where a plan is required
+- account not suspended and not banned
+
+`GET /v1/me/capabilities` returns the authoritative set. The UI renders what
+that says and decides nothing itself. **Hiding a button is not authorisation.**
 
 **Shared Flutter code** lives in `packages/core` — models, API client, design system. Duplicated widget code between rider and driver is a defect.
 
@@ -44,13 +73,23 @@ If a rule here is ambiguous for the task at hand, **ask one question** rather th
 - Admin: drivers, rides, wallet top-ups, disputes, fare config
 - Arabic UI, RTL layout, IQD currency
 
+### SCOPE EXPANSION — approved by the owner, 2026-08-25
+
+Four systems moved from OUT to IN. They are approved, not assumed; each one
+changes rules elsewhere in this file and those changes are noted here.
+
+| System | What it changes |
+|---|---|
+| **Fare negotiation and driver offers** | Riders propose a fare; drivers bid. This does **not** delete nearest-driver dispatch — §5.1's atomic claim still governs who wins a ride, and direct dispatch remains the fallback when nobody bids. Bids live in their own aggregate (`ride_bids`), not inside `RideStateMachine`. |
+| **Driver subscriptions** | Periodic plans alongside commission. A subscription charge is an ordinary double-entry transaction under §6 — **not** a second money system, and **not** a mutable counter. An expired subscription blocks going online; it never edits a ledger row. |
+| **Driver KYC, documents and approval** | Drivers upload identity, licence, vehicle registration. Approval is an admin workflow. Feeds the §1.1 capability check. |
+| **iOS** | The Flutter source must build for iOS. **Building and signing an IPA requires macOS and an Apple Developer account and cannot happen on the current machine** — that part is BLOCKED, not done. |
+
 ### OUT OF SCOPE — do not build, do not scaffold, do not "prepare for"
-- iOS builds
 - In-app navigation (deep-link to Google Maps instead)
 - Live payment gateway integration (build the interface only — see §7)
 - Surge pricing, scheduled rides, ride sharing, multiple vehicle classes
 - In-app chat, SOS, referrals, promo codes
-- Driver KYC/document upload (admin creates drivers manually in v1)
 - Multi-city, multi-currency, i18n beyond Arabic + English
 
 **If asked to add anything from the OUT list, respond: "That's out of v1 scope per CLAUDE.md §2. Confirm you want to expand scope?" and wait.**

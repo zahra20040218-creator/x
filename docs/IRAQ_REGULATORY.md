@@ -102,16 +102,35 @@ recording:
 
 ## The only honest next step
 
-Three questions, to a lawyer and to the Ministry of Transport:
+Four questions, to a lawyer and to the Ministry of Transport, in this order.
 
-1. What licence does an app-based passenger transport intermediary need, and
+1. **Must the operator itself be registered — a company, with a tax number —
+   to run an app-based passenger transport intermediary at all?** Section 1
+   above reports that it must, at status *directionally confirmed,
+   procedurally unverified*. Nothing in this repository records a decision
+   either way, and this question gates every other one on the list: it decides
+   whether v1 may launch, and it binds long before any payment provider does.
+   Raised to first position on 2026-09-05 — see `DECISIONS.md` D-019, which
+   found the same question arriving from the payments side and concluded it
+   was never a payments question.
+2. What licence does an app-based passenger transport intermediary need, and
    does it differ from a taxi operator's?
-2. Are drivers required to hold verified documents that the platform must
+3. Are drivers required to hold verified documents that the platform must
    check and retain?
-3. Does Electronic Trade Regulation No. 4 of 2025 apply to a cash-settled ride
-   platform?
+4. Does Electronic Trade Regulation No. 4 of 2025 apply to a cash-settled ride
+   platform — and does the answer change once the platform collects money from
+   drivers centrally (subscriptions) rather than only recording cash between
+   rider and driver?
 
-Answers to those three determine whether v1 scope is legal as designed.
+Answers to those four determine whether v1 scope is legal as designed.
+
+**Note on payment aggregators.** A licensed Iraqi aggregator will run its own
+merchant onboarding — reportedly including business registration and a tax
+number. That is a *second* registration gate, downstream of question 1, and it
+is not worth asking about until question 1 is answered: if the operator must be
+registered anyway, the aggregator's requirement costs nothing extra; if it need
+not be, the aggregator becomes the only thing forcing registration, and the
+cash-only path avoids it entirely.
 
 ---
 

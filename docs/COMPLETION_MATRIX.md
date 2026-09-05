@@ -46,7 +46,25 @@ curl -s http://localhost:4123/v1/health/ready  # degraded, PG+Redis fail  503
 | Double-entry ledger, balanced | **DONE** | service refuses unbalanced writes; DB trigger as second layer | `ledger.service.test.ts` | `npx vitest run` | 33 pass |
 | Ledger append-only | **DONE** | service refuses; **and the DB trigger was executed** — UPDATE and DELETE both rejected on real PostgreSQL | `ledger.service.test.ts`, `real-postgres.test.ts` | `REAL_INFRA=1 vitest --project integration` | **verified 2026-08-23** |
 | Wallet balance derived, not stored | **DONE** | `SUM(credits) - SUM(debits)`; no counter column | `ledger.service.test.ts` | `npx vitest run` | pass |
-| Commission configurable, default 0, no deploy | **DONE** | TTL cache; snapshotted per ride | `platform-config.service.test.ts` | `npx vitest run` | 23 pass |
+| Commission configurable, default 0, no deploy | **DONE** | TTL cache; snapshotted per ride. Stays at 0 by decision, not oversight — uncollectable under cash payment (DECISIONS.md D-020) | `platform-config.service.test.ts` | `npx vitest run` | 23 pass |
+| **Sell a driver a subscription** | **DONE** | admin grant, cash-collected; expires the prior period and writes DEBIT `MANUAL_ADJUSTMENT` / CREDIT `PLATFORM_REVENUE` in one transaction; idempotency-keyed. One plan seeded at 25,000 IQD / 30 days (migration 0013) | `subscription.service.test.ts` | `npx vitest run` | 16 pass |
+| Subscription expiry sweep | **DONE** | hourly BullMQ job; the capability check does not depend on it (it compares `expires_at` to the clock), so a late sweep cannot let a lapsed driver work | `subscription.service.test.ts` | `npx vitest run` | 16 pass |
+| `subscription_required` switchable without a deploy | **DONE** | `PlatformConfigService.setFlag` + `PUT /admin/config`; was reachable ONLY by hand-written SQL against production | `subscription.service.test.ts` | `npx vitest run` | pass |
+| Platform revenue readable | **DONE** | `LedgerService.platformRevenue()`; `PLATFORM_REVENUE` was write-only — `balanceFor`/`entriesFor` both hardcode `DRIVER_WALLET`, so the platform could bank revenue it had no way to read | `ledger.service.test.ts` | `npx vitest run` | 33 pass |
+| Negotiated fare reaches settlement | **DONE** | `settleRide` now reads `agreed_fare_iqd`; it read `estimatedFareIqd` only, so every negotiated ride would have billed the meter price | `ride.service.test.ts` | `npx vitest run` | 52 pass |
+| Fare negotiation reachable at all | **DONE** | `NegotiationController` serves the three documented bid paths; `NegotiationService` registered in `app.module`; `POST /rides` accepts `proposedFareIqd`, clamped server-side to `negotiation_band_bps` around the meter. Ships OFF (`negotiation_enabled` false) | `api.e2e.test.ts`, `real-negotiation.test.ts` | `npx vitest run` | 5 e2e pass · **flow itself proven only under REAL_INFRA** |
+| Bid expiry sweep | **DONE** | 30s BullMQ job; the window defaults to 90s, so an hourly sweep would leave riders looking at bids the accept path refuses | — | — | **wired, unexercised without Redis** |
+| §7 seam actually carries a payment | **DONE** | `RideService.complete` settles through `PaymentProviderRegistry.get(ride.paymentMethod).charge()` instead of an inlined INSERT with `'CASH'` as a SQL literal. The registry was DI-registered and injected nowhere, so §7's "three methods" promise had never been exercised | `ride.service.test.ts`, `payment-provider.test.ts` | `npx vitest run` | 52 + 15 pass |
+| Capability gate on accepting a ride | **DONE** | `POST /rides/{id}/accept` now calls `requireDriver` before the Redis claim. Deliberately NOT extended to arrived/start/complete: refusing those mid-trip strands a rider and blocks settlement | `api.e2e.test.ts` | `npx vitest run` | pass |
+| **Driver sees WHY they are blocked** | **DONE** | `driver-mode-unavailable` added to Dart `ApiProblem` (it parsed as `unknown`, so every non-document refusal showed "something went wrong"); `ApiClient.capabilities()`; blocker copy moved out of hardcoded Arabic into `AppStrings` (§8) | `capabilities_test.dart` | `flutter test` | 16 pass · **core suite 327 pass, 0 analyze errors** |
+| **Driver subscription screen** | **DONE** | `SubscriptionScreen` mounted in the driver app bar; shows the live period, other blockers, and plan prices. No Buy button — v1 collects cash (D-019) | `flutter analyze` | `flutter analyze && flutter test` | 0 errors · driver suite 6 pass |
+| **Admin: sell a subscription** | **DONE** | inline panel under the driver row, idempotency-keyed. Without it the grant endpoint had no caller at all | — | `npx tsc --noEmit` | typechecks; **no UI test** |
+| **Admin: disputes** | **DONE** | list, filter by status, resolve with a mandatory note. Riders and drivers could open disputes since 2026-08-24 into a table no screen could read | — | `npx tsc --noEmit` | typechecks; **no UI test** |
+| **ALY builds, installs and RUNS** | **DONE** | `flutter build apk --release` → 59MB signed; `appbundle` → 57MB AAB; installed on a Pixel 6 emulator and launched — Arabic RTL sign-in renders, no crash. APK verified: package `iq.rideapp.rideapp_rider`, label `ALY`/`الي`, all three §5.3 permissions present | `aapt2 dump badging`, `apksigner verify`, `adb install` | see BLOCKED.md | **first time this app has ever been built or run** |
+| **One app, two modes (§1.1)** | **DONE (additive)** | `apps/aly` built: rider package id kept, driver §5.3 manifest merged in, launcher renamed ALY/الي, mode chosen from `/me/capabilities`. Sign-in tries DRIVER then RIDER because the server keys accounts on (phone, role) — see D-023. `apps/rider` and `apps/driver` deliberately NOT deleted | `mode_selection_test.dart` | `flutter analyze && flutter test` | 10 pass · 0 issues · **never built as an APK or run on a device** |
+| **Flutter CI job actually passes** | **DONE** | `flutter analyze` exits NON-ZERO on an info-level lint, so the job had been failing on pre-existing lints in all three packages — the same silent-red shape as `REAL_INFRA`. `dart fix --apply` plus manual fixes; every package now reports `No issues found!` and exits 0 | `flutter analyze` | `flutter analyze && flutter test` | **core 327 · rider 18 · driver 6 — all pass, 0 issues** |
+| Request path cannot hang on Redis | **DONE** | `RideDispatcher` bounds the enqueue at 3s. ioredis BUFFERS while disconnected rather than rejecting, so the existing `catch` waited for a rejection that never came — `POST /rides` hung, and 16 e2e tests timed out | `api.e2e.test.ts` | `npx vitest run` | 71 pass |
+| **Real-infra tests actually run in CI** | **DONE** | `REAL_INFRA=1` was never set, so EVERY real-infrastructure test skipped on every green run — including the §5.1 atomic-claim proof. Guard now fails on any skip | `.github/workflows/ci.yml` | CI | **unverified on this host — no Docker** |
 | Ride state machine, illegal transitions fail | **DONE** | 16 rules; all 121 pairs walked; 409 not silent | `ride-state-machine.test.ts` | `npx vitest run` | 28 pass |
 | double accept / double start / double complete | **DONE** | exhaustive pair table + service-level guards | `ride-state-machine.test.ts`, `ride.service.test.ts` | `npx vitest run` | pass |
 | **two drivers accepting same ride** | **DONE** | 1,000 concurrent claims — 20 rounds x 50 drivers — with a counter inside the critical section that never exceeded 1 | `real-redis-claim.test.ts` | `REAL_INFRA=1 vitest` | **vs genuine Redis 8.0.5** |
@@ -86,7 +104,9 @@ curl -s http://localhost:4123/v1/health/ready  # degraded, PG+Redis fail  503
 | **Security headers** | **DONE** | CSP `default-src 'none'`, HSTS 180d, nosniff, DENY, no X-Powered-By | live response | `curl -sD - /v1/health` | **7 headers verified on the binary** |
 | **Admin audit log** | **DONE** | actor/action/target/result/correlationId; failures recorded; PII scrubbed | `audit.service.test.ts`, `api.e2e.test.ts` | `npx vitest run` | 12 pass |
 | PII never logged | **DONE** | structural redaction at depth; coords coarsened to ~110 m | `logger.test.ts` | `npx vitest run` | 38 pass |
-| Webhook signature | **DONE** | HMAC over raw bytes, `timingSafeEqual`, checked before parsing | `webhook.test.ts` | `npx vitest run` | pass |
+| Webhook signature | **DONE** | HMAC over raw bytes, `timingSafeEqual`, checked before parsing; now also exercised over real HTTP with a secret configured | `webhook.test.ts`, `webhook.e2e.test.ts` | `npx vitest run` | 47 + 8 pass |
+| Webhook rejection status codes | **DONE** | 401 bad/missing signature, 400 malformed, reason not disclosed; was 501 for every rejection, which contradicted the contract and made a retrying provider loop forever | `webhook.e2e.test.ts` | `npx vitest run` | 8 pass |
+| **Webhook replay dedup** | **ABSENT** | `payment_webhook_events` and its UNIQUE `(provider, external_id)` exist; NO code reads or writes them. `docs/security-audit.md` claimed this was in place — corrected 2026-09-05. Latent, not live: the handler 501s before any ledger write. MUST land in the same change that makes a gateway write reachable — DECISIONS.md D-019 | — | — | **not implemented** |
 | CORS allowlist, wildcard refused | **DONE** | `loadConfig` throws on `*` | `config.test.ts` | `npx vitest run` | pass |
 | Secrets in ENV only | **DONE** | no secret in repo; `.env.example` committed | grep scan | see below | 0 hits |
 
@@ -123,6 +143,11 @@ $ grep -rnE "\+9647[0-9]{9}" services/api/src --include=*.ts | grep -v .test.
 | **Push registration (FCM client)** | **PARTIAL** | fetch, register, rotation, unregister on sign-out; 13 tests over a fake token source | 13 | `flutter test` | **no real FCM credentials, so never exercised against Firebase** |
 | **Driver sign-out** | **DONE** | goes offline before revoking, so no offers reach an unwatched phone | — | `flutter analyze` | **did not exist before** |
 | **Map picker (M-3)** | **PARTIAL** | real `GoogleMap`, 8 states, no crash without a key | `map_state_test.dart`, `location_gate_test.dart` | `flutter test` | 19 pass · **never rendered on a device** |
+| **Ride dispatch** | **DONE** | `POST /rides` created a ride and NOTHING ever offered it - `dispatch` was reachable only from tests. Now queued on creation, consumed by the worker | e2e against the live API | `scripts/dispatch-e2e-check.mjs` | **the product did not work before this** |
+| **Realtime delivery** | **DONE** | gateway was attached and nothing published to it; both apps polled. Server now publishes `ride.offer` and `ride.status_changed` | 3 e2e | `vitest` | **offer arrives in 36-66ms vs a 5s poll** |
+| **Realtime client (apps)** | **DONE** | shared `RealtimeClient` with exponential backoff, resync-on-reconnect, and no retry on a refused token | 11 against a real WebSocket server | `flutter test` | **driver app had no socket at all** |
+| **WebSocket crash** | **DONE** | any client connecting killed the API process - `redis.duplicate()` inherited `enableOfflineQueue:false` | — | reproduced and re-verified live | **trivial denial of service** |
+| **Matching < 3s** | **DONE** | measured request-to-offer on a real driver socket | 3 runs: 66 / 45 / 36 ms | `scripts/dispatch-e2e-check.mjs` | **single user, not under load** |
 | **Release signing** | **DONE** | upload keystore per app, outside the repo, gitignored; Gradle fails the build rather than falling back to the debug key | — | built and `keytool -printcert` on the bundle | **verified: `CN=Darb`, not `CN=Android Debug`** |
 | **Release AAB** | **DONE** | both apps; `scripts/build-release.sh` refuses to build without https/wss endpoints | — | `aapt2` + signature check | **58,305,563 bytes, upload-signed** |
 | **Disputes (rider/driver)** | **DONE** | endpoint existed with no caller in either app; now reachable from the receipt and the trip screen | 7 e2e + 9 widget | `vitest` + `flutter test` | **the admin queue could only ever be empty before** |
@@ -147,7 +172,6 @@ $ grep -rnE "\+9647[0-9]{9}" services/api/src --include=*.ts | grep -v .test.
 |---|---|---|---|---|---|
 | Load test 500+ concurrent | **DONE** | k6 v0.54.0, 400 driver VUs + 120 rides/min + 20 racers, 5 min, against real PostgreSQL and Redis | claim 1 win/961 losses, 0 duplicate rides, 0 5xx at pool 50 | `k6 run` | **found pool exhaustion at the default 10: 8x500. See docs/REAL_INFRA_SETUP.md** |
 | API p95 < 200ms | **PARTIAL** | measured 161ms p95 (location ingest 164ms) with pool=50 | — | `k6 run` | **on a laptop sharing cores with the load generator, NOT the 4-core VPS** |
-| Matching < 3s | **BLOCKED** | — | — | needs load test | **unmeasured** |
 | Redis unavailable → degrade | **DONE** | readiness 503; limiter fails open with a warn | — | `node dist/main.js` no Redis | **verified: 13/13 fail-open events** |
 | DB unavailable → degrade | **DONE** | API starts, liveness serves, readiness 503 | — | `node dist/main.js` no PG | **verified** |
 | Queue delayed / WS disconnect / FCM down | **PARTIAL** | reconnect + polling fallback in client code | **none** | — | **untested** |
@@ -158,11 +182,11 @@ $ grep -rnE "\+9647[0-9]{9}" services/api/src --include=*.ts | grep -v .test.
 
 | Status | Count | Change |
 |---|---|---|
-| **DONE** — built, tested, and I ran it | **56** |
+| **DONE** — built, tested, and I ran it | **61** |
 | **PARTIAL** — works but not fully verified, or scope-limited | **8** |
-| **BLOCKED** — needs a device, k6, Docker, or an owner decision | **5** |
+| **BLOCKED** — needs a device, k6, Docker, or an owner decision | **4** |
 | **FAILED** — missing code, not a missing tool | **0** |
-| **Total rows** | **69** |
+| **Total rows** | **73** |
 
 **Counted by machine from the rows above**, not by hand:
 

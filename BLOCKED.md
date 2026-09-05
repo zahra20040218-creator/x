@@ -12,7 +12,43 @@ that is not installed.
 
 ---
 
-## Root cause: four toolchains are absent
+## CORRECTION, 2026-09-05 - the Flutter half of this was WRONG
+
+Flutter and Dart were installed all along, at `C:\Users\moaay\flutter\bin`, and
+simply not on `PATH`. So was the Android SDK (36.1.0), with three emulators and
+a signing keystore. The probe below only ever tested `PATH`, and one negative
+result was written up as an absent toolchain.
+
+What that mistake cost: every Flutter task in this file was reported blocked
+when it was runnable; `flutter analyze` was never run, so the Flutter CI job had
+been RED on pre-existing lints without anyone knowing; and Dart code shipped for
+weeks without a compiler ever seeing it.
+
+**What has since actually been done, on this host:**
+
+```
+$ export PATH="$HOME/flutter/bin:$PATH"
+$ flutter --version                  Flutter 3.47.1 / Dart 3.13.1
+$ flutter analyze                    No issues found!  (core, aly, rider, driver)
+$ flutter test                       327 + 10 + 18 + 6 pass
+$ flutter build apk --release        app-release.apk  59.0MB, signed
+$ flutter build appbundle --release  app-release.aab  57.0MB
+$ adb install app-debug.apk          Success
+$ adb shell am start ...             runs; Arabic RTL sign-in renders, no crash
+```
+
+Signing certificate on the release build: `CN=Darb, O=Darb, L=Baghdad, C=IQ`,
+SHA-1 `52:30:a8:a2:3d:7d:e1:b3:92:8b:4d:61:fd:f4:de:8a:4b:4a:e2:6b`. That
+fingerprint must be registered on the Firebase Android app, or Phone Auth fails
+on a real handset.
+
+**Still genuinely absent:** `docker`, `psql`, `redis-cli`, `k6`, `make`, `gh`.
+The integration and load suites remain unrunnable here - but that is six tools,
+not "the toolchain", and none of it touches Flutter.
+
+---
+
+## Original root cause (kept for the record, and now partly false)
 
 ```
 $ for c in docker flutter dart make psql redis-cli k6; do printf "%-12s " "$c"; command -v $c >/dev/null 2>&1 && echo present || echo "NOT FOUND"; done
