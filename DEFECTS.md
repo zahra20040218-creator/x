@@ -250,6 +250,18 @@ by a test; no widget test asserts a rendered colour. Fixed by restating the
 colour in each replaced style. `apps/rider` and `apps/driver` still use this
 theme.
 
+### D-12 — The rider cannot see the driver move · **P2**
+
+`TrackRideScreen` subscribes to `driver.location` and does nothing with it.
+The screen has no map: without `MAPS_CONFIGURED` and a Maps key there is
+nothing to put a marker on, and the previous build printed the raw coordinate
+as text instead — which no rider can read, and which is the one thing the
+handoff's screen 8 draws as a car on a map.
+
+Not a regression in information, only in pixels: a lat/lng string was never
+usable. It becomes real work when the tracking map lands, and the socket event
+already carries everything that map will need.
+
 ## What a real reviewer should attack first
 
 1. **The fake Redis** (D-2). Everything about concurrency rests on it, and it

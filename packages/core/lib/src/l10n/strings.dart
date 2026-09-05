@@ -132,6 +132,10 @@ abstract class AppStrings {
   String get requestRide;
   String get searchingForDriver;
   String get noDriversFound;
+
+  /// Why nobody came, and what the rider can do about it. The status alone
+  /// reads as a fault; this says it is not one.
+  String get noDriversFoundBody;
   String get driverOnTheWay;
   String get driverHasArrived;
   String get onTrip;
@@ -140,6 +144,11 @@ abstract class AppStrings {
   String get cancelRideConfirm;
   String get rateYourDriver;
   String get submitRating;
+
+  /// Shown after a rating lands — including the duplicate case, where it
+  /// landed on an earlier attempt the rider never saw succeed.
+  String get thankYou;
+  String get ratingSubmitted;
   String get youAlreadyHaveARide;
   String get fareBreakdown;
   String get baseFare;
@@ -467,6 +476,9 @@ class ArabicStrings implements AppStrings {
   @override
   String get noDriversFound => 'لا يوجد سائقون متاحون الآن';
   @override
+  String get noDriversFoundBody =>
+      'لم يقبل أي سائق قريب طلبك. جرّب بعد قليل أو غيّر نقطة الانطلاق.';
+  @override
   String get driverOnTheWay => 'السائق في الطريق إليك';
   @override
   String get driverHasArrived => 'السائق وصل';
@@ -482,6 +494,10 @@ class ArabicStrings implements AppStrings {
   String get rateYourDriver => 'قيّم السائق';
   @override
   String get submitRating => 'إرسال التقييم';
+  @override
+  String get thankYou => 'شكراً لك';
+  @override
+  String get ratingSubmitted => 'وصل تقييمك، وهو يساعد سائقين آخرين.';
   @override
   String get youAlreadyHaveARide => 'لديك رحلة جارية بالفعل';
   @override
@@ -890,6 +906,10 @@ class EnglishStrings implements AppStrings {
   @override
   String get noDriversFound => 'No drivers available right now';
   @override
+  String get noDriversFoundBody =>
+      'No nearby driver took your request. Try again shortly, or move your '
+      'pickup point.';
+  @override
   String get driverOnTheWay => 'Your driver is on the way';
   @override
   String get driverHasArrived => 'Your driver has arrived';
@@ -905,6 +925,11 @@ class EnglishStrings implements AppStrings {
   String get rateYourDriver => 'Rate your driver';
   @override
   String get submitRating => 'Submit';
+  @override
+  String get thankYou => 'Thank you';
+  @override
+  String get ratingSubmitted =>
+      'Your rating was received, and it helps other riders.';
   @override
   String get youAlreadyHaveARide => 'You already have a ride in progress';
   @override
