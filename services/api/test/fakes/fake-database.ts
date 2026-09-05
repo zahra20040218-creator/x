@@ -867,11 +867,16 @@ export class FakeDatabase implements Database {
       return this.ok([], 1);
     }
 
-    if (/^UPDATE ride_offers SET status = 'TIMED_OUT'/i.test(s)) {
+    // The status is a PARAMETER, not a literal. It was hardcoded 'TIMED_OUT'
+    // in both the query and this fake, which is why the DECLINED value in the
+    // `offer_status` enum had never been written since migration 0001 - and
+    // why a fake that matched the literal string kept passing.
+    if (/^UPDATE ride_offers SET status = \$2/i.test(s)) {
+      const outcome = (params[1] as string) ?? 'TIMED_OUT';
       let n = 0;
       for (const o of this.rows('ride_offers')) {
         if (o['ride_id'] === params[0] && o['status'] === 'PENDING') {
-          o['status'] = 'TIMED_OUT';
+          o['status'] = outcome;
           o['responded_at'] = new Date();
           n++;
         }

@@ -250,6 +250,24 @@ describe('MatchingService', () => {
       expect(db.rows('ride_offers')[0]!['status']).toBe('TIMED_OUT');
     });
 
+    it('marks a DECLINED offer DECLINED, not TIMED_OUT', async () => {
+      await onlineDriver(NEAR, KARRADA);
+      const ride = await requestRide();
+      await matching.dispatch(ride.id);
+      await matching.handleOfferOutcome(ride.id, 'declined');
+
+      // `offer_status` has carried DECLINED since migration 0001 and the value
+      // was never once written: both outcomes hardcoded 'TIMED_OUT'.
+      //
+      // They are opposite operational signals. A driver declining 80% of
+      // offers is cherry-picking the profitable trips - an owner's problem. A
+      // driver timing out on 80% has a broken app or a dead network - a
+      // support problem. Recording both the same way destroys the only column
+      // that separates them, and destroys it silently: the query still returns
+      // rows, they are just all identical.
+      expect(db.rows('ride_offers')[0]!['status']).toBe('DECLINED');
+    });
+
     it('is a no-op for a ride that is not currently OFFERED', async () => {
       const ride = await requestRide();
       expect((await matching.handleOfferOutcome(ride.id, 'timeout')).outcome).toBe(

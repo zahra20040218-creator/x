@@ -170,6 +170,8 @@ export class MatchingService {
     await this.rideService.expireOffer(rideId, {
       candidatesRemain,
       reason: reason === 'declined' ? 'driver declined' : 'offer timed out',
+      // The queryable column, not just the prose above it.
+      outcome: reason === 'declined' ? 'DECLINED' : 'TIMED_OUT',
     });
 
     if (!candidatesRemain) {

@@ -357,7 +357,17 @@ export class RideService {
    */
   async expireOffer(
     rideId: string,
-    options: { candidatesRemain: boolean; reason?: string } = { candidatesRemain: true },
+    options: {
+      candidatesRemain: boolean;
+      reason?: string;
+      /**
+       * Why the offer ended, as the offer row records it.
+       *
+       * Distinct from `reason`, which is prose for the event metadata. This
+       * one is the queryable column, and the two answer different questions.
+       */
+      outcome?: 'TIMED_OUT' | 'DECLINED';
+    } = { candidatesRemain: true },
   ): Promise<RideRecord> {
     return this.db.transaction(async (tx) => {
       const ride = await this.rides.findByIdForUpdate(tx, rideId);
@@ -375,10 +385,23 @@ export class RideService {
       if (!expired) throw new InvalidRideTransitionError(ride.status, 'EXPIRED');
       await this.rides.insertEvent(tx, toExpired);
 
+      // DECLINED and TIMED_OUT are different facts, and the schema has had
+      // both since migration 0001 - but this wrote 'TIMED_OUT' for either,
+      // so the DECLINED value was never once used.
+      //
+      // Operationally they are opposites. "This driver declines 80% of
+      // offers" is a driver cherry-picking the profitable trips, and it is an
+      // owner's problem to act on. "This driver times out on 80%" is a broken
+      // app or a dead network, and it is a support problem. Recording both as
+      // a timeout destroys the only signal that separates them, and it does
+      // so silently: the query returns rows, they are just all the same.
+      //
+      // `ride_events.metadata.reason` did carry the distinction in prose. That
+      // is an audit trail, not something an operator can GROUP BY.
       await tx.query(
-        `UPDATE ride_offers SET status = 'TIMED_OUT', responded_at = now()
+        `UPDATE ride_offers SET status = $2, responded_at = now()
           WHERE ride_id = $1 AND status = 'PENDING'`,
-        [rideId],
+        [rideId, options.outcome ?? 'TIMED_OUT'],
       );
 
       const next: RideStatus = options.candidatesRemain ? 'REQUESTED' : 'NO_DRIVERS_FOUND';
