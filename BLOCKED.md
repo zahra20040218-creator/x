@@ -42,9 +42,29 @@ SHA-1 `52:30:a8:a2:3d:7d:e1:b3:92:8b:4d:61:fd:f4:de:8a:4b:4a:e2:6b`. That
 fingerprint must be registered on the Firebase Android app, or Phone Auth fails
 on a real handset.
 
-**Still genuinely absent:** `docker`, `psql`, `redis-cli`, `k6`, `make`, `gh`.
-The integration and load suites remain unrunnable here - but that is six tools,
-not "the toolchain", and none of it touches Flutter.
+**Second correction, later the same day: the integration suite is no longer
+blocked either.**
+
+Docker Desktop is installed on this machine and its daemon will not start. But
+Docker was never the requirement - PostgreSQL, PostGIS and Redis were, and WSL2
+Ubuntu 26.04 was already installed with **Redis 8.0.5 already running**. Only
+PostgreSQL was missing, and it is one `apt-get install` away.
+
+```
+$ node dist/db/migrate.js up                    15 migrations applied
+$ REAL_INFRA=1 vitest --project integration     153 passed, 11 files
+```
+
+First execution of any of them. Among them the proof CLAUDE.md §5.1 rests on:
+"yields exactly one winner when many callers race", and "lets exactly one of
+two drivers win when both hold a pending offer" - against real Redis, not the
+in-memory fake that had been standing in for it.
+
+Setup and the two non-obvious settings are in `docs/LOCAL_INFRA_WSL.md`;
+`scripts/wsl-infra.sh` automates it.
+
+**Genuinely absent now:** `k6` (load suite), `make`, `gh`. And a working Docker
+daemon, which is still the right answer on a server and is not needed here.
 
 ---
 
