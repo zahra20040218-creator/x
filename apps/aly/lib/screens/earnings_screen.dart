@@ -117,41 +117,73 @@ class _EarningsScreenState extends State<EarningsScreen> {
           state: _state,
           onRetry: _load,
           empty: (context) => EmptyView(message: strings.noEarningsYet),
-          success: (context, data) => ListView(
+          // Slivers, not a plain ListView: the statement paginates, and a
+          // ListView built from a `children:` list constructs every row it has
+          // ever loaded on each frame. The header and the footer are fixed, so
+          // only the entries need to be lazy — which is exactly the split
+          // SliverList.builder expresses.
+          success: (context, data) => CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(AppSpacing.md),
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: _Stat(
-                      label: strings.totalEarnings,
-                      amount: data.balance,
-                      emphasis: true,
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                sliver: SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _Stat(
+                              label: strings.totalEarnings,
+                              amount: data.balance,
+                              emphasis: true,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: _Stat(
+                              label: strings.todayEarnings,
+                              amount: data.summary.today,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      _Stat(
+                        label: strings.completedRides,
+                        count: data.summary.rideCount,
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      Text(
+                        strings.statement,
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                    ],
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                ),
+                sliver: SliverList.builder(
+                  itemCount: data.entries.length,
+                  itemBuilder: (context, i) =>
+                      _EntryTile(entry: data.entries[i]),
+                ),
+              ),
+              if (data.hasMore)
+                SliverPadding(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  sliver: SliverToBoxAdapter(
+                    child: AlyButton.secondary(
+                      label: _loadingMore ? strings.loading : strings.loadMore,
+                      onPressed: _loadingMore ? null : _loadMore,
                     ),
                   ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: _Stat(label: strings.todayEarnings, amount: data.summary.today),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              _Stat(label: strings.completedRides, count: data.summary.rideCount),
-
-              const SizedBox(height: AppSpacing.lg),
-              Text(strings.statement, style: Theme.of(context).textTheme.titleSmall),
-              const SizedBox(height: AppSpacing.sm),
-
-              ...data.entries.map((entry) => _EntryTile(entry: entry)),
-
-              if (data.hasMore) ...[
-                const SizedBox(height: AppSpacing.sm),
-                OutlinedButton(
-                  onPressed: _loadingMore ? null : _loadMore,
-                  child: Text(_loadingMore ? strings.loading : strings.loadMore),
                 ),
-              ],
             ],
           ),
         ),
@@ -233,7 +265,7 @@ class _EntryTile extends StatelessWidget {
       dense: true,
       contentPadding: EdgeInsets.zero,
       leading: Icon(
-        credit ? Icons.arrow_downward : Icons.arrow_upward,
+        credit ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
         color: credit ? AppColors.success : AppColors.textSecondary,
         size: 20,
       ),
@@ -249,7 +281,13 @@ class _EntryTile extends StatelessWidget {
       trailing: Text(
         // The sign is carried explicitly. A statement where a debit and a
         // credit look identical is a statement nobody can reconcile.
-        '${credit ? '+' : '−'}${entry.amountIqd.value}',
+        //
+        // Through IqdFormatter, not `.value`: a bare `10500` next to a
+        // `10,500 د.ع` on the card above is the same money written two ways,
+        // and the reader has to work out that it is. CLAUDE.md §8 gives one
+        // format for every figure on the screen — thousands separated, the
+        // currency named, no decimals.
+        '${credit ? '+' : '−'}${IqdFormatter.format(entry.amountIqd.value)}',
         textDirection: TextDirection.ltr,
         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: credit ? AppColors.success : AppColors.textSecondary,

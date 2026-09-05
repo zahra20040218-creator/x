@@ -131,10 +131,10 @@ class _BatteryExemptionScreenState extends State<BatteryExemptionScreen> {
               const SizedBox(height: AppSpacing.xl),
               Icon(
                 switch (_step) {
-                  _Step.foreground => Icons.my_location,
-                  _Step.background => Icons.location_on_outlined,
-                  _Step.battery => Icons.battery_saver_outlined,
-                  _Step.done => Icons.check_circle_outline,
+                  _Step.foreground => Icons.my_location_rounded,
+                  _Step.background => Icons.location_on_rounded,
+                  _Step.battery => Icons.battery_saver_rounded,
+                  _Step.done => Icons.check_circle_rounded,
                 },
                 size: 64,
                 color: AppColors.primary,
@@ -153,10 +153,10 @@ class _BatteryExemptionScreenState extends State<BatteryExemptionScreen> {
               ],
 
               const Spacer(),
-              PrimaryButton(
+              AlyButton(
                 label: _error == null ? cta : strings.retry,
                 onPressed: _advance,
-                busy: _busy,
+                isLoading: _busy,
               ),
               const SizedBox(height: AppSpacing.md),
             ],

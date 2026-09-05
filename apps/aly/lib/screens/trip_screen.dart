@@ -164,14 +164,14 @@ class _TripScreenState extends State<TripScreen> {
           ),
 
           const SizedBox(height: AppSpacing.md),
-          OutlinedButton.icon(
-            onPressed: _navigate,
-            icon: const Icon(Icons.navigation_outlined),
-            label: Text(strings.navigateToPickup),
-          ),
+          AlyButton.secondary(
+              label: strings.navigateToPickup,
+              onPressed: _navigate,
+              icon: Icons.navigation_rounded,
+            ),
 
           const SizedBox(height: AppSpacing.lg),
-          PrimaryButton(label: actionLabel, onPressed: () => _act(action), busy: _busy),
+          AlyButton(label: actionLabel, onPressed: () => _act(action), isLoading: _busy),
 
           if (_ride.status == RideStatus.accepted ||
               _ride.status == RideStatus.driverArrived) ...[
@@ -194,7 +194,7 @@ class _TripScreenState extends State<TripScreen> {
               _ride.status == RideStatus.inProgress) ...[
             TextButton.icon(
               onPressed: _busy ? null : _report,
-              icon: const Icon(Icons.flag_outlined, size: 18),
+              icon: const Icon(Icons.flag_rounded, size: 18),
               label: Text(strings.reportProblem),
             ),
           ],

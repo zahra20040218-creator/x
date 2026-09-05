@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:rideapp_core/rideapp_core.dart';
@@ -237,59 +239,68 @@ class _SignInScreenState extends State<SignInScreen> {
       // them in exactly the same place.
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
+          padding: const EdgeInsetsDirectional.all(AlySpacing.xl),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (_error != null) ...[
                 StatusBanner(message: _error!, tone: BannerTone.danger),
-                const SizedBox(height: AppSpacing.md),
+                const SizedBox(height: AlySpacing.lg),
               ],
 
               if (!awaitingCode) ...[
-                Text(strings.phoneNumber,
-                    style: Theme.of(context).textTheme.labelLarge,),
-                const SizedBox(height: AppSpacing.sm),
-                TextField(
+                // The design system's field, which carries the `+964` prefix
+                // itself. `_toE164` still normalises what comes back, because
+                // a rider who types the leading `0` out of habit is typing the
+                // number the way it is written everywhere in Baghdad.
+                AlyPhoneField(
                   controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  textDirection: TextDirection.ltr,
-                  decoration: InputDecoration(hintText: strings.phoneHint),
+                  label: strings.phoneNumber,
+                  enabled: !_busy,
                 ),
-                const SizedBox(height: AppSpacing.md),
-                Text(strings.yourName,
-                    style: Theme.of(context).textTheme.labelLarge,),
-                const SizedBox(height: AppSpacing.sm),
-                TextField(controller: _nameController),
-                const SizedBox(height: AppSpacing.lg),
-                PrimaryButton(
+                const SizedBox(height: AlySpacing.lg),
+                AlyTextField(
+                  label: strings.yourName,
+                  controller: _nameController,
+                  enabled: !_busy,
+                ),
+                const SizedBox(height: AlySpacing.xl),
+                AlyButton(
                   label: strings.sendCode,
                   onPressed: _sendCode,
-                  busy: _busy,
+                  isLoading: _busy,
                 ),
               ] else ...[
                 Text(
                   '${strings.codeSentTo} ${_phoneController.text}',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
-                const SizedBox(height: AppSpacing.md),
-                TextField(
-                  controller: _codeController,
-                  keyboardType: TextInputType.number,
-                  textDirection: TextDirection.ltr,
-                  textAlign: TextAlign.center,
-                  decoration: InputDecoration(hintText: strings.enterCode),
+                const SizedBox(height: AlySpacing.lg),
+                // The six-box input from the design system, not one centred
+                // field. It holds its own text; `_codeController` stays the
+                // single source `_verifyCode` reads, so the two cannot drift.
+                AlyOtpInput(
+                  enabled: !_busy,
+                  onChanged: (code) => _codeController.text = code,
+                  // Submitting on the sixth digit is the whole point of the
+                  // six-box shape: there is nothing left to decide.
+                  onCompleted: (code) {
+                    _codeController.text = code;
+                    if (!_busy) unawaited(_verifyCode());
+                  },
                 ),
-                const SizedBox(height: AppSpacing.lg),
-                PrimaryButton(
+                const SizedBox(height: AlySpacing.xl),
+                AlyButton(
                   label: strings.verify,
                   onPressed: _verifyCode,
-                  busy: _busy,
+                  isLoading: _busy,
                 ),
-                TextButton(
+                const SizedBox(height: AlySpacing.sm),
+                AlyButton(
+                  label: strings.resendCode,
                   onPressed:
                       _busy ? null : () => setState(() => _verificationId = null),
-                  child: Text(strings.resendCode),
+                  variant: AlyButtonVariant.tertiary,
                 ),
               ],
             ],

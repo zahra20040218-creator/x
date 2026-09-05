@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:rideapp_aly/location/location_service.dart';
 import 'package:rideapp_aly/screens/earnings_screen.dart';
@@ -69,9 +70,30 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   Me? _me;
   Ride? _activeRide;
   RideOffer? _offer;
-  WalletBalance? _wallet;
   String? _error;
   bool _busy = false;
+
+  /// What the server says this account may do (CLAUDE.md §1.1). The blockers
+  /// drive [AlyBlockerList] and decide whether [AlyOnlineToggle] is pressable —
+  /// the screen decides nothing itself.
+  Capabilities? _capabilities;
+
+  /// The driver's own subscription, plus the plan's display name resolved
+  /// against the catalogue. Both null when the driver has never bought one.
+  DriverSubscription? _subscription;
+  String? _planName;
+
+  /// Today's earnings, derived from the statement page (see [EarningsSummary] —
+  /// summing every ledger row would double-count).
+  EarningsSummary? _earnings;
+
+  /// When this app instance first saw the driver online.
+  ///
+  /// Session-local, and deliberately not persisted or invented: the server has
+  /// no online-time field, and [AlyEarningsCard] needs a `Duration`. A driver
+  /// who restarts the app mid-shift sees the count restart. Making this
+  /// accurate needs a server-side shift clock — see DEFECTS.md D-10.
+  DateTime? _onlineSince;
 
   Timer? _poll;
   RealtimeClient? _realtime;
@@ -135,8 +157,15 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
   Future<void> _refresh() async {
     try {
-      final me = await widget.api.me();
-      final rides = await widget.api.myRides(limit: 5);
+      // Together, not one after the other. The two are independent, and on a
+      // Baghdad mobile link each round trip is most of a second — sequencing
+      // them doubled the time before the console had anything to draw.
+      final results = await Future.wait<Object>([
+        widget.api.me(),
+        widget.api.myRides(limit: 5),
+      ]);
+      final me = results[0] as Me;
+      final rides = results[1] as List<Ride>;
       final active = rides.where((r) => r.status.isActive).firstOrNull;
 
       if (!mounted) return;
@@ -144,23 +173,105 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         _me = me;
         _activeRide = active;
         _error = null;
+        // Started here rather than in the toggle: a driver who was already
+        // online when the app opened would otherwise never get a clock at all.
+        if (me.availability == DriverAvailability.online) {
+          _onlineSince ??= DateTime.now();
+        } else {
+          _onlineSince = null;
+        }
       });
 
-      if (me.availability != DriverAvailability.offline) {
-        unawaited(_loadWallet());
-      }
+      // The console's three cards. Each is unawaited and individually
+      // tolerant: none of them is worth failing a shift over, and a driver
+      // whose subscription endpoint is slow still gets the online toggle.
+      unawaited(_loadCapabilities());
+      unawaited(_loadSubscription());
+      unawaited(_loadEarnings());
     } on ApiException catch (error) {
       if (!mounted) return;
       setState(() => _error = _messageFor(error));
     }
   }
 
-  Future<void> _loadWallet() async {
+  Future<void> _loadCapabilities() async {
     try {
-      final wallet = await widget.api.wallet();
-      if (mounted) setState(() => _wallet = wallet);
+      final capabilities = await widget.api.capabilities();
+      if (mounted) setState(() => _capabilities = capabilities);
     } on ApiException {
-      // A wallet that fails to load is not worth interrupting a shift for.
+      // Left null, which renders no blocker list at all. Guessing "blocked"
+      // from a failed request would strand a driver who is perfectly able to
+      // work; the server refuses the availability call anyway if they are not.
+    }
+  }
+
+  Future<void> _loadSubscription() async {
+    try {
+      final subscription = await widget.api.mySubscription();
+      if (subscription == null) {
+        if (mounted) {
+          setState(() {
+            _subscription = null;
+            _planName = null;
+          });
+        }
+        return;
+      }
+
+      // The plan's own name where the catalogue still lists it, falling back
+      // to the stored code — a driver whose plan was withdrawn after they
+      // bought it still holds a valid period.
+      var name = subscription.planCode;
+      try {
+        final plans = await widget.api.subscriptionPlans();
+        final language = mounted ? AppStrings.of(context).languageCode : 'ar';
+        for (final plan in plans) {
+          if (plan.code == subscription.planCode) name = plan.nameFor(language);
+        }
+      } on ApiException {
+        // Keep the code as the name.
+      }
+
+      if (mounted) {
+        setState(() {
+          _subscription = subscription;
+          _planName = name;
+        });
+      }
+    } on ApiException {
+      // No card rather than a wrong one.
+    }
+  }
+
+  /// Where a blocker row sends the driver.
+  ///
+  /// Only the one blocker that has somewhere to go is routed. Every other
+  /// reason is resolved by an operator, and [AlyBlockerList] already states
+  /// what to do — a button that goes nowhere is worse than a sentence that
+  /// explains. Document upload is not a screen this build has (CLAUDE.md §2:
+  /// approved, not yet built), so it is not routed either.
+  void _onBlockerAction(String code) {
+    if (code == 'SUBSCRIPTION_REQUIRED') unawaited(_openSubscription());
+  }
+
+  Future<void> _openSubscription() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SubscriptionScreen(api: widget.api),
+      ),
+    );
+    // Refresh on return. An operator may have activated the driver's
+    // subscription while they were looking at the screen, and the online
+    // toggle's blockers are computed from that.
+    if (mounted) await _refresh();
+  }
+
+  Future<void> _loadEarnings() async {
+    try {
+      final page = await widget.api.walletEntries();
+      if (mounted) setState(() => _earnings = EarningsSummary.from(page.items));
+    } on ApiException {
+      // The earnings card is hidden until it has real numbers.
     }
   }
 
@@ -198,6 +309,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   }
 
   Future<void> _toggleOnline() async {
+    // Going online or offline is the driver's most consequential tap, and the
+    // request that confirms it can take a second on a bad connection.
+    unawaited(HapticFeedback.selectionClick());
     final me = _me;
     if (me == null) return;
 
@@ -328,35 +442,70 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final strings = AppStrings.of(context);
-    final me = _me;
     final ride = _activeRide;
 
-    if (ride != null) {
-      return TripScreen(
-        api: widget.api,
-        ride: ride,
-        onFinished: () async {
-          setState(() => _activeRide = null);
-          await _refresh();
-        },
-      );
-    }
+    // Accepting a ride replaced the whole screen in a single frame. It is the
+    // largest state change in the app and it read as a glitch — a driver who
+    // taps accept should see the console leave and the trip arrive, so they
+    // know which of the two they are looking at.
+    //
+    // Keys are what make the switch a switch: without them the framework sees
+    // one subtree being rebuilt and cross-fades nothing.
+    return AnimatedSwitcher(
+      duration: AlyMotion.respecting(context, AlyMotion.medium),
+      switchInCurve: AlyMotion.enter,
+      switchOutCurve: AlyMotion.exit,
+      child: ride != null
+          ? TripScreen(
+              key: const ValueKey<String>('trip'),
+              api: widget.api,
+              ride: ride,
+              onFinished: () async {
+                setState(() => _activeRide = null);
+                await _refresh();
+              },
+            )
+          : _console(context),
+    );
+  }
+
+  /// The driver console: the toggle, and what the server says about this shift.
+  Widget _console(BuildContext context) {
+    final strings = AppStrings.of(context);
+    final me = _me;
 
     final isOnline = me?.availability == DriverAvailability.online;
+    final earnings = _earnings;
+    final subscription = _subscription;
+
+    // The server's list, verbatim. A suspended account is a blocker the
+    // server also reports, so the local flag only ever adds to it.
+    final blockers = <String>[
+      ...?_capabilities?.driver.blockers,
+      if ((me?.isSuspended ?? false) &&
+          !(_capabilities?.driver.blockers.contains('SUSPENDED') ?? false))
+        'SUSPENDED',
+    ];
+    final blocked = blockers.isNotEmpty;
+
+    // Only ever the current stretch — see [_onlineSince].
+    final onlineTime = _onlineSince == null
+        ? Duration.zero
+        : DateTime.now().difference(_onlineSince!);
 
     return Scaffold(
+      key: const ValueKey<String>('console'),
       appBar: AppBar(
         title: Text(strings.appNameDriver),
         actions: [
           IconButton(
             tooltip: strings.signOut,
-            icon: const Icon(Icons.logout),
+            icon: const Icon(Icons.logout_rounded),
             onPressed: _signingOut ? null : _signOut,
           ),
           IconButton(
             tooltip: strings.earnings,
-            icon: const Icon(Icons.account_balance_wallet_outlined),
+            icon: const Icon(Icons.account_balance_wallet_rounded),
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => EarningsScreen(api: widget.api),
@@ -365,7 +514,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           ),
           IconButton(
             tooltip: strings.profile,
-            icon: const Icon(Icons.person_outline),
+            icon: const Icon(Icons.person_rounded),
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => ProfileScreen(
@@ -377,18 +526,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           ),
           IconButton(
             tooltip: strings.subscriptionTitle,
-            icon: const Icon(Icons.card_membership_outlined),
-            onPressed: () async {
-              await Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => SubscriptionScreen(api: widget.api),
-                ),
-              );
-              // Refresh on return. An operator may have activated the driver's
-              // subscription while they were looking at the screen, and the
-              // online toggle's blockers are computed from that.
-              if (mounted) await _refresh();
-            },
+            icon: const Icon(Icons.card_membership_rounded),
+            onPressed: () => unawaited(_openSubscription()),
           ),
         ],
       ),
@@ -409,22 +548,52 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 tone: BannerTone.danger,
               ),
 
-            const SizedBox(height: AppSpacing.md),
-            _OnlineCard(
+            const SizedBox(height: AlySpacing.lg),
+            // The one saturated fill on the screen. `onChanged` is null — not
+            // a hidden button — whenever the server says this driver may not
+            // go online: CLAUDE.md §1.1, hiding a control is not authorisation.
+            AlyOnlineToggle(
               isOnline: isOnline,
-              busy: _busy,
-              onToggle: (me?.isSuspended ?? false) ? null : _toggleOnline,
+              isBusy: _busy,
+              onChanged: blocked ? null : (_) => unawaited(_toggleOnline()),
             ),
 
-            const SizedBox(height: AppSpacing.md),
-            if (_wallet != null)
-              Card(
-                child: ListTile(
-                  title: Text(strings.wallet),
-                  subtitle: Text(strings.balance),
-                  trailing: FareText(_wallet!.balanceIqd),
+            // Every reason, in the server's order, each naming its next step.
+            if (blockers.isNotEmpty) ...[
+              const SizedBox(height: AlySpacing.lg),
+              AlyBlockerList(
+                codes: blockers,
+                onAction: _onBlockerAction,
+              ),
+            ],
+
+            if (earnings != null) ...[
+              const SizedBox(height: AlySpacing.lg),
+              AlyEarningsCard(
+                todayIqd: earnings.today,
+                tripCount: earnings.rideCount,
+                onlineTime: onlineTime,
+                // No yesterday figure exists server-side, and an invented
+                // comparison is worse than none — the card hides it on null.
+                onViewStatement: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => EarningsScreen(api: widget.api),
+                  ),
                 ),
               ),
+            ],
+
+            if (subscription != null) ...[
+              const SizedBox(height: AlySpacing.lg),
+              AlySubscriptionCard(
+                planName: _planName ?? subscription.planCode,
+                expiresAt: subscription.expiresAt,
+                // Against the real clock, so a console left open overnight
+                // does not keep showing yesterday's number.
+                daysRemaining: subscription.daysRemainingAt(DateTime.now()),
+                onRenew: () => unawaited(_openSubscription()),
+              ),
+            ],
 
             // Buffered positions, surfaced so a driver can see that their
             // location is queued rather than lost when coverage is bad.
@@ -436,59 +605,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                       '${strings.bufferedLocations}: ${widget.location.pendingCount}',
                 ),
               ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _OnlineCard extends StatelessWidget {
-  const _OnlineCard({
-    required this.isOnline,
-    required this.busy,
-    required this.onToggle,
-  });
-
-  final bool isOnline;
-  final bool busy;
-  final VoidCallback? onToggle;
-
-  @override
-  Widget build(BuildContext context) {
-    final strings = AppStrings.of(context);
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
-        child: Column(
-          children: [
-            Container(
-              width: 88,
-              height: 88,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: (isOnline ? AppColors.online : AppColors.offline)
-                    .withValues(alpha: 0.15),
-              ),
-              child: Icon(
-                isOnline ? Icons.wifi_tethering : Icons.wifi_tethering_off,
-                size: 44,
-                color: isOnline ? AppColors.online : AppColors.offline,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              isOnline ? strings.youAreOnline : strings.youAreOffline,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            PrimaryButton(
-              label: isOnline ? strings.goOffline : strings.goOnline,
-              onPressed: onToggle,
-              busy: busy,
-              color: isOnline ? AppColors.danger : AppColors.online,
-            ),
           ],
         ),
       ),

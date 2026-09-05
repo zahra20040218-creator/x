@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:rideapp_core/rideapp_core.dart';
 
 /// The offer sheet: accept or decline, against a deadline.
@@ -28,6 +31,9 @@ class _OfferSheetState extends State<OfferSheet> {
   String? _error;
 
   Future<void> _accept() async {
+    // A driver accepts one-handed, in a moving car, against a 15-second
+    // deadline — often without looking. The confirmation has to be felt.
+    unawaited(HapticFeedback.mediumImpact());
     setState(() {
       _busy = true;
       _error = null;
@@ -59,6 +65,9 @@ class _OfferSheetState extends State<OfferSheet> {
   }
 
   Future<void> _decline() async {
+    // Lighter than accept: the same gesture must not feel like the same
+    // decision.
+    unawaited(HapticFeedback.selectionClick());
     setState(() => _busy = true);
     try {
       await widget.api.declineRide(widget.offer.rideId);
@@ -130,16 +139,15 @@ class _OfferSheetState extends State<OfferSheet> {
             ],
 
             const SizedBox(height: AppSpacing.lg),
-            PrimaryButton(
+            AlyButton(
               label: strings.accept,
               onPressed: _accept,
-              busy: _busy,
-              color: AppColors.online,
+              isLoading: _busy,
             ),
             const SizedBox(height: AppSpacing.sm),
-            OutlinedButton(
+            AlyButton.secondary(
+              label: strings.decline,
               onPressed: _busy ? null : _decline,
-              child: Text(strings.decline),
             ),
           ],
         ),

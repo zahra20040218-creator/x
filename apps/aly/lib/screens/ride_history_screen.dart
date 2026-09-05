@@ -58,12 +58,17 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
           state: _state,
           onRetry: _load,
           empty: (context) => EmptyView(message: strings.noRidesYet),
+          // AlyRideCard, not a hand-rolled tile: it is the component that
+          // knows the three fare cases — settled, estimated, and none — and
+          // never renders a ride with no fare as "0 د.ع", which reads as a
+          // fact rather than as an absence.
           success: (context, rides) => ListView.separated(
             // Always scrollable so pull-to-refresh works even on a short list.
             physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsetsDirectional.all(AlySpacing.lg),
             itemCount: rides.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
-            itemBuilder: (context, index) => _RideTile(
+            separatorBuilder: (_, __) => const SizedBox(height: AlySpacing.md),
+            itemBuilder: (context, index) => AlyRideCard(
               ride: rides[index],
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
@@ -77,75 +82,6 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _RideTile extends StatelessWidget {
-  const _RideTile({required this.ride, required this.onTap});
-
-  final Ride ride;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final strings = AppStrings.of(context);
-    final settled = ride.displayFareIqd;
-
-    return ListTile(
-      onTap: onTap,
-      leading: _StatusDot(status: ride.status),
-      title: Text(
-        ride.dropoffAddress ?? strings.statusLabel(ride.status),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: Text(
-        formatDateTimeAr(ride.completedAt ?? ride.requestedAt),
-        style: Theme.of(context).textTheme.bodySmall,
-      ),
-      trailing: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          FareText(settled),
-          // An estimate and a settled fare must not look identical — a rider
-          // comparing the two should be able to tell which they were charged.
-          if (ride.finalFareIqd == null)
-            Text(
-              strings.estimated,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatusDot extends StatelessWidget {
-  const _StatusDot({required this.status});
-
-  final RideStatus status;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = switch (status) {
-      RideStatus.completed => AppColors.success,
-      RideStatus.cancelledByRider ||
-      RideStatus.cancelledByDriver ||
-      RideStatus.cancelledInTrip ||
-      RideStatus.noDriversFound ||
-      RideStatus.expired =>
-        AppColors.danger,
-      _ => AppColors.accent,
-    };
-
-    return CircleAvatar(
-      radius: 6,
-      backgroundColor: color,
-      // A colour alone is not a label. Screen readers and colour-blind users
-      // both need the status in words.
-      child: Semantics(label: AppStrings.of(context).statusLabel(status), child: const SizedBox()),
     );
   }
 }

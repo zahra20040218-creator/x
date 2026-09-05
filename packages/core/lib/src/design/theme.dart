@@ -144,18 +144,28 @@ abstract class AppTheme {
         // updates.
         headlineMedium: const TextStyle(
           fontFamily: fontFamily,
+          // Every style replaced here must restate the colour: `.copyWith`
+          // overwrites the style wholesale, so a style built without one
+          // discards what `.apply(bodyColor:)` set above and renders invisible.
+          color: AppColors.textPrimary,
           fontSize: 28,
           fontWeight: FontWeight.w700,
           fontFeatures: [FontFeature.tabularFigures()],
         ),
         titleLarge: const TextStyle(
           fontFamily: fontFamily,
+          color: AppColors.textPrimary,
           fontSize: 20,
           fontWeight: FontWeight.w600,
         ),
-        bodyMedium: const TextStyle(fontFamily: fontFamily, fontSize: 15),
+        bodyMedium: const TextStyle(
+          fontFamily: fontFamily,
+          color: AppColors.textPrimary,
+          fontSize: 15,
+        ),
         labelLarge: const TextStyle(
           fontFamily: fontFamily,
+          color: AppColors.textPrimary,
           fontSize: 16,
           fontWeight: FontWeight.w600,
         ),

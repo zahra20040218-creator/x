@@ -57,3 +57,28 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  # Bundled, not fetched at runtime. `AlyTypography.fontFamily` has named Cairo
+  # since the design system was written, but no asset ever shipped, so every
+  # screen fell back to whatever Arabic face the handset happened to have —
+  # different on a Samsung than on a Pixel, and never the one the type ramp was
+  # designed against.
+  #
+  # Cairo is the variable font: one 600KB file covers 400/600/700 (and every
+  # weight between), which is smaller than three static cuts and cannot drift
+  # out of sync with them. Tajawal ships static because that is how upstream
+  # publishes it.
+  #
+  # Both are SIL Open Font License 1.1; the licence text sits beside the fonts
+  # in assets/fonts/ as that licence requires.
+  fonts:
+    - family: Cairo
+      fonts:
+        - asset: assets/fonts/Cairo.ttf
+    - family: Tajawal
+      fonts:
+        - asset: assets/fonts/Tajawal-Regular.ttf
+        - asset: assets/fonts/Tajawal-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Tajawal-Bold.ttf
+          weight: 700

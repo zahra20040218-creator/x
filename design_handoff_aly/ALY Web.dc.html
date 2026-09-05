@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&family=IBM+Plex+Mono:wght@400&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #EEEEF2; }
+  @keyframes alyradar { from { transform: translate(-50%,-50%) scale(.35); opacity: .9 } to { transform: translate(-50%,-50%) scale(1); opacity: 0 } }
+  a { color: #1010FF; text-decoration: none; }
+  a:hover { color: #0C0CCC; text-decoration: underline; }
+</style>
+</helmet>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="w-car" viewBox="0 0 66 34">
+    <path fill="#2E6BE6" d="M17.5 17.5 24.2 8.6c1-1.3 2.2-2 3.7-2h13.4c1.6 0 2.9.7 3.9 2.1l6 8.8z"></path>
+    <path fill="#DCE9FF" d="M22.8 15.9 27.4 9.7c.4-.6.9-.9 1.6-.9h2.6v7.1zm11.4-7.1h6.6c.7 0 1.3.3 1.7.9l4.3 6.2H34.2z"></path>
+    <path fill="#1B49D6" d="M6.4 17.1h53.2c2.3 0 3.6 1.2 3.6 3.3v3.5c0 1.8-1.1 2.8-3 2.8H5.8c-1.9 0-3-1-3-2.8v-3.5c0-2.1 1.3-3.3 3.6-3.3z"></path>
+    <path fill="#FFE9A8" d="M2.9 19.4h3.4v2.6H2.9z"></path>
+    <circle cx="19.4" cy="26.4" r="5.9" fill="#15161C"></circle>
+    <circle cx="19.4" cy="26.4" r="2.3" fill="#ffffff"></circle>
+    <circle cx="48.6" cy="26.4" r="5.9" fill="#15161C"></circle>
+    <circle cx="48.6" cy="26.4" r="2.3" fill="#ffffff"></circle>
+  </symbol>
+  <symbol id="w-badge-bolt" viewBox="0 0 24 24"><path fill="#FFC531" d="M13.9 1.4 5.2 13.1h5.4L9.1 22.6 18.8 10h-5.9z"></path></symbol>
+  <symbol id="w-badge-coin" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="10.4" fill="#FFC531"></circle>
+    <circle cx="12" cy="12" r="7.6" fill="#F0A81E"></circle>
+    <path fill="#7A5300" d="M11.1 4.6h1.8v14.8h-1.8z"></path>
+    <path fill="#7A5300" d="M15.4 9.1h-2c0-.8-.8-1.4-1.9-1.4s-1.9.6-1.9 1.3c0 .8.7 1.1 2.4 1.5 1.9.4 3.5 1 3.5 3 0 1.8-1.6 3-3.6 3s-3.8-1.1-3.8-3.1h2c0 .9.9 1.5 1.9 1.5s1.7-.5 1.7-1.2c0-.8-.7-1.1-2.4-1.5-1.9-.4-3.5-1.1-3.5-3.1 0-1.9 1.7-3 3.6-3 2.1 0 3.9 1.1 4 3z"></path>
+  </symbol>
+  <symbol id="w-badge-star" viewBox="0 0 24 24"><path fill="#FFC531" d="m12 1.8 3.1 6.6 7 .9-5.1 4.9 1.3 7L12 17.8 5.7 21.2l1.3-7L1.9 9.3l7-.9z"></path></symbol>
+  <symbol id="w-tune" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M2.6 5.6h11.2v2.2H2.6zm14.6 0h4.2v2.2h-4.2zM2.6 16.2h4.2v2.2H2.6zm7.6 0h11.2v2.2H10.2z"></path>
+    <circle cx="15.6" cy="6.7" r="3" fill="none" stroke="currentColor" stroke-width="2.2"></circle>
+    <circle cx="8.4" cy="17.3" r="3" fill="none" stroke="currentColor" stroke-width="2.2"></circle>
+  </symbol>
+  <symbol id="w-tag" viewBox="0 0 24 24">
+    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M11.6 2.6H21.4v9.8l-9.9 9.9a1.4 1.4 0 0 1-2 0l-7.8-7.8a1.4 1.4 0 0 1 0-2z"></path>
+    <circle cx="17.1" cy="6.9" r="1.9" fill="currentColor"></circle>
+  </symbol>
+  <symbol id="w-road" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="M9.2 3.2 h5.6 l4.6 17.6 H4.6 Z M10.8 6.2 h2.4 v4.4 h-2.4 Z M10.8 13.0 h2.4 v4.8 h-2.4 Z"></path></symbol>
+  <symbol id="w-pin" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2.6c-3.65 0-6.6 2.95-6.6 6.6 0 4.85 6.6 12.2 6.6 12.2s6.6-7.35 6.6-12.2c0-3.65-2.95-6.6-6.6-6.6zm0 9a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"></path></symbol>
+  <symbol id="w-hospital" viewBox="0 0 24 24"><path fill="currentColor" d="M10.2 3.6h3.6v6.6h6.6v3.6h-6.6v6.6h-3.6v-6.6H3.6v-3.6h6.6z"></path></symbol>
+  <symbol id="w-book" viewBox="0 0 24 24"><path fill="currentColor" d="M11.1 5.6C9.4 4.4 7.2 3.8 4.4 3.8c-.6 0-1.1.5-1.1 1.1v12.4c0 .6.5 1.1 1.1 1.1 2.6 0 4.6.5 6.1 1.5.3.2.7.2 1 0 .1-.1.1-.1.1-.2V6.1c0-.2-.1-.4-.5-.5zm1.8 0c-.4.1-.5.3-.5.5v13.6c0 .1 0 .1.1.2.3.2.7.2 1 0 1.5-1 3.5-1.5 6.1-1.5.6 0 1.1-.5 1.1-1.1V4.9c0-.6-.5-1.1-1.1-1.1-2.8 0-5 .6-6.7 1.8z"></path></symbol>
+  <symbol id="w-bag" viewBox="0 0 24 24"><path fill="currentColor" d="M8.4 6.6V6a3.6 3.6 0 0 1 7.2 0v.6h2.7c.7 0 1.3.5 1.4 1.2l1.1 10.4a2 2 0 0 1-2 2.2H5.2a2 2 0 0 1-2-2.2L4.3 7.8c.1-.7.7-1.2 1.4-1.2zm2 0h3.2V6a1.6 1.6 0 0 0-3.2 0z"></path></symbol>
+</svg>
+
+<div style="font-family:Tajawal,'Segoe UI',Tahoma,sans-serif;background:#EEEEF2;color:#17181C;padding:48px 40px 96px;min-height:100vh;box-sizing:border-box">
+
+  <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px">
+    <div style="font:700 12px/1.35 Tajawal,sans-serif;letter-spacing:.2px;color:#62687A">RECREATION · web/ (rider PWA)</div>
+    <div style="font:700 34px/1.2 Tajawal,sans-serif;letter-spacing:-.5px">الانطلاق — <span style="color:#1010FF">the web app, screen by screen</span></div>
+    <div dir="ltr" style="font:400 17px/1.55 Tajawal,sans-serif;color:#62687A;max-width:860px;text-wrap:pretty;text-align:left">Every value is lifted from the attached folder: colours, geometry and copy from <span style="font-family:'IBM Plex Mono',monospace;font-size:14px">style.css</span>, <span style="font-family:'IBM Plex Mono',monospace;font-size:14px">index.html</span>, <span style="font-family:'IBM Plex Mono',monospace;font-size:14px">script.js</span> and <span style="font-family:'IBM Plex Mono',monospace;font-size:14px">app.js</span>; fares recomputed with the real tariff at 6.8 km. Frame is the app's own 420×900 card, RTL, Tajawal. The amber marks are drift against the Flutter design system in <a href="ALY App.dc.html">ALY App</a> — the two products do not currently share a token. Map still © OpenStreetMap contributors.</div>
+  </div>
+
+  <sc-if value="{{ showLegend }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex;flex-wrap:wrap;gap:32px;background:#fff;border:1px solid #E7E9F1;border-radius:16px;padding:24px;margin:32px 0 8px;box-shadow:0 1px 2px rgba(23,24,28,.05),0 2px 6px rgba(23,24,28,.04)">
+      <div style="display:flex;flex-direction:column;gap:12px;min-width:300px">
+        <div style="font:700 12px/1.35 Tajawal,sans-serif;letter-spacing:.2px;color:#62687A">WEB PALETTE — style.css</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          <div style="display:flex;flex-direction:column;gap:4px;width:88px"><div style="height:40px;border-radius:6px;background:#1010FF"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#77777E">primary<br>#1010FF</div></div>
+          <div style="display:flex;flex-direction:column;gap:4px;width:88px"><div style="height:40px;border-radius:6px;background:#EFEFFC"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#77777E">selected<br>#EFEFFC</div></div>
+          <div style="display:flex;flex-direction:column;gap:4px;width:88px"><div style="height:40px;border-radius:6px;background:#F26A18"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#77777E">pickup<br>#F26A18</div></div>
+          <div style="display:flex;flex-direction:column;gap:4px;width:88px"><div style="height:40px;border-radius:6px;background:#F5A623"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#77777E">rating<br>#F5A623</div></div>
+          <div style="display:flex;flex-direction:column;gap:4px;width:88px"><div style="height:40px;border-radius:6px;background:#B4453A"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#77777E">destructive<br>#B4453A</div></div>
+          <div style="display:flex;flex-direction:column;gap:4px;width:88px"><div style="height:40px;border-radius:6px;background:#17181C"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#77777E">ink<br>#17181C</div></div>
+          <div style="display:flex;flex-direction:column;gap:4px;width:88px"><div style="height:40px;border-radius:6px;background:#77777E"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#77777E">ink muted<br>#77777E</div></div>
+          <div style="display:flex;flex-direction:column;gap:4px;width:88px"><div style="height:40px;border-radius:6px;background:#F7F7FB;border:1px solid #E7E9F1"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#77777E">field<br>#F7F7FB</div></div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;min-width:260px">
+        <div style="font:700 12px/1.35 Tajawal,sans-serif;letter-spacing:.2px;color:#62687A">TYPE — Tajawal 400 / 500 / 700</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="font:700 21px/1.2 Tajawal,sans-serif">21 · 700 — عنوان الشاشة</div>
+          <div style="font:500 22px/1.3 Tajawal,sans-serif">22 · 500 — حقل البحث</div>
+          <div style="font:500 20px/1.2 Tajawal,sans-serif">20 · 500 — زر التأكيد</div>
+          <div style="font:500 19px/1.35 Tajawal,sans-serif">19 · 500 — سطر العنوان</div>
+          <div style="font:700 18px/1.3 Tajawal,sans-serif">18 · 700 — اسم مكان</div>
+          <div style="font:400 15px/1.5 Tajawal,sans-serif;color:#62687A">15 · 400 — سيارة السائق</div>
+          <div style="font:400 14.5px/1.4 Tajawal,sans-serif;color:#77777E">14.5 · 400 — سطر ثانوي</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;min-width:300px">
+        <div style="font:700 12px/1.35 Tajawal,sans-serif;letter-spacing:.2px;color:#62687A">DRIFT — web vs Flutter design system</div>
+        <div dir="ltr" style="display:grid;grid-template-columns:auto auto auto;gap:6px 16px;font-family:'IBM Plex Mono',monospace;font-size:11.5px;line-height:1.5;color:#3A3A3F;text-align:left">
+          <div style="color:#77777E">token</div><div style="color:#77777E">web</div><div style="color:#77777E">flutter</div>
+          <div>primary</div><div style="color:#1010FF">#1010FF</div><div style="color:#0F7B6C">#0F7B6C</div>
+          <div>typeface</div><div>Tajawal 500</div><div>Cairo 600</div>
+          <div>primary btn</div><div>64h · r14 · 20px</div><div>56h · r10 · 17px</div>
+          <div>sheet radius</div><div>27px</div><div>20px</div>
+          <div>radii in use</div><div>10·12·14·16·22·27</div><div>6·10·16·20</div>
+          <div>body / title</div><div>19 / 18</div><div>15 / 17</div>
+          <div>ink</div><div>#17181C</div><div>#111827</div>
+          <div>ink muted</div><div>#77777E</div><div>#4B5563</div>
+          <div>hairline</div><div>#ECECEF</div><div>#E5E7EB</div>
+          <div>error</div><div>#B4453A</div><div>#B91C1C</div>
+          <div>accent</div><div>#F26A18 · #F5A623</div><div>#C07C14</div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <div style="display:flex;align-items:baseline;gap:12px;margin:56px 0 24px">
+    <div style="font:700 24px/1.3 Tajawal,sans-serif">مسار الراكب</div>
+    <div style="font:400 15px/1.55 Tajawal,sans-serif;color:#62687A">Rider flow · #/pickup → #/rate</div>
+    <div style="flex:1;height:1px;background:#D8D8DF"></div>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start">
+
+    <!-- 1 · pickup -->
+    <div style="display:flex;flex-direction:column;gap:12px;width:420px">
+      <div dir="rtl" style="font:700 17px/1.4 Tajawal,sans-serif">١ · اختيار نقطة الانطلاق</div>
+      <div dir="rtl" style="width:420px;height:900px;border-radius:32px;overflow:hidden;background:#fff;box-shadow:0 20px 60px rgba(0,0,0,.28),0 2px 10px rgba(0,0,0,.12);position:relative;font-family:Tajawal,'Segoe UI',Tahoma,sans-serif">
+        <div style="position:absolute;inset:0;background:#dfe3e6 url('assets/map-karrada.png') 50% 44%/cover no-repeat"></div>
+        <div style="position:absolute;top:46px;left:16px;width:52px;height:52px;border-radius:50%;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.15);display:flex;align-items:center;justify-content:center;z-index:20"><span style="font-family:'Material Symbols Outlined';font-size:24px;line-height:1;color:#444">person</span></div>
+        <div style="position:absolute;top:46px;right:16px;width:52px;height:52px;border-radius:50%;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.15);display:flex;align-items:center;justify-content:center;z-index:20"><span style="font-family:'Material Symbols Outlined';font-size:24px;line-height:1;color:#444">home</span></div>
+        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-100%);z-index:10;display:flex;flex-direction:column;align-items:center">
+          <div style="width:30px;height:30px;border-radius:50%;background:#FF6A13;border:2.5px solid #fff;box-sizing:border-box;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(0,0,0,.3)"><span style="width:9px;height:9px;border-radius:50%;background:#fff"></span></div>
+          <div style="width:3px;height:20px;background:#17181C"></div>
+        </div>
+        <div dir="ltr" style="position:absolute;left:10px;bottom:225px;z-index:12;background:rgba(255,255,255,.78);color:#333;font-size:10px;line-height:1;padding:4px 8px;border-radius:20px;box-shadow:0 1px 4px rgba(0,0,0,.15);white-space:nowrap">© OpenStreetMap contributors © CARTO</div>
+        <div style="position:absolute;right:16px;bottom:227px;width:46px;height:46px;border-radius:50%;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.15);display:flex;align-items:center;justify-content:center;z-index:20"><span style="font-family:'Material Symbols Outlined';font-size:22px;line-height:1;color:#404040">my_location</span></div>
+        <div style="position:absolute;left:0;right:0;bottom:0;z-index:15;background:#fff;border-radius:27px 27px 0 0;box-shadow:0 -6px 24px rgba(0,0,0,.14);padding:10px 16px 22px">
+          <div style="width:45px;height:5px;border-radius:3px;background:#E7E9F1;margin:6px auto 16px"></div>
+          <div style="display:flex;align-items:center;gap:10px;height:76px;background:#F7F7FB;border-radius:14px;padding:0 14px">
+            <span style="flex:0 0 auto;width:23px;height:23px;border-radius:50%;background:#F26A18;display:flex;align-items:center;justify-content:center"><span style="width:7px;height:7px;border-radius:50%;background:#fff"></span></span>
+            <span style="flex:1 1 auto;min-width:0;font:500 19px/1.3 Tajawal,sans-serif;color:#272B3E;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">الكرادة، شارع ٤٢، بغداد</span>
+            <span style="flex:0 0 auto;font-family:'Material Symbols Outlined';font-size:24px;line-height:1;color:#62687A">search</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:center;width:100%;height:64px;margin-top:14px;border-radius:14px;background:#1010FF;color:#fff;font:500 20px/1.2 Tajawal,sans-serif">تأكيد نقطة الانطلاق</div>
+        </div>
+      </div>
+      <sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}">
+        <div dir="ltr" style="font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.6;color:#77777E;text-align:left">index.html → .app-frame · sheet 213px tall, so #btnMyLocation and the attribution pill both ride on --sheet-h<br>the pin never moves — the map pans under it, and the address row reports whatever is under the tip</div>
+      </sc-if>
+      <sc-if value="{{ showDrift }}" hint-placeholder-val="{{ true }}">
+        <div dir="ltr" style="align-self:flex-start;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.5;background:#FFF7ED;border:1px solid #FED7AA;color:#9A3412;border-radius:8px;padding:8px 10px;text-align:left">DRIFT · confirm 64h/r14/20px vs Flutter 56h/r10/17px · sheet r27 vs r20 · #1010FF vs #0F7B6C</div>
+      </sc-if>
+    </div>
+
+    <!-- 2 · search -->
+    <div style="display:flex;flex-direction:column;gap:12px;width:420px">
+      <div dir="rtl" style="font:700 17px/1.4 Tajawal,sans-serif">٢ · البحث عن مكان</div>
+      <div dir="rtl" style="width:420px;height:900px;border-radius:32px;overflow:hidden;background:#fff;box-shadow:0 20px 60px rgba(0,0,0,.28),0 2px 10px rgba(0,0,0,.12);position:relative;font-family:Tajawal,'Segoe UI',Tahoma,sans-serif;display:flex;flex-direction:column">
+        <div style="flex:0 0 auto;position:relative;height:54px;display:flex;align-items:center;justify-content:center">
+          <div style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Outlined';font-size:26px;line-height:1;color:#3A3A3F">close</span></div>
+          <div style="font:700 21px/1.2 Tajawal,sans-serif;color:#17181C">الانطلاق</div>
+        </div>
+        <div style="flex:0 0 auto;display:flex;align-items:center;gap:12px;height:52px;margin:2px 10px 6px;padding:0 15px;border-radius:10px;background:#EFEFF3">
+          <span style="flex:0 0 auto;width:14px;height:14px;border-radius:50%;background:#F26A18;display:flex;align-items:center;justify-content:center"><span style="width:5px;height:5px;border-radius:50%;background:#fff"></span></span>
+          <span style="flex:1 1 auto;min-width:0;font:500 22px/1.2 Tajawal,sans-serif;color:#17181C">الكرادة</span>
+          <span style="flex:0 0 auto;font-family:'Material Symbols Outlined';font-size:22px;line-height:1;color:#3A3A3F">search</span>
+        </div>
+        <div style="flex:1 1 auto;display:flex;flex-direction:column;padding:2px 0 16px;overflow:hidden">
+          <div style="display:flex;align-items:center;gap:14px;min-height:75px;padding:12px 20px;box-shadow:inset 0 -1px 0 0 #ECECEF">
+            <div style="flex:1 1 auto;min-width:0;text-align:start">
+              <div style="font:700 18px/1.3 Tajawal,sans-serif;color:#17181C;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">بيت</div>
+              <div style="margin-top:3px;font:400 14.5px/1.35 Tajawal,sans-serif;color:#77777E">الكرادة، شارع ٤٢، بغداد</div>
+            </div>
+            <div style="flex:0 0 auto;width:40px;display:flex;flex-direction:column;align-items:center;gap:5px">
+              <span style="font-family:'Material Symbols Outlined';font-size:23px;line-height:1;color:#55555C;font-variation-settings:'wght' 300">star</span>
+              <span dir="ltr" style="font:400 13px/1 Tajawal,sans-serif;color:#77777E">١ KM</span>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;min-height:75px;padding:12px 20px;box-shadow:inset 0 -1px 0 0 #ECECEF">
+            <div style="flex:1 1 auto;min-width:0;text-align:start">
+              <div style="font:700 18px/1.3 Tajawal,sans-serif;color:#17181C;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">شارع أبو نواس</div>
+              <div style="margin-top:3px;font:400 14.5px/1.35 Tajawal,sans-serif;color:#77777E">الكرادة الشرقية، بغداد</div>
+            </div>
+            <div style="flex:0 0 auto;width:40px;display:flex;flex-direction:column;align-items:center;gap:5px">
+              <span style="font-family:'Material Symbols Outlined';font-size:23px;line-height:1;color:#55555C;font-variation-settings:'wght' 300">history</span>
+              <span dir="ltr" style="font:400 13px/1 Tajawal,sans-serif;color:#77777E">٢ KM</span>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;min-height:75px;padding:12px 20px;box-shadow:inset 0 -1px 0 0 #ECECEF">
+            <div style="flex:1 1 auto;min-width:0;text-align:start">
+              <div style="font:700 18px/1.3 Tajawal,sans-serif;color:#17181C;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">شارع الكرادة داخل</div>
+              <div style="margin-top:3px;font:400 14.5px/1.35 Tajawal,sans-serif;color:#77777E">الكرادة، بغداد</div>
+            </div>
+            <div style="flex:0 0 auto;width:40px;display:flex;flex-direction:column;align-items:center;gap:5px">
+              <span style="width:24px;height:24px;border-radius:50%;background:#7E9C9B;color:#fff;display:flex;align-items:center;justify-content:center"><svg style="width:16px;height:16px;display:block"><use href="#w-road"></use></svg></span>
+              <span dir="ltr" style="font:400 13px/1 Tajawal,sans-serif;color:#77777E">٢ KM</span>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;min-height:75px;padding:12px 20px;box-shadow:inset 0 -1px 0 0 #ECECEF">
+            <div style="flex:1 1 auto;min-width:0;text-align:start">
+              <div style="font:700 18px/1.3 Tajawal,sans-serif;color:#17181C;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ساحة كهرمانة</div>
+              <div style="margin-top:3px;font:400 14.5px/1.35 Tajawal,sans-serif;color:#77777E">الكرادة، بغداد</div>
+            </div>
+            <div style="flex:0 0 auto;width:40px;display:flex;flex-direction:column;align-items:center;gap:5px">
+              <span style="width:24px;height:24px;border-radius:50%;background:#7E9C9B;color:#fff;display:flex;align-items:center;justify-content:center"><svg style="width:16px;height:16px;display:block"><use href="#w-pin"></use></svg></span>
+              <span dir="ltr" style="font:400 13px/1 Tajawal,sans-serif;color:#77777E">٣ KM</span>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;min-height:75px;padding:12px 20px;box-shadow:inset 0 -1px 0 0 #ECECEF">
+            <div style="flex:1 1 auto;min-width:0;text-align:start">
+              <div style="font:700 18px/1.3 Tajawal,sans-serif;color:#17181C;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">مستشفى ابن النفيس</div>
+              <div style="margin-top:3px;font:400 14.5px/1.35 Tajawal,sans-serif;color:#77777E">باب الشيخ، بغداد</div>
+            </div>
+            <div style="flex:0 0 auto;width:40px;display:flex;flex-direction:column;align-items:center;gap:5px">
+              <span style="width:24px;height:24px;border-radius:50%;background:#F2637E;color:#fff;display:flex;align-items:center;justify-content:center"><svg style="width:16px;height:16px;display:block"><use href="#w-hospital"></use></svg></span>
+              <span dir="ltr" style="font:400 13px/1 Tajawal,sans-serif;color:#77777E">٤ KM</span>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;min-height:75px;padding:12px 20px;box-shadow:inset 0 -1px 0 0 #ECECEF">
+            <div style="flex:1 1 auto;min-width:0;text-align:start">
+              <div style="font:700 18px/1.3 Tajawal,sans-serif;color:#17181C;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">جامعة بغداد</div>
+              <div style="margin-top:3px;font:400 14.5px/1.35 Tajawal,sans-serif;color:#77777E">الجادرية، بغداد</div>
+            </div>
+            <div style="flex:0 0 auto;width:40px;display:flex;flex-direction:column;align-items:center;gap:5px">
+              <span style="width:24px;height:24px;border-radius:50%;background:#F0904A;color:#fff;display:flex;align-items:center;justify-content:center"><svg style="width:16px;height:16px;display:block"><use href="#w-book"></use></svg></span>
+              <span dir="ltr" style="font:400 13px/1 Tajawal,sans-serif;color:#77777E">٥ KM</span>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;min-height:75px;padding:12px 20px">
+            <div style="flex:1 1 auto;min-width:0;text-align:start">
+              <div style="font:700 18px/1.3 Tajawal,sans-serif;color:#17181C;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">مول بابل</div>
+              <div style="margin-top:3px;font:400 14.5px/1.35 Tajawal,sans-serif;color:#77777E">الجادرية، بغداد</div>
+            </div>
+            <div style="flex:0 0 auto;width:40px;display:flex;flex-direction:column;align-items:center;gap:5px">
+              <span style="width:24px;height:24px;border-radius:50%;background:#5B93D6;color:#fff;display:flex;align-items:center;justify-content:center"><svg style="width:16px;height:16px;display:block"><use href="#w-bag"></use></svg></span>
+              <span dir="ltr" style="font:400 13px/1 Tajawal,sans-serif;color:#77777E">٦ KM</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}">
+        <div dir="ltr" style="font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.6;color:#77777E;text-align:left">search-engine.js + data/baghdad-gazetteer.json — local index, works offline<br>saved and recent rows carry a bare 300-weight glyph; a gazetteer hit gets a filled category disc<br>row is one clipped line by design: a name with three OSM variants must not grow the row to 120px</div>
+      </sc-if>
+      <sc-if value="{{ showDrift }}" hint-placeholder-val="{{ true }}">
+        <div dir="ltr" style="align-self:flex-start;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.5;background:#FFF7ED;border:1px solid #FED7AA;color:#9A3412;border-radius:8px;padding:8px 10px;text-align:left">DRIFT · 7 category disc colours exist only here — no Flutter equivalent · row title 18/700 vs title 17/600</div>
+      </sc-if>
+    </div>
+
+    <!-- 3 · dropoff -->
+    <div style="display:flex;flex-direction:column;gap:12px;width:420px">
+      <div dir="rtl" style="font:700 17px/1.4 Tajawal,sans-serif">٣ · نقطة الوصول — اللوحة موسّعة</div>
+      <div dir="rtl" style="width:420px;height:900px;border-radius:32px;overflow:hidden;background:#fff;box-shadow:0 20px 60px rgba(0,0,0,.28),0 2px 10px rgba(0,0,0,.12);position:relative;font-family:Tajawal,'Segoe UI',Tahoma,sans-serif">
+        <div style="position:absolute;inset:0;background:#dfe3e6 url('assets/map-karrada.png') 38% 30%/cover no-repeat"></div>
+        <div style="position:absolute;top:46px;left:16px;width:52px;height:52px;border-radius:50%;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.15);display:flex;align-items:center;justify-content:center;z-index:20"><span style="font-family:'Material Symbols Outlined';font-size:24px;line-height:1;color:#444">person</span></div>
+        <div style="position:absolute;top:46px;right:16px;width:52px;height:52px;border-radius:50%;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.15);display:flex;align-items:center;justify-content:center;z-index:20"><span style="font-family:'Material Symbols Outlined';font-size:24px;line-height:1;color:#444">arrow_forward</span></div>
+        <div style="position:absolute;left:52px;top:214px;z-index:11;display:flex;align-items:center;gap:8px;height:38px;padding:0 5px 0 14px;border-radius:19px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.22);white-space:nowrap">
+          <span style="flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#F26A18;display:flex;align-items:center;justify-content:center"><span style="width:10px;height:10px;border-radius:50%;background:#fff"></span></span>
+          <span style="font:700 15px/1.2 Tajawal,sans-serif;color:#17181C">شارع ٤٢</span>
+        </div>
+        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-100%);z-index:10;display:flex;flex-direction:column;align-items:center">
+          <div style="width:28px;height:28px;border-radius:8px;background:#1010FF;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(0,0,0,.3)"><span style="width:9px;height:9px;border-radius:2px;background:#fff"></span></div>
+          <div style="width:3px;height:20px;background:#17181C"></div>
+        </div>
+        <div dir="ltr" style="position:absolute;left:10px;bottom:361px;z-index:12;background:rgba(255,255,255,.78);color:#333;font-size:10px;line-height:1;padding:4px 8px;border-radius:20px;box-shadow:0 1px 4px rgba(0,0,0,.15);white-space:nowrap">© OpenStreetMap contributors © CARTO</div>
+        <div style="position:absolute;right:16px;bottom:363px;width:46px;height:46px;border-radius:50%;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.15);display:flex;align-items:center;justify-content:center;z-index:20"><span style="font-family:'Material Symbols Outlined';font-size:22px;line-height:1;color:#404040">my_location</span></div>
+        <div style="position:absolute;left:0;right:0;bottom:0;z-index:15;background:#fff;border-radius:27px 27px 0 0;box-shadow:0 -6px 24px rgba(0,0,0,.14);padding:10px 16px 22px">
+          <div style="display:flex;align-items:center;justify-content:center;width:100%;height:26px;margin:-4px 0 8px;color:#C6C9D3"><span style="font-family:'Material Symbols Outlined';font-size:26px;line-height:1;transform:rotate(180deg)">expand_less</span></div>
+          <div style="display:flex;align-items:center;gap:10px;height:76px;background:#F7F7FB;border-radius:14px;padding:0 14px">
+            <span style="flex:0 0 auto;width:23px;height:23px;border-radius:7px;background:#1010FF;display:flex;align-items:center;justify-content:center"><span style="width:8px;height:8px;border-radius:2px;background:#fff"></span></span>
+            <span style="flex:1 1 auto;min-width:0;font:500 19px/1.3 Tajawal,sans-serif;color:#272B3E;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">الجادرية، شارع الجامعة</span>
+            <span style="flex:0 0 auto;font-family:'Material Symbols Outlined';font-size:24px;line-height:1;color:#62687A">search</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;padding:16px 4px 14px;border-bottom:1px solid #ECECEF">
+            <div style="flex:1 1 auto;min-width:0;text-align:start">
+              <div style="font:700 18px/1.3 Tajawal,sans-serif;color:#17181C;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">شارع الجامعة</div>
+              <div style="margin-top:3px;font:400 14.5px/1.35 Tajawal,sans-serif;color:#77777E">أقرب عنوان لهذه النقطة</div>
+            </div>
+            <span style="flex:0 0 auto;font-family:'Material Symbols Outlined';font-size:24px;line-height:1;color:#55555C">pin_drop</span>
+          </div>
+          <div style="display:flex;gap:22px;padding:18px 4px 4px;overflow:hidden">
+            <div style="flex:0 0 auto;display:flex;align-items:center;gap:10px">
+              <span style="flex:0 0 auto;width:34px;height:34px;border-radius:50%;background:#EDEDFB;display:flex;align-items:center;justify-content:center;color:#1010FF"><span style="font-family:'Material Symbols Outlined';font-size:19px;line-height:1;font-variation-settings:'FILL' 1">star</span></span>
+              <span style="font:500 16px/1.2 Tajawal,sans-serif;color:#17181C;white-space:nowrap">بيت</span>
+            </div>
+            <div style="flex:0 0 auto;display:flex;align-items:center;gap:10px">
+              <span style="flex:0 0 auto;width:34px;height:34px;border-radius:50%;background:#EDEDFB;display:flex;align-items:center;justify-content:center;color:#1010FF"><span style="font-family:'Material Symbols Outlined';font-size:19px;line-height:1;font-variation-settings:'FILL' 1">star</span></span>
+              <span style="font:500 16px/1.2 Tajawal,sans-serif;color:#17181C;white-space:nowrap">العمل</span>
+            </div>
+            <div style="flex:0 0 auto;display:flex;align-items:center;gap:10px">
+              <span style="flex:0 0 auto;width:34px;height:34px;border-radius:50%;background:#EDEDFB;display:flex;align-items:center;justify-content:center;color:#1010FF"><span style="font-family:'Material Symbols Outlined';font-size:19px;line-height:1;font-variation-settings:'FILL' 1">star</span></span>
+              <span style="font:500 16px/1.2 Tajawal,sans-serif;color:#17181C;white-space:nowrap">الجامعة</span>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:center;width:100%;height:64px;margin-top:14px;border-radius:14px;background:#1010FF;color:#fff;font:500 20px/1.2 Tajawal,sans-serif">تأكيد نقطة الوصول</div>
+        </div>
+      </div>
+      <sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}">
+        <div dir="ltr" style="font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.6;color:#77777E;text-align:left">script.js → dropoff stage · the chevron points where the sheet will go, 0fr→1fr grid collapse<br>the confirmed pickup stays on the map as a chip so both ends of the trip are visible at once<br>home button becomes the back arrow here; it is mirrored by .icon--dir under LTR</div>
+      </sc-if>
+      <sc-if value="{{ showDrift }}" hint-placeholder-val="{{ true }}">
+        <div dir="ltr" style="align-self:flex-start;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.5;background:#FFF7ED;border:1px solid #FED7AA;color:#9A3412;border-radius:8px;padding:8px 10px;text-align:left">DRIFT · two marker vocabularies (orange dot / blue square) vs one Flutter pin · chip r19, off the radius scale</div>
+      </sc-if>
+    </div>
+
+    <!-- 4 · ride -->
+    <div style="display:flex;flex-direction:column;gap:12px;width:420px">
+      <div dir="rtl" style="font:700 17px/1.4 Tajawal,sans-serif">٤ · اختيار المركبة والأجرة</div>
+      <div dir="rtl" style="width:420px;height:900px;border-radius:32px;overflow:hidden;background:#fff;box-shadow:0 20px 60px rgba(0,0,0,.28),0 2px 10px rgba(0,0,0,.12);position:relative;font-family:Tajawal,'Segoe UI',Tahoma,sans-serif">
+        <div style="position:absolute;inset:0;background:#dfe3e6 url('assets/map-karrada.png') 46% 62%/cover no-repeat"></div>
+        <div style="position:absolute;left:44px;top:150px;z-index:11;display:flex;align-items:center;gap:8px;height:38px;padding:0 5px 0 14px;border-radius:19px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.22);white-space:nowrap">
+          <span style="flex:0 0 auto;width:28px;height:28px;border-radius:9px;background:#1010FF;display:flex;align-items:center;justify-content:center"><span style="width:10px;height:10px;border-radius:3px;background:#fff"></span></span>
+          <span style="font:700 15px/1.2 Tajawal,sans-serif;color:#17181C">شارع الجامعة</span>
+        </div>
+        <div style="position:absolute;left:64px;top:246px;z-index:11;display:flex;align-items:center;gap:8px;height:38px;padding:0 5px 0 14px;border-radius:19px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.22);white-space:nowrap">
+          <span style="flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#F26A18;display:flex;align-items:center;justify-content:center"><span style="width:10px;height:10px;border-radius:50%;background:#fff"></span></span>
+          <span style="font:700 15px/1.2 Tajawal,sans-serif;color:#17181C">شارع ٤٢</span>
+        </div>
+        <div dir="ltr" style="position:absolute;left:10px;bottom:521px;z-index:12;background:rgba(255,255,255,.78);color:#333;font-size:10px;line-height:1;padding:4px 8px;border-radius:20px;box-shadow:0 1px 4px rgba(0,0,0,.15);white-space:nowrap">© OpenStreetMap contributors © CARTO</div>
+        <div style="position:absolute;left:0;right:0;bottom:0;z-index:15;background:#fff;border-radius:27px 27px 0 0;box-shadow:0 -6px 24px rgba(0,0,0,.14);padding:6px 16px 22px">
+          <div style="width:45px;height:5px;border-radius:3px;background:#E7E9F1;margin:6px auto 16px"></div>
+          <div style="display:flex;margin:2px -16px 6px;border-bottom:1px solid #ECECEF">
+            <div style="flex:1 1 0;position:relative;height:52px;display:flex;align-items:center;justify-content:center;font:700 19px/1.2 Tajawal,sans-serif;color:#17181C">تكسي<span style="position:absolute;left:12%;right:12%;bottom:-1px;height:3px;border-radius:2px;background:#17181C"></span></div>
+            <div style="flex:1 1 0;height:52px;display:flex;align-items:center;justify-content:center;font:700 19px/1.2 Tajawal,sans-serif;color:#9A9AA1">بوكس</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;padding:6px 0 2px">
+            <div style="display:flex;align-items:center;gap:14px;width:100%;min-height:78px;padding:10px 12px;box-sizing:border-box;border:2px solid #1010FF;border-radius:16px;background:#EFEFFC">
+              <div style="position:relative;flex:0 0 auto;width:74px;height:40px">
+                <svg style="width:74px;height:38px;display:block"><use href="#w-car"></use></svg>
+                <svg style="position:absolute;top:-2px;left:2px;width:21px;height:21px"><use href="#w-badge-bolt"></use></svg>
+              </div>
+              <div style="flex:1 1 auto;min-width:0">
+                <div style="font:700 19px/1.25 Tajawal,sans-serif;color:#17181C">سوبر</div>
+                <div style="margin-top:2px;font:400 14.5px/1.35 Tajawal,sans-serif;color:#77777E">الخيار الأفضل</div>
+              </div>
+              <div style="flex:0 0 auto;font:700 18px/1.2 Tajawal,sans-serif;color:#17181C;white-space:nowrap">٤٬٥٠٠ دينار</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:14px;width:100%;min-height:78px;padding:10px 12px;box-sizing:border-box;border:2px solid transparent;border-radius:16px">
+              <div style="position:relative;flex:0 0 auto;width:74px;height:40px">
+                <svg style="width:74px;height:38px;display:block"><use href="#w-car"></use></svg>
+                <svg style="position:absolute;top:-2px;left:2px;width:21px;height:21px"><use href="#w-badge-coin"></use></svg>
+              </div>
+              <div style="flex:1 1 auto;min-width:0">
+                <div style="font:700 19px/1.25 Tajawal,sans-serif;color:#17181C">توفير</div>
+                <div style="margin-top:2px;font:400 14.5px/1.35 Tajawal,sans-serif;color:#77777E">التكسي الأوفر</div>
+              </div>
+              <div style="flex:0 0 auto;font:700 18px/1.2 Tajawal,sans-serif;color:#17181C;white-space:nowrap">٣٬٥٠٠ دينار</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:14px;width:100%;min-height:78px;padding:10px 12px;box-sizing:border-box;border:2px solid transparent;border-radius:16px">
+              <div style="position:relative;flex:0 0 auto;width:74px;height:40px">
+                <svg style="width:74px;height:38px;display:block"><use href="#w-car"></use></svg>
+                <svg style="position:absolute;top:-2px;left:2px;width:21px;height:21px"><use href="#w-badge-star"></use></svg>
+              </div>
+              <div style="flex:1 1 auto;min-width:0">
+                <div style="font:700 19px/1.25 Tajawal,sans-serif;color:#17181C">بلَس</div>
+                <div style="margin-top:2px;font:400 14.5px/1.35 Tajawal,sans-serif;color:#77777E">راحة أكثر</div>
+              </div>
+              <div style="flex:0 0 auto;font:700 18px/1.2 Tajawal,sans-serif;color:#17181C;white-space:nowrap">٥٬٢٥٠ دينار</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;margin:4px -16px 0;padding:6px 0;border-top:1px solid #ECECEF">
+            <div style="flex:1 1 0;display:flex;align-items:center;justify-content:center;gap:8px;height:50px;font:500 16px/1.2 Tajawal,sans-serif;color:#17181C">
+              <span style="display:flex;color:#55555C"><svg style="width:20px;height:20px;display:block"><use href="#w-tune"></use></svg></span>
+              <span>خيارات الرحلة</span>
+            </div>
+            <span style="width:1px;height:26px;background:#ECECEF"></span>
+            <div style="flex:1 1 0;display:flex;align-items:center;justify-content:center;gap:8px;height:50px;font:500 16px/1.2 Tajawal,sans-serif;color:#17181C">
+              <span style="display:flex;color:#55555C"><svg style="width:20px;height:20px;display:block"><use href="#w-tag"></use></svg></span>
+              <span>رمز الخصم</span>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:center;width:100%;height:64px;margin-top:14px;border-radius:14px;background:#1010FF;color:#fff;font:500 20px/1.2 Tajawal,sans-serif">طلب سوبر</div>
+        </div>
+      </div>
+      <sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}">
+        <div dir="ltr" style="font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.6;color:#77777E;text-align:left">script.js → TARIFFS · fare = max(minimum, base + perKm × km), km = straight line × 1.3, rounded UP to 250<br>6.8 km: super 1,250+450 → ٤٬٥٠٠ · saver 1,000+350 → ٣٬٥٠٠ · plus 1,500+550 → ٥٬٢٥٠<br>TIER_ORDER puts the recommended tier first, then cheaper, then dearer — not price order</div>
+      </sc-if>
+      <sc-if value="{{ showDrift }}" hint-placeholder-val="{{ true }}">
+        <div dir="ltr" style="align-self:flex-start;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.5;background:#FFF7ED;border:1px solid #FED7AA;color:#9A3412;border-radius:8px;padding:8px 10px;text-align:left">DRIFT · selected row = 2px #1010FF + #EFEFFC; Flutter marks selection with muted #EDF9F7 and no border</div>
+      </sc-if>
+    </div>
+
+    <!-- 5 · searching -->
+    <div style="display:flex;flex-direction:column;gap:12px;width:420px">
+      <div dir="rtl" style="font:700 17px/1.4 Tajawal,sans-serif">٥ · الرحلة الحية — بحث عن سائق</div>
+      <div dir="rtl" style="width:420px;height:900px;border-radius:32px;overflow:hidden;background:#fff;box-shadow:0 20px 60px rgba(0,0,0,.28),0 2px 10px rgba(0,0,0,.12);position:relative;font-family:Tajawal,'Segoe UI',Tahoma,sans-serif">
+        <div style="position:absolute;inset:0;background:#dfe3e6 url('assets/map-karrada.png') 55% 24%/cover no-repeat"></div>
+        <div dir="ltr" style="position:absolute;left:10px;bottom:272px;z-index:12;background:rgba(255,255,255,.78);color:#333;font-size:10px;line-height:1;padding:4px 8px;border-radius:20px;box-shadow:0 1px 4px rgba(0,0,0,.15);white-space:nowrap">© OpenStreetMap contributors © CARTO</div>
+        <div style="position:absolute;left:0;right:0;bottom:0;z-index:15;background:#fff;border-radius:27px 27px 0 0;box-shadow:0 -6px 24px rgba(0,0,0,.14);padding:10px 16px 22px">
+          <div style="width:45px;height:5px;border-radius:3px;background:#E7E9F1;margin:6px auto 16px"></div>
+          <div style="position:relative;width:74px;height:74px;margin:10px auto 14px">
+            <span style="position:absolute;top:50%;left:50%;width:74px;height:74px;border-radius:50%;background:rgba(16,16,255,.16);transform:translate(-50%,-50%);animation:alyradar 2s ease-out infinite"></span>
+            <span style="position:absolute;top:50%;left:50%;width:74px;height:74px;border-radius:50%;background:rgba(16,16,255,.16);transform:translate(-50%,-50%);animation:alyradar 2s ease-out 1s infinite"></span>
+            <span style="position:absolute;top:50%;left:50%;width:20px;height:20px;border-radius:50%;background:#1010FF;transform:translate(-50%,-50%)"></span>
+          </div>
+          <div style="font:700 19px/1.3 Tajawal,sans-serif;color:#17181C;margin-top:4px">جارِ البحث عن سائق قريب</div>
+          <div style="font:400 14.5px/1.4 Tajawal,sans-serif;color:#77777E;margin-top:6px">عادة يستغرق الأمر أقل من دقيقة</div>
+          <div style="display:flex;align-items:center;justify-content:center;width:100%;height:50px;margin-top:12px;border-radius:12px;background:#F4F4F8;font:500 16px/1.2 Tajawal,sans-serif;color:#B4453A">إلغاء الطلب</div>
+        </div>
+      </div>
+      <sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}">
+        <div dir="ltr" style="font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.6;color:#77777E;text-align:left">app.js → renderTripSheet(), state 'searching' · two rings on one 2s keyframe, offset 1s so the pulse never gaps<br>with a server this waits on a real driver accepting; without one, a timer stands in</div>
+      </sc-if>
+      <sc-if value="{{ showDrift }}" hint-placeholder-val="{{ true }}">
+        <div dir="ltr" style="align-self:flex-start;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.5;background:#FFF7ED;border:1px solid #FED7AA;color:#9A3412;border-radius:8px;padding:8px 10px;text-align:left">DRIFT · cancel is a filled grey button with red text; Flutter uses a tertiary text button, no fill</div>
+      </sc-if>
+    </div>
+
+    <!-- 6 · driver on the way -->
+    <div style="display:flex;flex-direction:column;gap:12px;width:420px">
+      <div dir="rtl" style="font:700 17px/1.4 Tajawal,sans-serif">٦ · السائق في الطريق</div>
+      <div dir="rtl" style="width:420px;height:900px;border-radius:32px;overflow:hidden;background:#fff;box-shadow:0 20px 60px rgba(0,0,0,.28),0 2px 10px rgba(0,0,0,.12);position:relative;font-family:Tajawal,'Segoe UI',Tahoma,sans-serif">
+        <div style="position:absolute;inset:0;background:#dfe3e6 url('assets/map-karrada.png') 34% 48%/cover no-repeat"></div>
+        <div style="position:absolute;left:198px;top:262px;z-index:11;display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:50%;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.28)"><svg style="width:24px;height:24px;display:block"><use href="#w-car"></use></svg></div>
+        <div dir="ltr" style="position:absolute;left:10px;bottom:366px;z-index:12;background:rgba(255,255,255,.78);color:#333;font-size:10px;line-height:1;padding:4px 8px;border-radius:20px;box-shadow:0 1px 4px rgba(0,0,0,.15);white-space:nowrap">© OpenStreetMap contributors © CARTO</div>
+        <div style="position:absolute;left:0;right:0;bottom:0;z-index:15;background:#fff;border-radius:27px 27px 0 0;box-shadow:0 -6px 24px rgba(0,0,0,.14);padding:10px 16px 22px">
+          <div style="width:45px;height:5px;border-radius:3px;background:#E7E9F1;margin:6px auto 16px"></div>
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding-bottom:4px">
+            <div style="font:700 19px/1.3 Tajawal,sans-serif;color:#17181C">السائق في الطريق إليك</div>
+            <div style="font:400 15px/1.2 Tajawal,sans-serif;color:#77777E;white-space:nowrap"><span style="font:700 20px/1.2 Tajawal,sans-serif;color:#1010FF;margin-inline-end:4px">٤</span>دقيقة</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;padding:18px 0">
+            <div style="flex:0 0 auto;width:64px;height:64px;border-radius:50%;background:#E7E9F1;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Outlined';font-size:36px;line-height:1;color:#9AA0AE">person</span></div>
+            <div style="flex:1 1 auto;min-width:0">
+              <div style="font:700 18px/1.3 Tajawal,sans-serif;color:#17181C">برهان حسين شمخي</div>
+              <div style="margin-top:4px;font:400 15px/1.35 Tajawal,sans-serif;color:#62687A">Changan Eado أبيض ٢٤٧٥١ بغداد</div>
+            </div>
+            <div dir="ltr" style="display:flex;align-items:center;gap:3px;font:700 15px/1.2 Tajawal,sans-serif;color:#17181C"><span style="font-family:'Material Symbols Outlined';font-size:18px;line-height:1;color:#F5A623;font-variation-settings:'FILL' 1">star</span><span>٤٫٩</span></div>
+          </div>
+          <div style="display:flex;gap:10px;padding:4px 0 12px;border-bottom:1px solid #ECECEF">
+            <div style="flex:1 1 0;display:flex;align-items:center;justify-content:center;gap:8px;height:46px;border:1px solid #E7E7EC;border-radius:12px;background:#fff;font:500 15.5px/1.2 Tajawal,sans-serif;color:#17181C"><span style="font-family:'Material Symbols Outlined';font-size:19px;line-height:1;color:#55555C">call</span><span>اتصال</span></div>
+            <div style="flex:1 1 0;display:flex;align-items:center;justify-content:center;gap:8px;height:46px;border:1px solid #E7E7EC;border-radius:12px;background:#fff;font:500 15.5px/1.2 Tajawal,sans-serif;color:#17181C"><span style="font-family:'Material Symbols Outlined';font-size:19px;line-height:1;color:#55555C">chat</span><span>رسالة</span></div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0 4px;font:400 15.5px/1.3 Tajawal,sans-serif;color:#77777E">
+            <span>سوبر</span>
+            <span style="font:700 18px/1.2 Tajawal,sans-serif;color:#17181C">٤٬٥٠٠ دينار</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:center;width:100%;height:50px;margin-top:12px;border-radius:12px;background:#F4F4F8;font:500 16px/1.2 Tajawal,sans-serif;color:#B4453A">إلغاء الرحلة</div>
+        </div>
+      </div>
+      <sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}">
+        <div dir="ltr" style="font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.6;color:#77777E;text-align:left">app.js → states assigned / arrived / onboard share this sheet; 'arrived' drops the ETA, 'onboard' drops cancel<br>driver names and plates are the invented DRIVERS roster · rating and fare use Arabic-Indic digits with ٬<br>the car marker follows real driver GPS when a server is connected</div>
+      </sc-if>
+      <sc-if value="{{ showDrift }}" hint-placeholder-val="{{ true }}">
+        <div dir="ltr" style="align-self:flex-start;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.5;background:#FFF7ED;border:1px solid #FED7AA;color:#9A3412;border-radius:8px;padding:8px 10px;text-align:left">DRIFT · rating gold #F5A623 has no token; Flutter's accent is #C07C14 · driver card has no container, Flutter cards do</div>
+      </sc-if>
+    </div>
+
+    <!-- 7 · rating -->
+    <div style="display:flex;flex-direction:column;gap:12px;width:420px">
+      <div dir="rtl" style="font:700 17px/1.4 Tajawal,sans-serif">٧ · تقييم السائق — قبل الاختيار</div>
+      <div dir="rtl" style="width:420px;height:900px;border-radius:32px;overflow:hidden;background:#fff;box-shadow:0 20px 60px rgba(0,0,0,.28),0 2px 10px rgba(0,0,0,.12);position:relative;font-family:Tajawal,'Segoe UI',Tahoma,sans-serif;display:flex;flex-direction:column">
+        <div style="position:relative;flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:20px 16px 16px">
+          <div style="position:absolute;left:16px;top:16px;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Outlined';font-size:26px;line-height:1;color:#444">close</span></div>
+          <div style="font:700 21px/1.2 Tajawal,sans-serif;color:#17181C">تقييم السائق</div>
+        </div>
+        <div style="flex:1 1 auto;padding:8px 20px 24px">
+          <div style="display:flex;align-items:center;gap:14px;padding:18px 0">
+            <div style="flex:0 0 auto;width:64px;height:64px;border-radius:50%;background:#E7E9F1;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Outlined';font-size:36px;line-height:1;color:#9AA0AE">person</span></div>
+            <div style="flex:1 1 auto;min-width:0">
+              <div style="font:700 18px/1.3 Tajawal,sans-serif;color:#17181C">برهان حسين شمخي</div>
+              <div style="margin-top:4px;font:400 15px/1.35 Tajawal,sans-serif;color:#62687A">Changan Eado أبيض</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;padding:16px 0;border-top:1px solid #ECEDF3">
+            <span style="flex:0 0 auto;width:23px;height:23px;border-radius:7px;background:#1010FF;display:flex;align-items:center;justify-content:center"><span style="width:8px;height:8px;border-radius:2px;background:#fff"></span></span>
+            <span style="flex:1 1 auto;font:400 16px/1.4 Tajawal,sans-serif;color:#272B3E;text-align:start">بغداد، شارع أبو الفداء</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;padding:16px 0;border-top:1px solid #ECEDF3;border-bottom:1px solid #ECEDF3">
+            <span style="flex:0 0 auto;width:22px;height:22px;display:flex;align-items:center;justify-content:center;color:#9AA0AE"><span style="font-family:'Material Symbols Outlined';font-size:20px;line-height:1">calendar_today</span></span>
+            <span style="flex:1 1 auto;font:400 16px/1.4 Tajawal,sans-serif;color:#272B3E;text-align:start">الرحلة الاثنين ظهراً</span>
+          </div>
+          <div style="height:8px;margin:8px -20px 0;background:#F5F6FA"></div>
+          <div style="margin:28px 0 20px;font:700 18px/1.3 Tajawal,sans-serif;color:#17181C;text-align:center">تقييم الرحلة والسائق</div>
+          <div dir="ltr" style="display:flex;justify-content:space-between;gap:8px;padding:0 4px">
+            <div style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:#C6C9D3"><span style="font-family:'Material Symbols Outlined';font-size:34px;line-height:1">star</span></div>
+            <div style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:#C6C9D3"><span style="font-family:'Material Symbols Outlined';font-size:34px;line-height:1">star</span></div>
+            <div style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:#C6C9D3"><span style="font-family:'Material Symbols Outlined';font-size:34px;line-height:1">star</span></div>
+            <div style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:#C6C9D3"><span style="font-family:'Material Symbols Outlined';font-size:34px;line-height:1">star</span></div>
+            <div style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:#C6C9D3"><span style="font-family:'Material Symbols Outlined';font-size:34px;line-height:1">star</span></div>
+          </div>
+          <div dir="ltr" style="display:flex;justify-content:space-between;margin-top:4px;padding:0 4px;font:400 13px/1.4 Tajawal,sans-serif;color:#62687A">
+            <span>سيئ جداً</span>
+            <span>جيد جداً</span>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:10px;margin-top:28px">
+            <span style="flex:0 0 auto;font-family:'Material Symbols Outlined';font-size:18px;line-height:1;color:#62687A;margin-top:2px">visibility_off</span>
+            <span style="flex:1 1 auto;font:400 13px/1.5 Tajawal,sans-serif;color:#62687A">سيتم الاحتفاظ بتقييمك بشكل سري ولن يعرف السائق به</span>
+          </div>
+        </div>
+      </div>
+      <sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}">
+        <div dir="ltr" style="font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.6;color:#77777E;text-align:left">index.html → .rating-overlay · stars stay LTR in every locale: 1 worst on the left, 5 best on the right<br>#9AA0AE was 2.66:1 on white, so the privacy line and the scale labels were moved to #62687A (5.56:1)</div>
+      </sc-if>
+      <sc-if value="{{ showDrift }}" hint-placeholder-val="{{ true }}">
+        <div dir="ltr" style="align-self:flex-start;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.5;background:#FFF7ED;border:1px solid #FED7AA;color:#9A3412;border-radius:8px;padding:8px 10px;text-align:left">DRIFT · stars fill #1010FF here but #F5A623 in the driver card — one product, two meanings for a star</div>
+      </sc-if>
+    </div>
+
+    <!-- 8 · rating feedback -->
+    <div style="display:flex;flex-direction:column;gap:12px;width:420px">
+      <div dir="rtl" style="font:700 17px/1.4 Tajawal,sans-serif">٨ · تقييم السائق — بعد الاختيار</div>
+      <div dir="rtl" style="width:420px;height:900px;border-radius:32px;overflow:hidden;background:#fff;box-shadow:0 20px 60px rgba(0,0,0,.28),0 2px 10px rgba(0,0,0,.12);position:relative;font-family:Tajawal,'Segoe UI',Tahoma,sans-serif;display:flex;flex-direction:column">
+        <div style="position:relative;flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:20px 16px 16px">
+          <div style="position:absolute;left:16px;top:16px;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Outlined';font-size:26px;line-height:1;color:#444">close</span></div>
+          <div style="font:700 21px/1.2 Tajawal,sans-serif;color:#17181C">تقييم السائق</div>
+        </div>
+        <div style="flex:1 1 auto;padding:8px 20px 24px">
+          <div style="margin:8px 0 20px;font:700 18px/1.3 Tajawal,sans-serif;color:#17181C;text-align:center">تقييم الرحلة والسائق</div>
+          <div dir="ltr" style="display:flex;justify-content:space-between;gap:8px;padding:0 4px">
+            <div style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:#1010FF"><span style="font-family:'Material Symbols Outlined';font-size:34px;line-height:1;font-variation-settings:'FILL' 1">star</span></div>
+            <div style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:#1010FF"><span style="font-family:'Material Symbols Outlined';font-size:34px;line-height:1;font-variation-settings:'FILL' 1">star</span></div>
+            <div style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:#1010FF"><span style="font-family:'Material Symbols Outlined';font-size:34px;line-height:1;font-variation-settings:'FILL' 1">star</span></div>
+            <div style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:#1010FF"><span style="font-family:'Material Symbols Outlined';font-size:34px;line-height:1;font-variation-settings:'FILL' 1">star</span></div>
+            <div style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:#C6C9D3"><span style="font-family:'Material Symbols Outlined';font-size:34px;line-height:1">star</span></div>
+          </div>
+          <div style="margin:6px 0 0;text-align:center;font:400 15px/1.4 Tajawal,sans-serif;color:#9A9AA1">جيد</div>
+          <div style="height:8px;margin:16px -20px 0;background:#F5F6FA"></div>
+          <div style="display:flex;margin:0 -20px 6px;border-bottom:1px solid #ECECEF">
+            <div style="flex:1 1 0;position:relative;height:52px;display:flex;align-items:center;justify-content:center;font:700 17px/1.2 Tajawal,sans-serif;color:#17181C">الميزات<span style="position:absolute;left:12%;right:12%;bottom:-1px;height:3px;border-radius:2px;background:#17181C"></span></div>
+            <div style="flex:1 1 0;height:52px;display:flex;align-items:center;justify-content:center;font:700 17px/1.2 Tajawal,sans-serif;color:#9A9AA1">المساوئ</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:18px 0 4px">
+            <div style="min-height:62px;padding:10px 12px;box-sizing:border-box;border:2px solid #1010FF;border-radius:12px;background:#EFEFFC;font:500 15.5px/1.35 Tajawal,sans-serif;color:#17181C;display:flex;align-items:center;justify-content:center;text-align:center">سيارة نظيفة</div>
+            <div style="min-height:62px;padding:10px 12px;box-sizing:border-box;border:1px solid #E7E7EC;border-radius:12px;background:#fff;font:400 15.5px/1.35 Tajawal,sans-serif;color:#17181C;display:flex;align-items:center;justify-content:center;text-align:center">سائق مهذب</div>
+            <div style="min-height:62px;padding:10px 12px;box-sizing:border-box;border:1px solid #E7E7EC;border-radius:12px;background:#fff;font:400 15.5px/1.35 Tajawal,sans-serif;color:#17181C;display:flex;align-items:center;justify-content:center;text-align:center">قيادة آمنة</div>
+            <div style="min-height:62px;padding:10px 12px;box-sizing:border-box;border:1px solid #E7E7EC;border-radius:12px;background:#fff;font:400 15.5px/1.35 Tajawal,sans-serif;color:#17181C;display:flex;align-items:center;justify-content:center;text-align:center">وصل في الوقت</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;width:100%;height:56px;margin-top:18px;padding:0 16px;box-sizing:border-box;border-radius:12px;background:#F4F4F8;font:400 15.5px/1.3 Tajawal,sans-serif;color:#77777E">
+            <span style="flex:0 0 auto;font-family:'Material Symbols Outlined';font-size:20px;line-height:1;color:#55555C">chat</span>
+            <span style="flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">اخبرنا برأيك بخصوص الرحلة</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:center;width:100%;height:64px;margin-top:16px;border-radius:14px;background:#1010FF;color:#fff;font:500 20px/1.2 Tajawal,sans-serif">إرسال</div>
+        </div>
+      </div>
+      <sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}">
+        <div dir="ltr" style="font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.6;color:#77777E;text-align:left">everything below the stars is revealed by choosing a score; the two scale labels give way to the chosen word<br>scrolled past the driver card and trip details, which stay above · tags come in الميزات / المساوئ pairs</div>
+      </sc-if>
+      <sc-if value="{{ showDrift }}" hint-placeholder-val="{{ true }}">
+        <div dir="ltr" style="align-self:flex-start;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.5;background:#FFF7ED;border:1px solid #FED7AA;color:#9A3412;border-radius:8px;padding:8px 10px;text-align:left">DRIFT · chosen tag border grows 1px→2px, so the tag shifts 1px on toggle · Flutter chips keep a fixed border</div>
+      </sc-if>
+    </div>
+
+    <!-- 9 · account -->
+    <div style="display:flex;flex-direction:column;gap:12px;width:420px">
+      <div dir="rtl" style="font:700 17px/1.4 Tajawal,sans-serif">٩ · حسابي</div>
+      <div dir="rtl" style="width:420px;height:900px;border-radius:32px;overflow:hidden;background:#fff;box-shadow:0 20px 60px rgba(0,0,0,.28),0 2px 10px rgba(0,0,0,.12);position:relative;font-family:Tajawal,'Segoe UI',Tahoma,sans-serif;display:flex;flex-direction:column">
+        <div style="position:relative;flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:20px 16px 14px;border-bottom:1px solid #ECECEF">
+          <div style="position:absolute;left:16px;top:16px;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Outlined';font-size:26px;line-height:1;color:#444">arrow_forward</span></div>
+          <div style="font:700 21px/1.2 Tajawal,sans-serif;color:#17181C">حسابي</div>
+        </div>
+        <div style="flex:1 1 auto;padding:8px 20px 24px">
+          <div style="display:flex;align-items:center;gap:14px;padding:18px 0 20px;border-bottom:1px solid #ECECEF;margin-bottom:6px">
+            <div style="flex:0 0 auto;width:64px;height:64px;border-radius:50%;background:#E7E9F1;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Outlined';font-size:36px;line-height:1;color:#9AA0AE">person</span></div>
+            <div style="flex:1 1 auto;min-width:0">
+              <div style="font:700 18px/1.3 Tajawal,sans-serif;color:#17181C">زينب الربيعي</div>
+              <div dir="ltr" style="margin-top:3px;font:400 14.5px/1.35 Tajawal,sans-serif;color:#77777E;text-align:start">+964 771 234 5678</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;width:100%;padding:15px 0;border-bottom:1px solid #ECECEF">
+            <span style="flex:0 0 auto;font-family:'Material Symbols Outlined';font-size:23px;line-height:1;color:#55555C">person</span>
+            <div style="flex:1 1 auto;min-width:0;font:500 16.5px/1.3 Tajawal,sans-serif;color:#17181C">الملف الشخصي</div>
+            <span style="flex:0 0 auto;font-family:'Material Symbols Outlined';font-size:22px;line-height:1;color:#C6C9D3">chevron_left</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;width:100%;padding:15px 0;border-bottom:1px solid #ECECEF">
+            <span style="flex:0 0 auto;font-family:'Material Symbols Outlined';font-size:23px;line-height:1;color:#55555C">history</span>
+            <div style="flex:1 1 auto;min-width:0">
+              <div style="font:500 16.5px/1.3 Tajawal,sans-serif;color:#17181C">الرحلات</div>
+              <div style="margin-top:3px;font:400 13.5px/1.35 Tajawal,sans-serif;color:#77777E">٣ رحلات محفوظة</div>
+            </div>
+            <span style="flex:0 0 auto;font-family:'Material Symbols Outlined';font-size:22px;line-height:1;color:#C6C9D3">chevron_left</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;width:100%;padding:15px 0;border-bottom:1px solid #ECECEF">
+            <span style="flex:0 0 auto;font-family:'Material Symbols Outlined';font-size:23px;line-height:1;color:#55555C">star</span>
+            <div style="flex:1 1 auto;min-width:0">
+              <div style="font:500 16.5px/1.3 Tajawal,sans-serif;color:#17181C">الأماكن المحفوظة</div>
+              <div style="margin-top:3px;font:400 13.5px/1.35 Tajawal,sans-serif;color:#77777E">بيت · العمل · الجامعة</div>
+            </div>
+            <span style="flex:0 0 auto;font-family:'Material Symbols Outlined';font-size:22px;line-height:1;color:#C6C9D3">chevron_left</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;width:100%;padding:15px 0;border-bottom:1px solid #ECECEF">
+            <span style="flex:0 0 auto;font-family:'Material Symbols Outlined';font-size:23px;line-height:1;color:#55555C">account_balance_wallet</span>
+            <div style="flex:1 1 auto;min-width:0">
+              <div style="font:500 16.5px/1.3 Tajawal,sans-serif;color:#17181C">طريقة الدفع</div>
+              <div style="margin-top:3px;font:400 13.5px/1.35 Tajawal,sans-serif;color:#77777E">نقداً للسائق</div>
+            </div>
+            <span style="flex:0 0 auto;font-family:'Material Symbols Outlined';font-size:22px;line-height:1;color:#C6C9D3">chevron_left</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;width:100%;padding:15px 0;border-bottom:1px solid #ECECEF">
+            <span style="flex:0 0 auto;font-family:'Material Symbols Outlined';font-size:23px;line-height:1;color:#55555C">translate</span>
+            <div style="flex:1 1 auto;min-width:0">
+              <div style="font:500 16.5px/1.3 Tajawal,sans-serif;color:#17181C">اللغة</div>
+              <div style="margin-top:3px;font:400 13.5px/1.35 Tajawal,sans-serif;color:#77777E">العربية</div>
+            </div>
+            <span style="flex:0 0 auto;font-family:'Material Symbols Outlined';font-size:22px;line-height:1;color:#C6C9D3">chevron_left</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;width:100%;padding:15px 0;border-bottom:1px solid #ECECEF">
+            <span style="flex:0 0 auto;font-family:'Material Symbols Outlined';font-size:23px;line-height:1;color:#55555C">settings</span>
+            <div style="flex:1 1 auto;min-width:0;font:500 16.5px/1.3 Tajawal,sans-serif;color:#17181C">الإعدادات</div>
+            <span style="flex:0 0 auto;font-family:'Material Symbols Outlined';font-size:22px;line-height:1;color:#C6C9D3">chevron_left</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;width:100%;padding:15px 0">
+            <span style="flex:0 0 auto;font-family:'Material Symbols Outlined';font-size:23px;line-height:1;color:#55555C">support_agent</span>
+            <div style="flex:1 1 auto;min-width:0;font:500 16.5px/1.3 Tajawal,sans-serif;color:#17181C">المساعدة والدعم</div>
+            <span style="flex:0 0 auto;font-family:'Material Symbols Outlined';font-size:22px;line-height:1;color:#C6C9D3">chevron_left</span>
+          </div>
+          <div style="display:block;width:100%;height:50px;margin-top:26px;border:1px solid #F0D4D1;border-radius:12px;background:#FDF5F4;font:500 15.5px/50px Tajawal,sans-serif;color:#B4453A;text-align:center;box-sizing:border-box">تسجيل الخروج</div>
+          <div style="margin:18px 0 0;font:400 12.5px/1.6 Tajawal,sans-serif;color:#9A9AA1;text-align:center">الانطلاق · نسخة الويب</div>
+        </div>
+      </div>
+      <sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}">
+        <div dir="ltr" style="font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.6;color:#77777E;text-align:left">app.js → MENU_SECTIONS · one surface, body swapped per section rather than six overlays<br>sign-in is optional and lives here; with no server nothing in this list breaks</div>
+      </sc-if>
+      <sc-if value="{{ showDrift }}" hint-placeholder-val="{{ true }}">
+        <div dir="ltr" style="align-self:flex-start;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.5;background:#FFF7ED;border:1px solid #FED7AA;color:#9A3412;border-radius:8px;padding:8px 10px;text-align:left">DRIFT · rows are 53–58px tall, under the 56px Flutter tap floor for the shortest ones</div>
+      </sc-if>
+    </div>
+
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;showLegend&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Annotation&quot;},&quot;showNotes&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Annotation&quot;},&quot;showDrift&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Annotation&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      showLegend: this.props.showLegend ?? true,
+      showNotes: this.props.showNotes ?? true,
+      showDrift: this.props.showDrift ?? true
+    };
+  }
+}
+</script>
+</body>
+</html>

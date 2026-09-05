@@ -145,14 +145,11 @@ class RideReceiptScreen extends StatelessWidget {
             ),
 
           const SizedBox(height: AppSpacing.sm),
-          OutlinedButton.icon(
-            onPressed: () => _report(context),
-            icon: const Icon(Icons.flag_outlined),
-            label: Text(strings.reportProblem),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(48),
+          AlyButton.secondary(
+              label: strings.reportProblem,
+              onPressed: () => _report(context),
+              icon: Icons.flag_rounded,
             ),
-          ),
         ],
       ),
     );

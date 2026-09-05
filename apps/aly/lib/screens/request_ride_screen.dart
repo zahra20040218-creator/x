@@ -139,7 +139,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
         actions: [
           IconButton(
             tooltip: strings.rideHistory,
-            icon: const Icon(Icons.receipt_long),
+            icon: const Icon(Icons.receipt_long_rounded),
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => RideHistoryScreen(api: widget.api),
@@ -148,7 +148,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
           ),
           IconButton(
             tooltip: strings.profile,
-            icon: const Icon(Icons.person_outline),
+            icon: const Icon(Icons.person_rounded),
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => ProfileScreen(
@@ -219,10 +219,10 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
           ],
 
           const SizedBox(height: AppSpacing.lg),
-          PrimaryButton(
+          AlyButton(
             label: strings.requestRide,
             onPressed: ready ? _request : null,
-            busy: _busy,
+            isLoading: _busy,
           ),
         ],
       ),
@@ -263,7 +263,7 @@ class _LocationField extends StatelessWidget {
                 '${value!.lat.toStringAsFixed(4)}, ${value!.lng.toStringAsFixed(4)}',
                 textDirection: TextDirection.ltr,
               ),
-        trailing: const Icon(Icons.map_outlined),
+        trailing: const Icon(Icons.map_rounded),
         onTap: () async {
           final picked = await Navigator.of(context).push<LatLng>(
             MaterialPageRoute(builder: (_) => MapPickerScreen(title: label)),

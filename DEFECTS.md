@@ -227,6 +227,29 @@ message. Reachable only via a tariff configured entirely to zeros.
 
 ---
 
+### D-10 — The driver console's "مدة الاتصال" is session-local · **P2**
+
+`AlyEarningsCard` takes a non-nullable `Duration onlineTime`, and no endpoint
+reports one. `DriverHomeScreen` therefore measures from the moment *this app
+instance* first observed the driver online, and a driver who restarts the app
+mid-shift watches the figure reset to zero next to two numbers that are real.
+
+Not fixable on the client: it needs a shift clock the server keeps, the way it
+already keeps availability. Until then the number is honest about the current
+stretch and wrong about the day. No endpoint was invented for it
+(CLAUDE.md §12.1).
+
+### D-11 — `AppTheme` dropped the text colour on four styles · **P2 · FIXED**
+
+`_textTheme` applied `bodyColor`/`displayColor` and then replaced
+`headlineMedium`, `titleLarge`, `bodyMedium` and `labelLarge` with `TextStyle`s
+carrying no colour — `copyWith` overwrites a style wholesale. Every value drawn
+in those styles rendered invisible on the light surface: the fare on the
+receipt, the driver's name, the earnings figures. Found by running the app, not
+by a test; no widget test asserts a rendered colour. Fixed by restating the
+colour in each replaced style. `apps/rider` and `apps/driver` still use this
+theme.
+
 ## What a real reviewer should attack first
 
 1. **The fake Redis** (D-2). Everything about concurrency rests on it, and it

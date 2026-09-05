@@ -204,12 +204,9 @@ class _TrackRideScreenState extends State<TrackRideScreen> {
 
           if (_ride.status.isActive && _ride.status != RideStatus.inProgress) ...[
             const SizedBox(height: AppSpacing.lg),
-            OutlinedButton(
+            AlyButton.danger(
+              label: strings.cancelRide,
               onPressed: _busy ? null : _cancel,
-              child: Text(
-                strings.cancelRide,
-                style: const TextStyle(color: AppColors.danger),
-              ),
             ),
           ],
 
@@ -278,17 +275,17 @@ class _RatingCardState extends State<_RatingCard> {
                   iconSize: 36,
                   onPressed: () => setState(() => _score = value),
                   icon: Icon(
-                    value <= _score ? Icons.star : Icons.star_border,
+                    value <= _score ? Icons.star_rounded : Icons.star_outline_rounded,
                     color: AppColors.accent,
                   ),
                 );
               }),
             ),
             const SizedBox(height: AppSpacing.md),
-            PrimaryButton(
+            AlyButton(
               label: strings.submitRating,
               onPressed: _submit,
-              busy: _busy,
+              isLoading: _busy,
             ),
           ],
         ),

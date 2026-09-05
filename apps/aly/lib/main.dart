@@ -243,7 +243,13 @@ class _AlyAppState extends State<AlyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       onGenerateTitle: (context) => AppStrings.of(context).appNameRider,
-      theme: AppTheme.light(),
+      theme: AlyTheme.light(),
+      // Both themes are built and tested; only the wiring was missing.
+      // A driver working a night shift in Baghdad was being handed a
+      // white screen because the app never offered the dark one.
+      // Follows the OS setting, which is `ThemeMode.system` by default and so
+      // is not restated here — the linter rejects the redundant argument.
+      darkTheme: AlyTheme.dark(),
       // CLAUDE.md §8 - Arabic primary, RTL.
       locale: const Locale('ar'),
       supportedLocales: const [Locale('ar'), Locale('en')],
@@ -381,7 +387,7 @@ class _BlockedDriverScreen extends StatelessWidget {
         actions: [
           IconButton(
             tooltip: strings.signOut,
-            icon: const Icon(Icons.logout),
+            icon: const Icon(Icons.logout_rounded),
             onPressed: onSignedOut,
           ),
         ],

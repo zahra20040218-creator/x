@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:rideapp_core/src/design/theme.dart';
+import 'package:rideapp_core/src/design/tokens/metrics.dart';
 import 'package:rideapp_core/src/design/widgets.dart';
 import 'package:rideapp_core/src/l10n/strings.dart';
 
@@ -87,7 +88,7 @@ class AsyncView<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return switch (state) {
+    final child = switch (state) {
       LoadingState<T>() => loading?.call(context) ?? const _DefaultLoading(),
       EmptyState<T>() => empty(context),
       ErrorState<T>(:final message, :final canRetry) => _ErrorView(
@@ -96,6 +97,25 @@ class AsyncView<T> extends StatelessWidget {
         ),
       SuccessState<T>(:final data) => success(context, data),
     };
+
+    // Every screen that loads anything goes through here, so the cross-fade is
+    // applied once rather than screen by screen. A spinner that is replaced by
+    // a full list in one frame reads as a flash; 250ms of fade reads as the
+    // content arriving.
+    //
+    // Keyed by the state's own kind, not by the data: a list that gains a row
+    // must not fade — only a genuine change of state does. `AlyMotion.respecting`
+    // returns zero for a user who asked the OS for less motion, which disables
+    // the animation without disabling the change.
+    return AnimatedSwitcher(
+      duration: AlyMotion.respecting(context, AlyMotion.medium),
+      switchInCurve: AlyMotion.enter,
+      switchOutCurve: AlyMotion.exit,
+      child: KeyedSubtree(
+        key: ValueKey<String>(state.runtimeType.toString()),
+        child: child,
+      ),
+    );
   }
 }
 

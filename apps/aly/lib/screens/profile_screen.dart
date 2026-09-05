@@ -204,7 +204,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: AppSpacing.md),
 
-                    PrimaryButton(
+                    AlyButton(
                       label: _saving ? strings.saving : strings.save,
                       onPressed: _saving ? null : _save,
                     ),
@@ -214,16 +214,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: AppSpacing.lg),
 
-            OutlinedButton.icon(
+            AlyButton.danger(
+              label: _signingOut ? strings.loading : strings.signOut,
               onPressed: _signingOut ? null : _signOut,
-              icon: const Icon(Icons.logout),
-              label: Text(_signingOut ? strings.loading : strings.signOut),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.danger,
-                // 48dp: the Material minimum touch target. A destructive
-                // action that is hard to hit is also hard to hit on purpose.
-                minimumSize: const Size.fromHeight(48),
-              ),
+              icon: Icons.logout_rounded,
             ),
             const SizedBox(height: AppSpacing.sm),
 
