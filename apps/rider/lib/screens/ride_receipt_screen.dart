@@ -207,7 +207,7 @@ class _Row extends StatelessWidget {
         children: [
           Text(label, style: theme.textTheme.bodyMedium?.copyWith(
             color: AppColors.textSecondary,
-          )),
+          ),),
           if (amount != null)
             FareText(amount!, large: emphasis)
           else

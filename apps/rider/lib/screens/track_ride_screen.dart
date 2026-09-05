@@ -1,9 +1,7 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:rideapp_core/rideapp_core.dart';
-import 'package:web_socket_channel/web_socket_channel.dart';
 
 /// Live ride tracking, from "finding a driver" to the rating prompt.
 ///
@@ -24,8 +22,8 @@ class TrackRideScreen extends StatefulWidget {
 class _TrackRideScreenState extends State<TrackRideScreen> {
   late Ride _ride = widget.ride;
   LatLng? _driverPosition;
-  WebSocketChannel? _socket;
-  StreamSubscription<dynamic>? _events;
+  RealtimeClient? _realtime;
+  StreamSubscription<RealtimeEvent>? _events;
   Timer? _poll;
   bool _busy = false;
   String? _error;
@@ -33,65 +31,52 @@ class _TrackRideScreenState extends State<TrackRideScreen> {
   @override
   void initState() {
     super.initState();
-    unawaited(_connect());
-    _poll = Timer.periodic(const Duration(seconds: 8), (_) => unawaited(_refresh()));
+    _connect();
+    // The socket is primary; this is the fallback for the case it is not
+    // connected. Longer than it was, because a poll that duplicates a working
+    // socket is load for nothing.
+    _poll = Timer.periodic(const Duration(seconds: 20), (_) => unawaited(_refresh()));
   }
 
   @override
   void dispose() {
     _poll?.cancel();
     unawaited(_events?.cancel());
-    unawaited(_socket?.sink.close());
+    unawaited(_realtime?.dispose());
     super.dispose();
   }
 
   /// Open the realtime channel.
   ///
-  /// The client sends only its token. It does NOT name a channel — the server
+  /// The client sends only its token. It does NOT name a channel - the server
   /// derives that from the token's subject, so there is no frame this app could
   /// send that would subscribe it to another rider's stream.
-  Future<void> _connect() async {
-    final token = await widget.api.currentAccessToken();
-    if (token == null) return;
-
-    try {
-      final socket = WebSocketChannel.connect(
-        // Validated at startup by EndpointConfig - in a release build this
-        // cannot be plaintext or a development host.
-        Uri.parse(kRealtimeUrlFromEnv),
-      );
-      _socket = socket;
-
-      socket.sink.add(jsonEncode({'type': 'auth', 'token': token}));
-
-      _events = socket.stream.listen(
-        _onEvent,
-        // A dropped socket is normal on these networks. The poll timer keeps
-        // the screen truthful until it reconnects.
-        onError: (Object _) => unawaited(_reconnectLater()),
-        onDone: () => unawaited(_reconnectLater()),
-      );
-    } on Exception {
-      unawaited(_reconnectLater());
-    }
+  ///
+  /// `RealtimeClient` is shared with the driver app: the reconnect, backoff and
+  /// resync logic this screen used to carry inline is the same logic the driver
+  /// needs, and CLAUDE.md 1 makes the second copy a defect.
+  void _connect() {
+    final client = RealtimeClient(
+      url: kRealtimeUrlFromEnv,
+      tokenProvider: widget.api.currentAccessToken,
+      // The socket cannot replay what was missed while it was down, so the
+      // screen refetches. Without this a rider who lost signal for a minute
+      // reconnects and keeps showing the ride as it was before the gap.
+      onReconnect: () => unawaited(_refresh()),
+    );
+    _realtime = client;
+    _events = client.events.listen(_onEvent);
+    unawaited(client.connect());
   }
 
-  Future<void> _reconnectLater() async {
-    await Future<void>.delayed(const Duration(seconds: 5));
-    if (mounted && !_ride.status.isTerminal) await _connect();
-  }
+  void _onEvent(RealtimeEvent event) {
+    final payload = event.payload;
 
-  void _onEvent(dynamic raw) {
-    if (raw is! String) return;
-
-    final event = jsonDecode(raw) as Map<String, dynamic>;
-    final payload = event['payload'] as Map<String, dynamic>?;
-
-    switch (event['type']) {
+    switch (event.type) {
       case 'ride.status_changed':
         unawaited(_refresh());
       case 'driver.location':
-        if (payload != null && mounted) {
+        if (payload['lat'] != null && payload['lng'] != null && mounted) {
           setState(() {
             _driverPosition = LatLng(
               lat: (payload['lat'] as num).toDouble(),
@@ -141,7 +126,7 @@ class _TrackRideScreenState extends State<TrackRideScreen> {
       if (mounted) {
         setState(() => _error = error.problem == ApiProblem.network
             ? strings.noInternet
-            : strings.somethingWentWrong);
+            : strings.somethingWentWrong,);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -283,7 +268,7 @@ class _RatingCardState extends State<_RatingCard> {
         child: Column(
           children: [
             Text(strings.rateYourDriver,
-                style: Theme.of(context).textTheme.titleLarge),
+                style: Theme.of(context).textTheme.titleLarge,),
             const SizedBox(height: AppSpacing.md),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,

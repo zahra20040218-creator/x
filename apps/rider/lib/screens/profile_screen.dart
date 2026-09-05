@@ -55,7 +55,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() => _state = ViewState<Me>.error(
             error.detail ?? error.problem.slug,
             canRetry: !error.requiresReauthentication,
-          ));
+          ),);
     }
   }
 

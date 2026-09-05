@@ -8,27 +8,31 @@ environment:
   flutter: ">=3.24.0"
 
 dependencies:
+  # Sorted alphabetically — `sort_pub_dependencies` is enforced, and
+  # `flutter analyze` exits non-zero on an info-level lint, so one unsorted
+  # list is enough to keep the whole Flutter CI job red.
+
+  firebase_auth: ^5.3.3
+  firebase_core: ^3.8.0
+  firebase_messaging: ^15.1.5
+
   flutter:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
-
-  rideapp_core:
-    path: ../../packages/core
-
-  firebase_core: ^3.8.0
-  firebase_auth: ^5.3.3
-  firebase_messaging: ^15.1.5
-
-  google_maps_flutter: ^2.9.0
 
   # Foreground location only. The rider app has NO background location: it
   # needs a pickup point while the user is looking at the screen, and asking a
   # passenger for "allow all the time" would be an unjustifiable privacy ask.
   geolocator: ^13.0.2
 
-  web_socket_channel: ^3.0.1
+  google_maps_flutter: ^2.9.0
+
+  rideapp_core:
+    path: ../../packages/core
+
   uuid: ^4.5.1
+  web_socket_channel: ^3.0.1
 
 dev_dependencies:
   flutter_test:

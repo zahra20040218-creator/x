@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:rideapp_core/rideapp_core.dart';
 
-import 'ride_receipt_screen.dart';
+import 'package:rideapp_rider/screens/ride_receipt_screen.dart';
 
 /// Past rides.
 ///
@@ -43,7 +43,7 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
             // A 401 is not worth a retry button; the session is gone and the
             // app will route to sign-in.
             canRetry: !error.requiresReauthentication,
-          ));
+          ),);
     }
   }
 

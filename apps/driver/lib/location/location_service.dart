@@ -70,9 +70,6 @@ class _LocationTaskHandler extends TaskHandler {
         accuracy: LocationAccuracy.high,
         distanceFilter: kDistanceFilterMeters,
         intervalDuration: kSampleInterval,
-        // The service is ALREADY a foreground service; this tells geolocator
-        // not to start a second notification of its own.
-        foregroundNotificationConfig: null,
       ),
     ).listen(_onPosition);
 
@@ -146,10 +143,6 @@ class DriverLocationService {
       androidNotificationOptions: AndroidNotificationOptions(
         channelId: 'driver_status',
         channelName: _strings.notificationChannelName,
-        // LOW so the notification is persistent but silent. A driver who mutes
-        // a noisy notification channel also mutes the service's visibility.
-        channelImportance: NotificationChannelImportance.LOW,
-        priority: NotificationPriority.LOW,
       ),
       iosNotificationOptions: const IOSNotificationOptions(),
       foregroundTaskOptions: ForegroundTaskOptions(
@@ -158,7 +151,6 @@ class DriverLocationService {
         // pressure and never restarts it, and the driver's location silently
         // stops for the rest of their shift.
         autoRunOnBoot: true,
-        allowWakeLock: true,
         allowWifiLock: true,
       ),
     );

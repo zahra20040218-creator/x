@@ -3,10 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:rideapp_core/rideapp_core.dart';
-
-import 'earnings_screen.dart';
 import 'package:rideapp_driver/location/location_service.dart';
+import 'package:rideapp_driver/screens/earnings_screen.dart';
 import 'package:rideapp_driver/screens/offer_sheet.dart';
+import 'package:rideapp_driver/screens/subscription_screen.dart';
 import 'package:rideapp_driver/screens/trip_screen.dart';
 
 /// The driver's main screen: an online/offline switch and whatever ride is
@@ -73,21 +73,62 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   bool _busy = false;
 
   Timer? _poll;
+  RealtimeClient? _realtime;
+  StreamSubscription<RealtimeEvent>? _realtimeEvents;
 
   @override
   void initState() {
     super.initState();
     unawaited(_refresh());
 
-    // The polling fallback. Push is the primary path, but CLAUDE.md's own
-    // reasoning about Baghdad networks applies to FCM too - an offer that
-    // depends solely on push arriving is an offer that sometimes never arrives.
-    _poll = Timer.periodic(const Duration(seconds: 5), (_) => unawaited(_poll4Offer()));
+    // The socket is the primary path now. It was absent entirely: this screen
+    // polled every 5 seconds against a 15-second offer expiry, so up to a third
+    // of the window a driver has to decide was gone before the offer appeared.
+    // Measured end to end after wiring the server side, an offer now arrives in
+    // tens of milliseconds.
+    _connectRealtime();
+
+    // Kept as the fallback, at a longer interval. CLAUDE.md's reasoning about
+    // Baghdad networks applies to a socket as much as to push: a driver whose
+    // offers depend solely on a live connection is a driver who sometimes
+    // receives none. 15s rather than 5 because the socket is now doing the
+    // work, and a poll that duplicates it is load for nothing.
+    _poll = Timer.periodic(const Duration(seconds: 15), (_) => unawaited(_poll4Offer()));
+  }
+
+  void _connectRealtime() {
+    final client = RealtimeClient(
+      url: kRealtimeUrlFromEnv,
+      tokenProvider: widget.api.currentAccessToken,
+      // After a reconnect the driver may have been offered a ride during the
+      // gap. The socket cannot replay it, so ask.
+      onReconnect: () => unawaited(_poll4Offer()),
+    );
+    _realtime = client;
+    _realtimeEvents = client.events.listen(_onRealtimeEvent);
+    unawaited(client.connect());
+  }
+
+  void _onRealtimeEvent(RealtimeEvent event) {
+    switch (event.type) {
+      case 'ride.offer':
+        // Fetch rather than trusting the payload: the offer carries ids and
+        // timings, and the screen needs the full ride. This also means a
+        // revoked offer is caught - the endpoint returns null for one that is
+        // no longer current.
+        unawaited(_poll4Offer());
+      case 'ride.offer_revoked':
+        if (mounted) setState(() => _offer = null);
+      case 'ride.status_changed':
+        unawaited(_refresh());
+    }
   }
 
   @override
   void dispose() {
     _poll?.cancel();
+    unawaited(_realtimeEvents?.cancel());
+    unawaited(_realtime?.dispose());
     super.dispose();
   }
 
@@ -133,7 +174,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         unawaited(_showOffer(offer));
       }
     } on ApiException {
-      // Silent: this runs every 5 seconds and a transient failure is normal.
+      // Silent: this runs on a timer and on every socket event, and a
+      // transient failure is normal.
     }
   }
 
@@ -222,6 +264,32 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     final compliance = ComplianceFailure.from(error);
     if (compliance != null) return _complianceMessage(compliance, strings);
 
+    // Every other reason driver mode is unavailable: unapproved, rejected,
+    // suspended, subscription lapsed, or a code this build has never seen.
+    //
+    // The server has sent `driver-mode-unavailable` with a full blocker list
+    // since 2026-08-25 and no Dart build knew the slug, so all of it fell
+    // through to `somethingWentWrong`. A driver whose subscription expired was
+    // told "something went wrong" — true, useless, and unactionable.
+    //
+    // Every blocker, not the first: a driver blocked for three reasons who
+    // fixes one and is still blocked has learned nothing (CLAUDE.md §1.1).
+    if (error.problem == ApiProblem.driverModeUnavailable) {
+      final blockers = error.driverBlockers;
+      if (blockers.isEmpty) return strings.cannotGoOnlineNow;
+
+      final lines = <String>[strings.cannotGoOnlineNow];
+      for (final code in blockers) {
+        lines.add('${strings.blockerTitle(code)}: ${strings.blockerAction(code)}');
+      }
+      // The reason an operator gave, when there is one. It is the only part of
+      // this message the driver could not have predicted.
+      final suspended = error.suspendedReason;
+      if (suspended != null && suspended.isNotEmpty) lines.add(suspended);
+
+      return lines.join('\n');
+    }
+
     return switch (error.problem) {
       ApiProblem.network => strings.noInternet,
       ApiProblem.unauthorized => strings.sessionExpired,
@@ -294,6 +362,21 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               ),
             ),
           ),
+          IconButton(
+            tooltip: strings.subscriptionTitle,
+            icon: const Icon(Icons.card_membership_outlined),
+            onPressed: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => SubscriptionScreen(api: widget.api),
+                ),
+              );
+              // Refresh on return. An operator may have activated the driver's
+              // subscription while they were looking at the screen, and the
+              // online toggle's blockers are computed from that.
+              if (mounted) await _refresh();
+            },
+          ),
         ],
       ),
       body: RefreshIndicator(
@@ -338,7 +421,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 child: StatusBanner(
                   message:
                       '${strings.bufferedLocations}: ${widget.location.pendingCount}',
-                  tone: BannerTone.info,
                 ),
               ),
           ],

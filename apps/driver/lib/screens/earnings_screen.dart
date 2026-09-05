@@ -48,7 +48,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
       // Balance and statement together: a balance with no entries behind it is
       // a number the driver cannot check.
       final balance = await widget.api.wallet();
-      final page = await widget.api.walletEntries(limit: 50);
+      final page = await widget.api.walletEntries();
 
       if (!mounted) return;
       _entries.addAll(page.items);
@@ -57,13 +57,13 @@ class _EarningsScreenState extends State<EarningsScreen> {
 
       setState(() => _state = _entries.isEmpty
           ? const ViewState<_Earnings>.empty()
-          : ViewState<_Earnings>.success(_snapshot()));
+          : ViewState<_Earnings>.success(_snapshot()),);
     } on ApiException catch (error) {
       if (!mounted) return;
       setState(() => _state = ViewState<_Earnings>.error(
             error.detail ?? error.problem.slug,
             canRetry: !error.requiresReauthentication,
-          ));
+          ),);
     }
   }
 
@@ -77,7 +77,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
 
     setState(() => _loadingMore = true);
     try {
-      final page = await widget.api.walletEntries(limit: 50, cursor: cursor);
+      final page = await widget.api.walletEntries(cursor: cursor);
       if (!mounted) return;
       setState(() {
         _entries.addAll(page.items);
@@ -96,7 +96,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
     }
   }
 
-  IqdAmount _balance = const IqdAmount(0);
+  IqdAmount _balance = IqdAmount.zero;
 
   _Earnings _snapshot() => _Earnings(
         balance: _balance,

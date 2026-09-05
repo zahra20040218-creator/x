@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:rideapp_core/rideapp_core.dart';
 
-import 'profile_screen.dart';
-import 'ride_history_screen.dart';
+import 'package:rideapp_rider/screens/profile_screen.dart';
+import 'package:rideapp_rider/screens/ride_history_screen.dart';
 import 'package:rideapp_rider/screens/track_ride_screen.dart';
 
 /// Set a destination, see the fare, request the ride.

@@ -8,17 +8,20 @@ environment:
   flutter: ">=3.24.0"
 
 dependencies:
+  # Sorted alphabetically — `sort_pub_dependencies` is enforced, and
+  # `flutter analyze` exits non-zero on an info-level lint, so one unsorted
+  # list is enough to keep the whole Flutter CI job red.
+
+  # Battery optimisation exemption (CLAUDE.md §5.3). Without it Android Doze
+  # stops the service minutes after the screen goes off.
+  android_intent_plus: ^5.2.0
+
+  firebase_auth: ^5.3.3
+  firebase_core: ^3.8.0
+  firebase_messaging: ^15.1.5
+
   flutter:
     sdk: flutter
-  flutter_localizations:
-    sdk: flutter
-
-  rideapp_core:
-    path: ../../packages/core
-
-  firebase_core: ^3.8.0
-  firebase_auth: ^5.3.3
-  firebase_messaging: ^15.1.5
 
   # CLAUDE.md §5.3 - the location service must run as a FOREGROUND SERVICE with
   # a persistent notification. flutter_background_geolocation is the paid
@@ -26,16 +29,22 @@ dependencies:
   #   flutter_foreground_task  - the Android foreground service + notification
   #   geolocator               - the position stream and permission flow
   flutter_foreground_task: ^8.10.4
+
+  flutter_localizations:
+    sdk: flutter
+
   geolocator: ^13.0.2
+  google_maps_flutter: ^2.9.0
+  path_provider: ^2.1.5
   permission_handler: ^11.3.1
 
-  # Battery optimisation exemption (CLAUDE.md §5.3). Without it Android Doze
-  # stops the service minutes after the screen goes off.
-  android_intent_plus: ^5.2.0
+  rideapp_core:
+    path: ../../packages/core
 
-  google_maps_flutter: ^2.9.0
+  # Navigation hand-off. CLAUDE.md §2 keeps in-app navigation OUT of scope, so
+  # the driver is sent to Google Maps rather than given a second map to follow.
   url_launcher: ^6.3.1
-  path_provider: ^2.1.5
+
   uuid: ^4.5.1
 
 dev_dependencies:

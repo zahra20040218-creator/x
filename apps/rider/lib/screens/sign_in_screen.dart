@@ -39,7 +39,7 @@ class _SignInScreenState extends State<SignInScreen> {
   /// but a rider typing `07700000001` — which is how everyone writes it here —
   /// would otherwise just see a rejection from Firebase.
   String? _toE164(String input) {
-    final digits = input.replaceAll(RegExp(r'[^0-9+]'), '');
+    final digits = input.replaceAll(RegExp('[^0-9+]'), '');
     if (digits.startsWith('+964')) return digits;
     if (digits.startsWith('964')) return '+$digits';
     if (digits.startsWith('0')) return '+964${digits.substring(1)}';
@@ -153,63 +153,84 @@ class _SignInScreenState extends State<SignInScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(strings.signInTitle)),
-      body: Padding(
-        padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (_error != null) ...[
-              StatusBanner(message: _error!, tone: BannerTone.danger),
-              const SizedBox(height: AppSpacing.md),
-            ],
+      // Scrollable, not a bare Column.
+      //
+      // A Column directly under Scaffold.body inherits the viewport height as a
+      // hard constraint, so any content taller than the screen is a RenderFlex
+      // overflow rather than something the user can reach. A real device found
+      // it immediately: `BOTTOM OVERFLOWED BY 34 PIXELS` on a Samsung SC-53C in
+      // landscape.
+      //
+      // Landscape is not the only way it happens. The same overflow appears
+      // when the keyboard opens over a short screen, and when the system font
+      // scale is turned up - which the people most likely to need it will have
+      // done. On the rider this screen is the taller of the two, because it
+      // also collects a display name.
+      //
+      // Scrolling rather than shrinking: nothing here is optional, and a login
+      // form that hides its own submit button is worse than one that scrolls.
+      // Portrait is unchanged - with no Spacer and no mainAxisAlignment, the
+      // children were already top-aligned, and a shrink-wrapped Column puts
+      // them in exactly the same place.
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_error != null) ...[
+                StatusBanner(message: _error!, tone: BannerTone.danger),
+                const SizedBox(height: AppSpacing.md),
+              ],
 
-            if (!awaitingCode) ...[
-              Text(strings.phoneNumber,
-                  style: Theme.of(context).textTheme.labelLarge),
-              const SizedBox(height: AppSpacing.sm),
-              TextField(
-                controller: _phoneController,
-                keyboardType: TextInputType.phone,
-                textDirection: TextDirection.ltr,
-                decoration: InputDecoration(hintText: strings.phoneHint),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Text(strings.yourName,
-                  style: Theme.of(context).textTheme.labelLarge),
-              const SizedBox(height: AppSpacing.sm),
-              TextField(controller: _nameController),
-              const SizedBox(height: AppSpacing.lg),
-              PrimaryButton(
-                label: strings.sendCode,
-                onPressed: _sendCode,
-                busy: _busy,
-              ),
-            ] else ...[
-              Text(
-                '${strings.codeSentTo} ${_phoneController.text}',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              TextField(
-                controller: _codeController,
-                keyboardType: TextInputType.number,
-                textDirection: TextDirection.ltr,
-                textAlign: TextAlign.center,
-                decoration: InputDecoration(hintText: strings.enterCode),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              PrimaryButton(
-                label: strings.verify,
-                onPressed: _verifyCode,
-                busy: _busy,
-              ),
-              TextButton(
-                onPressed:
-                    _busy ? null : () => setState(() => _verificationId = null),
-                child: Text(strings.resendCode),
-              ),
+              if (!awaitingCode) ...[
+                Text(strings.phoneNumber,
+                    style: Theme.of(context).textTheme.labelLarge,),
+                const SizedBox(height: AppSpacing.sm),
+                TextField(
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  textDirection: TextDirection.ltr,
+                  decoration: InputDecoration(hintText: strings.phoneHint),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text(strings.yourName,
+                    style: Theme.of(context).textTheme.labelLarge,),
+                const SizedBox(height: AppSpacing.sm),
+                TextField(controller: _nameController),
+                const SizedBox(height: AppSpacing.lg),
+                PrimaryButton(
+                  label: strings.sendCode,
+                  onPressed: _sendCode,
+                  busy: _busy,
+                ),
+              ] else ...[
+                Text(
+                  '${strings.codeSentTo} ${_phoneController.text}',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: _codeController,
+                  keyboardType: TextInputType.number,
+                  textDirection: TextDirection.ltr,
+                  textAlign: TextAlign.center,
+                  decoration: InputDecoration(hintText: strings.enterCode),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                PrimaryButton(
+                  label: strings.verify,
+                  onPressed: _verifyCode,
+                  busy: _busy,
+                ),
+                TextButton(
+                  onPressed:
+                      _busy ? null : () => setState(() => _verificationId = null),
+                  child: Text(strings.resendCode),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

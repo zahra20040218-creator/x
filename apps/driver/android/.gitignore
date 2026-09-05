@@ -12,3 +12,10 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+
+# Per-project Firebase configuration. CLAUDE.md 9 forbids committed config, and
+# main.dart already documents that this file must not be in the repository:
+# committing it ties the checkout to one Firebase project and carries the
+# Android API key along with it.
+app/google-services.json
+google-services.json

@@ -110,7 +110,7 @@ void main() {
       await tester.pumpWidget(host(ride(
         status: RideStatus.cancelledByDriver,
         cancellationReason: 'السائق لم يستطع الوصول',
-      )));
+      ),),);
       await tester.pumpAndSettle();
       expect(find.text('سبب الإلغاء'), findsOneWidget);
     });
