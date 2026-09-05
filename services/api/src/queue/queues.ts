@@ -17,13 +17,46 @@ import type { Logger } from '../common/logger.js';
 
 export const QUEUE_NAMES = {
   push: 'push',
+  /**
+   * Offer a newly created ride to a driver.
+   *
+   * Queued rather than run inside `POST /rides` for the reason in the header:
+   * dispatch touches Postgres and Redis several times, and holding a pool slot
+   * for it while the rider waits on the response is how a 25-slot pool empties
+   * at 500 users. The rider gets their 201 immediately and hears about the
+   * driver over the socket.
+   */
+  rideDispatch: 'ride-dispatch',
   locationFlush: 'location-flush',
   offerSweep: 'offer-sweep',
   presenceSweep: 'presence-sweep',
   idempotencyPurge: 'idempotency-purge',
+  /**
+   * Close subscription periods whose date has passed.
+   *
+   * Hourly, not by the minute: the capability check compares `expires_at` to
+   * the clock and ignores the status column precisely so a late sweep can
+   * never let a lapsed driver work. This only keeps the column honest for
+   * things that read it directly - the admin panel, and the partial unique
+   * index that would otherwise refuse a renewal against an unclosed period.
+   */
+  subscriptionExpiry: 'subscription-expiry',
+  /**
+   * Close bids whose window has passed.
+   *
+   * Every 30s, not hourly: `negotiation_window_seconds` defaults to 90, so a
+   * slower sweep would leave a rider looking at bids that can no longer be
+   * accepted - and the accept path would refuse them with a conflict the
+   * rider has no way to have predicted.
+   */
+  bidExpiry: 'bid-expiry',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
+
+export interface RideDispatchJob {
+  rideId: string;
+}
 
 export interface PushJob {
   userId: string;
@@ -98,6 +131,18 @@ export class QueueRegistry {
       'purge',
       {},
       { repeat: { every: 3_600_000 }, jobId: 'idempotency-purge' },
+    );
+
+    await this.get(QUEUE_NAMES.subscriptionExpiry).add(
+      'sweep',
+      {},
+      { repeat: { every: 3_600_000 }, jobId: 'subscription-expiry' },
+    );
+
+    await this.get(QUEUE_NAMES.bidExpiry).add(
+      'sweep',
+      {},
+      { repeat: { every: 30_000 }, jobId: 'bid-expiry' },
     );
   }
 

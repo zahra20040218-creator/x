@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import type { Queryable } from '../db/db.port.js';
+import type { Queryable, SqlValue } from '../db/db.port.js';
 import { iqd, parseSignedIqdFromDb, type IqdAmount, type SignedIqdAmount } from '../money/iqd.js';
 import {
   isBalanced,
@@ -43,8 +43,9 @@ import {
  * which nets to zero because `earnings = fare - commission`. At the shipped
  * default of 0 bps (CLAUDE.md §6.5) the commission row is omitted - a
  * zero-amount row is forbidden by the schema - and the remaining two rows
- * still balance. See DECISIONS.md D-005 for why the wallet is modelled as
- * cumulative earnings rather than a float the platform holds.
+ * still balance. See DECISIONS.md D-003 for why the wallet is modelled as
+ * cumulative earnings rather than a float the platform holds - and for the
+ * condition under which that model has to be revisited.
  */
 export class LedgerService {
   /**
@@ -272,6 +273,69 @@ export class LedgerService {
          FROM ledger_entries
         WHERE account_type = 'DRIVER_WALLET' AND account_id = $1`,
       [driverId],
+    );
+
+    return parseSignedIqdFromDb(result.rows[0]?.balance_iqd ?? 0);
+  }
+
+  /**
+   * What the platform has earned, derived the same way a wallet is.
+   *
+   * ## Why this did not exist
+   *
+   * `PLATFORM_REVENUE` was write-only across the whole codebase. `write()` and
+   * `recordRideSettlement()` emit those rows; `balanceFor` and `entriesFor`
+   * both hardcode `account_type = 'DRIVER_WALLET'`, the materialised view is
+   * per-driver, and no admin route selected the account type. The platform
+   * could bank revenue it had no way to read.
+   *
+   * That was harmless only because `commission_bps` ships at 0 (CLAUDE.md
+   * §6.5), so no revenue row has ever been written. It stops being harmless the
+   * moment any income model is switched on - which is exactly what D-020
+   * contemplates - so this lands BEFORE the revenue, not after it.
+   *
+   * ## Direction
+   *
+   * `PLATFORM_REVENUE` is credited when the platform earns and debited when
+   * that is reversed, so CREDIT-minus-DEBIT is positive for real income and the
+   * sign means the same thing it means on a wallet. Signed, not absolute: a day
+   * whose only movement is a refund is legitimately negative, and clamping it
+   * to zero would hide the refund.
+   *
+   * `account_id IS NULL` is not a filter, it is the invariant - `write()`
+   * refuses a PLATFORM_REVENUE row that names an account (CLAUDE.md §6.2), so
+   * the condition is stated to document that rather than to select among rows.
+   *
+   * ## Index
+   *
+   * Served by `ledger_account_keyset_idx (account_type, account_id, created_at
+   * DESC, id DESC)` from migration 0008 - the leading column is the account
+   * type, so this aggregate is an index range scan, not a table scan, which is
+   * what CLAUDE.md §3.4 requires of any query on `ledger_entries`.
+   */
+  async platformRevenue(
+    q: Queryable,
+    range: { since?: Date; until?: Date } = {},
+  ): Promise<SignedIqdAmount> {
+    const conditions = [`account_type = 'PLATFORM_REVENUE'`, 'account_id IS NULL'];
+    const params: SqlValue[] = [];
+
+    if (range.since) {
+      params.push(range.since);
+      conditions.push(`created_at >= $${params.length}`);
+    }
+    if (range.until) {
+      params.push(range.until);
+      conditions.push(`created_at < $${params.length}`);
+    }
+
+    const result = await q.query<{ balance_iqd: string | null }>(
+      `SELECT COALESCE(SUM(CASE WHEN direction = 'CREDIT' THEN amount_iqd ELSE 0 END), 0)
+            - COALESCE(SUM(CASE WHEN direction = 'DEBIT'  THEN amount_iqd ELSE 0 END), 0)
+              AS balance_iqd
+         FROM ledger_entries
+        WHERE ${conditions.join(' AND ')}`,
+      params,
     );
 
     return parseSignedIqdFromDb(result.rows[0]?.balance_iqd ?? 0);

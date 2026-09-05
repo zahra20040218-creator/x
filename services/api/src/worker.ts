@@ -9,19 +9,31 @@ import { MatchingService } from './matching/matching.service.js';
 import { RideClaimService } from './matching/ride-claim.service.js';
 import { IdempotencyService } from './idempotency/idempotency.service.js';
 import { LedgerService } from './ledger/ledger.service.js';
+import {
+  CashProvider,
+  GatewayProvider,
+  PaymentProviderRegistry,
+} from './payments/payment-provider.js';
 import { FareCalculator } from './fare/fare-calculator.js';
 import { PlatformConfigService } from './platform-config/platform-config.service.js';
 import { IoRedisAdapter } from './redis/ioredis-adapter.js';
 import { RideStateMachine } from './rides/ride-state-machine.js';
 import { RideRepository } from './rides/ride.repository.js';
+import { RealtimeGateway } from './realtime/realtime.gateway.js';
+import { TokenService } from './auth/token.service.js';
 import { RideService } from './rides/ride.service.js';
+import { CapabilityService } from './capabilities/capability.service.js';
+import { DriverComplianceService } from './compliance/driver-compliance.service.js';
+import { NegotiationService } from './negotiation/negotiation.service.js';
+import { SubscriptionService } from './subscriptions/subscription.service.js';
 import {
   QUEUE_NAMES,
-  type PushJob,
   QueueRegistry,
   createConnection,
   createWorker,
+  type PushJob,
 } from './queue/queues.js';
+import type { RideDispatchJob } from './queue/queues.js';
 import { FcmSender, parseServiceAccount } from './push/fcm-sender.js';
 import { UnconfiguredPushSender, type PushSender } from './push/push.port.js';
 import { PushService } from './push/push.service.js';
@@ -57,16 +69,47 @@ async function bootstrap(): Promise<void> {
   const presence = new DriverPresenceService(redis, clock, config.DRIVER_PRESENCE_TTL_SECONDS);
   const repository = new RideRepository();
 
+  /**
+   * The worker publishes ride events too, and this is not optional.
+   *
+   * Dispatch happens HERE, in the worker - so if only the API process has a
+   * publisher, a ride is offered and the driver is never told. That is exactly
+   * what happened: the ride reached OFFERED in the database and nothing arrived
+   * on the driver's socket.
+   *
+   * The gateway is used here only as a publisher; `attach()` is never called,
+   * so the worker runs no WebSocket server. Delivery goes through Redis pub/sub
+   * to whichever API process holds the driver's connection, which is the same
+   * path a second API process would use.
+   */
+  const realtime = new RealtimeGateway(
+    new TokenService(
+      config.JWT_SECRET,
+      clock,
+      config.JWT_ACCESS_TTL_SECONDS,
+      config.JWT_REFRESH_TTL_SECONDS,
+    ),
+    redis,
+    logger,
+  );
+
+  const workerLedger = new LedgerService();
+
   const rideService = new RideService(
     database,
     repository,
     new RideStateMachine(),
     new RideClaimService(redis, config.MATCH_CLAIM_TTL_MS, logger),
-    new LedgerService(),
+    workerLedger,
     new FareCalculator(),
     platformConfig,
     clock,
     logger,
+    realtime,
+    // The same seam the API uses. The worker completes rides too (a swept
+    // ride settles here), and a second settlement path would be a second place
+    // for the money rules to drift.
+    new PaymentProviderRegistry([new CashProvider(workerLedger), new GatewayProvider()]),
   );
 
   const matching = new MatchingService(
@@ -81,7 +124,36 @@ async function bootstrap(): Promise<void> {
     logger,
   );
 
-  const idempotency = new IdempotencyService(clock, config.IDEMPOTENCY_TTL_SECONDS);
+  const idempotency = new IdempotencyService(clock, config.IDEMPOTENCY_TTL_SECONDS, logger);
+  const subscriptions = new SubscriptionService(new LedgerService(), clock);
+
+  // Built only for the bid-expiry sweep. The worker never places or accepts a
+  // bid, so nothing here is on a request path - but the sweep has to close
+  // windows that passed, or a rider keeps seeing bids the accept path will
+  // refuse.
+  const negotiation = new NegotiationService(
+    database,
+    repository,
+    new RideStateMachine(),
+    new RideClaimService(redis, config.MATCH_CLAIM_TTL_MS, logger),
+    platformConfig,
+    new CapabilityService(
+      database,
+      new DriverComplianceService(clock, () =>
+        platformConfig.requiredDriverDocuments(database, (unknown) => {
+          logger.warn(
+            { event: 'compliance.unknown_document_type', value: unknown },
+            'ignoring an unknown document type in required_driver_documents',
+          );
+        }),
+      ),
+      clock,
+      () => platformConfig.subscriptionRequired(database),
+    ),
+    clock,
+    realtime,
+    logger,
+  );
   const connection = createConnection(config.REDIS_URL);
   const queues = new QueueRegistry(connection);
   await queues.scheduleRecurring(config.LOCATION_FLUSH_INTERVAL_MS);
@@ -140,6 +212,27 @@ async function bootstrap(): Promise<void> {
       logger,
     ),
 
+    /**
+     * Offer a newly created ride to a driver.
+     *
+     * The job the whole product depends on: without it a ride is created and
+     * never offered to anybody. It was missing entirely - `POST /rides`
+     * returned 201 and the ride sat in REQUESTED.
+     */
+    createWorker(
+      QUEUE_NAMES.rideDispatch,
+      connection,
+      async (job) => {
+        const { rideId } = job.data as RideDispatchJob;
+        const outcome = await matching.dispatch(rideId);
+        logger.info(
+          { event: 'ride.dispatched', ride_id: rideId, outcome },
+          'dispatch attempted for a new ride',
+        );
+      },
+      logger,
+    ),
+
     createWorker(
       QUEUE_NAMES.offerSweep,
       connection,
@@ -178,6 +271,33 @@ async function bootstrap(): Promise<void> {
         const purged = await idempotency.purgeExpired(database);
         if (purged > 0) {
           logger.debug({ event: 'idempotency.purged', count: purged }, 'purged keys');
+        }
+      },
+      logger,
+    ),
+
+    createWorker(
+      QUEUE_NAMES.subscriptionExpiry,
+      connection,
+      async () => {
+        const expired = await subscriptions.expireLapsed(database);
+        if (expired > 0) {
+          logger.info(
+            { event: 'subscription.expired', count: expired },
+            'closed lapsed subscription periods',
+          );
+        }
+      },
+      logger,
+    ),
+
+    createWorker(
+      QUEUE_NAMES.bidExpiry,
+      connection,
+      async () => {
+        const expired = await negotiation.expireStaleBids();
+        if (expired > 0) {
+          logger.info({ event: 'bid.expired', count: expired }, 'closed stale bids');
         }
       },
       logger,

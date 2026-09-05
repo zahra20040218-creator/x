@@ -100,10 +100,16 @@ export class DriverPresenceService {
     );
     const newest = sorted.at(-1)!;
 
-    // Everything goes to the history buffer...
-    for (const sample of sorted) {
-      await this.redis.rPush(
-        RedisKeys.locationFlushBuffer,
+    // Everything goes to the history buffer, in ONE round trip.
+    //
+    // This was a loop with an `await` inside it, so a batch of five samples
+    // cost five sequential round trips - and a driver reports a batch every
+    // few seconds, for every driver online. `rPush` has always taken varargs;
+    // the loop was simply paying for a feature it was not using. Ordering is
+    // preserved because RPUSH appends its arguments left to right.
+    await this.redis.rPush(
+      RedisKeys.locationFlushBuffer,
+      ...sorted.map((sample) =>
         JSON.stringify({
           driverId,
           lat: sample.lat,
@@ -113,8 +119,8 @@ export class DriverPresenceService {
           speedMps: sample.speedMps ?? null,
           recordedAt: sample.recordedAt.toISOString(),
         }),
-      );
-    }
+      ),
+    );
 
     // ...but only the newest becomes "where this driver is now".
     await this.redis.geoAdd(RedisKeys.driversOnline, driverId, newest);
@@ -202,19 +208,27 @@ export class DriverPresenceService {
   }
 
   private async writeLastKnown(driverId: string, position: DriverPosition): Promise<void> {
-    const key = RedisKeys.driverLocation(driverId);
-    await this.redis.hSet(key, 'lat', String(position.lat));
-    await this.redis.hSet(key, 'lng', String(position.lng));
-    await this.redis.hSet(key, 'recordedAt', position.recordedAt.toISOString());
-    if (position.accuracyM !== undefined) {
-      await this.redis.hSet(key, 'accuracyM', String(position.accuracyM));
-    }
-    if (position.headingDeg !== undefined) {
-      await this.redis.hSet(key, 'headingDeg', String(position.headingDeg));
-    }
-    if (position.speedMps !== undefined) {
-      await this.redis.hSet(key, 'speedMps', String(position.speedMps));
-    }
+    // One round trip, not six.
+    //
+    // Six `hSet` calls on the same key, awaited one after another, is six
+    // sequential round trips to Redis on the request path - for a write that
+    // Redis has been able to do in a single HSET since 4.0. Together with the
+    // rPush loop above, a five-sample report was making thirteen sequential
+    // round trips; the whole handler does four now.
+    //
+    // The optional fields are omitted rather than written as empty strings, so
+    // `hGetAll` still distinguishes "the phone did not report a heading" from
+    // "the heading was zero".
+    const fields: Record<string, string> = {
+      lat: String(position.lat),
+      lng: String(position.lng),
+      recordedAt: position.recordedAt.toISOString(),
+    };
+    if (position.accuracyM !== undefined) fields['accuracyM'] = String(position.accuracyM);
+    if (position.headingDeg !== undefined) fields['headingDeg'] = String(position.headingDeg);
+    if (position.speedMps !== undefined) fields['speedMps'] = String(position.speedMps);
+
+    await this.redis.hSetMany(RedisKeys.driverLocation(driverId), fields);
   }
 }
 

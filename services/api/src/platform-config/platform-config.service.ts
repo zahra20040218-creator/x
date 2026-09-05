@@ -40,6 +40,18 @@ export const CONFIG_KEYS = [
 export type ConfigKey = (typeof CONFIG_KEYS)[number];
 
 /**
+ * Policy switches: string rows holding 'true' or 'false', not numbers.
+ *
+ * Kept apart from `CONFIG_KEYS` deliberately. Those have numeric bounds and are
+ * read on the fare hot path as one cached object; these are independent flags
+ * read once per guarded action, each seeded FALSE by the migration that
+ * introduced its feature.
+ */
+export const BOOLEAN_CONFIG_KEYS = ['subscription_required', 'negotiation_enabled'] as const;
+
+export type BooleanConfigKey = (typeof BOOLEAN_CONFIG_KEYS)[number];
+
+/**
  * Bounds are enforced here as well as at the HTTP boundary, because this reads
  * from the database - and a row edited by hand with `psql` never passed through
  * the API's validation.
@@ -95,6 +107,17 @@ export class PlatformConfigService {
    * does not fit `PlatformConfig`, and widening that type would put a string
    * member on the fare hot path for the sake of a check that is off by default.
    */
+  /**
+   * One cache for every simple policy row, keyed by config key.
+   *
+   * A field per flag was the shape the first two used, and it does not scale:
+   * three more flags would be three more fields, three more TTL checks and
+   * three more chances to forget one.
+   */
+  private readonly flagCache = new Map<string, { value: string; expiresAtMs: number }>();
+
+  private subscriptionCache: { value: boolean; expiresAtMs: number } | null = null;
+
   private documentsCache: { value: DriverDocumentType[]; expiresAtMs: number } | null = null;
 
   constructor(
@@ -173,6 +196,126 @@ export class PlatformConfigService {
     return value;
   }
 
+  /**
+   * Whether a valid subscription is required before a driver may go online.
+   *
+   * Cached on the same TTL as the document policy, and defaulting to FALSE for
+   * the same reason: an absent row means the migration has not run, and the
+   * safe direction for a check that gates a driver's earnings is off. Only the
+   * exact string 'true' turns it on - a typo in an admin text field must not
+   * put every driver in the city out of work.
+   */
+  async subscriptionRequired(q: Queryable): Promise<boolean> {
+    const now = this.clock.nowMs();
+    if (this.subscriptionCache && this.subscriptionCache.expiresAtMs > now) {
+      return this.subscriptionCache.value;
+    }
+
+    const result = await q.query<{ value: string }>(
+      `SELECT value FROM platform_config WHERE key = 'subscription_required'`,
+    );
+    const value = (result.rows[0]?.value ?? '').trim().toLowerCase() === 'true';
+
+    this.subscriptionCache = { value, expiresAtMs: now + this.cacheTtlMs };
+    return value;
+  }
+
+  /**
+   * Whether fare negotiation is switched on.
+   *
+   * Same shape and same default as the other two policy switches: off unless an
+   * owner has explicitly written 'true'. A typo in an admin text field must not
+   * silently change how every ride in the city is matched.
+   */
+  async negotiationEnabled(q: Queryable): Promise<boolean> {
+    return this.readBooleanFlag(q, 'negotiation_enabled', false);
+  }
+
+  /**
+   * How far a bid may sit from the rider's proposal, in basis points.
+   *
+   * Basis points rather than a percentage, matching `commission_bps` - one unit
+   * for proportions across the system means one way to get them wrong.
+   *
+   * The floor this produces is the point. Without one a driver bids 1 IQD,
+   * sorts to the top of the rider's list, and renegotiates in the car with a
+   * passenger who has nowhere else to go.
+   */
+  async negotiationBandBps(q: Queryable): Promise<number> {
+    return this.readNumericFlag(q, 'negotiation_band_bps', 3_000, {
+      min: 0,
+      max: 10_000,
+    });
+  }
+
+  /** How long a bid stands before it expires. */
+  async negotiationWindowSeconds(q: Queryable): Promise<number> {
+    return this.readNumericFlag(q, 'negotiation_window_seconds', 90, {
+      min: 10,
+      max: 600,
+    });
+  }
+
+  /**
+   * A boolean policy row, cached on the shared TTL.
+   *
+   * Only the exact string 'true' is true. Anything else - including 'TRUE ',
+   * '1', 'yes' and an absent row - is false, because every one of these flags
+   * gates someone's ability to earn and the safe direction is off.
+   */
+  private async readBooleanFlag(
+    q: Queryable,
+    key: string,
+    fallback: boolean,
+  ): Promise<boolean> {
+    const now = this.clock.nowMs();
+    const cached = this.flagCache.get(key);
+    if (cached && cached.expiresAtMs > now) return cached.value === 'true';
+
+    const result = await q.query<{ value: string }>(
+      `SELECT value FROM platform_config WHERE key = $1`,
+      [key],
+    );
+    const raw = result.rows[0]?.value;
+    if (raw === undefined) return fallback;
+
+    this.flagCache.set(key, { value: raw.trim().toLowerCase(), expiresAtMs: now + this.cacheTtlMs });
+    return raw.trim().toLowerCase() === 'true';
+  }
+
+  /**
+   * A numeric policy row, clamped to a sane range.
+   *
+   * Clamped rather than rejected: these are read on the request path, and an
+   * out-of-range value typed into an admin form should not take matching down
+   * for the whole city. The clamp is logged by the caller if it matters.
+   */
+  private async readNumericFlag(
+    q: Queryable,
+    key: string,
+    fallback: number,
+    bounds: { min: number; max: number },
+  ): Promise<number> {
+    const now = this.clock.nowMs();
+    const cached = this.flagCache.get(key);
+    const raw =
+      cached && cached.expiresAtMs > now
+        ? cached.value
+        : await (async () => {
+            const result = await q.query<{ value: string }>(
+              `SELECT value FROM platform_config WHERE key = $1`,
+              [key],
+            );
+            const value = result.rows[0]?.value ?? String(fallback);
+            this.flagCache.set(key, { value, expiresAtMs: now + this.cacheTtlMs });
+            return value;
+          })();
+
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.min(bounds.max, Math.max(bounds.min, Math.trunc(parsed)));
+  }
+
   /** Keys absent from the database, i.e. running on a built-in default. */
   async missingKeys(q: Queryable): Promise<ConfigKey[]> {
     const result = await q.query<{ key: string }>('SELECT key FROM platform_config');
@@ -239,8 +382,62 @@ export class PlatformConfigService {
     return this.read(q);
   }
 
+  /**
+   * Turn a boolean policy row on or off.
+   *
+   * ## Why this is separate from `update()`
+   *
+   * `update()` is typed to `Record<ConfigKey, number>` and every key it knows
+   * has numeric bounds. The policy switches are strings holding 'true' or
+   * 'false', and widening the numeric config to carry them would put a string
+   * member on the fare hot path for the sake of a flag that is read once per
+   * driver action.
+   *
+   * ## Why it had to exist at all
+   *
+   * `subscription_required` was reachable ONLY by running SQL against the
+   * production database by hand. It is not in `CONFIG_KEYS`, not in
+   * `UpdateConfigSchema`, and `update()` actively throws on it as an unknown
+   * key. So the subscription gate - the whole enforcement half of a feature -
+   * could not be switched on through any API or admin screen. A policy an owner
+   * cannot change without `psql` is not a policy, it is a deployment.
+   *
+   * Both caches are cleared, not just the map: `subscriptionRequired()` keeps
+   * its own field-level cache, and leaving it warm would mean an owner flipping
+   * the switch saw nothing happen for up to the TTL and flipped it again.
+   */
+  async setFlag(
+    q: Queryable,
+    key: BooleanConfigKey,
+    value: boolean,
+    adminId: string,
+  ): Promise<boolean> {
+    if (!BOOLEAN_CONFIG_KEYS.includes(key)) {
+      throw new InvalidConfigValueError(key, String(value), 'unknown policy switch');
+    }
+
+    // UPSERT rather than UPDATE. The numeric keys are guaranteed present by the
+    // 0001 seed; these arrive with later migrations, and an operator restoring
+    // an older dump would otherwise get a silent no-op that reads as success.
+    await q.query(
+      `INSERT INTO platform_config (key, value, updated_at, updated_by)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (key) DO UPDATE
+          SET value = EXCLUDED.value,
+              updated_at = EXCLUDED.updated_at,
+              updated_by = EXCLUDED.updated_by`,
+      [key, value ? 'true' : 'false', this.clock.now(), adminId],
+    );
+
+    this.flagCache.delete(key);
+    this.subscriptionCache = null;
+    return value;
+  }
+
   invalidate(): void {
     this.cache = null;
+    this.flagCache.clear();
+    this.subscriptionCache = null;
   }
 }
 
