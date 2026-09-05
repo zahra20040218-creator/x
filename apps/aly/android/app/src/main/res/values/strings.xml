@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Default (English) launcher label. The Arabic value in values-ar/ is what an
+     Arabic-locale device shows, which is the primary market.
+
+     ALY, not "Darb". CLAUDE.md §1 (decided 2026-08-25) makes ALY the product
+     name "in the UI, the launcher, notifications, logs, README and store
+     listings"; the two apps this one replaces still shipped the older name.
+     The package id is a separate question and deliberately does NOT change -
+     see CLAUDE.md:29. -->
+<resources>
+    <string name="app_name">ALY</string>
+</resources>

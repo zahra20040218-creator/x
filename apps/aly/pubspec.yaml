@@ -1,0 +1,59 @@
+name: rideapp_aly
+description: >
+  ALY - one app, two modes (CLAUDE.md §1.1). Android only in v1 (§2 - no iOS
+  builds). The Dart package is renamed; the Android applicationId is NOT, and
+  stays iq.rideapp.rideapp_rider because it is already registered as a Firebase
+  app with SHA fingerprints (CLAUDE.md:29).
+version: 1.0.0
+publish_to: none
+
+environment:
+  sdk: ">=3.6.0 <4.0.0"
+  flutter: ">=3.24.0"
+
+dependencies:
+  # The UNION of the rider and driver dependency sets. Both apps pinned the
+  # same versions, so nothing had to be reconciled - verified before merging.
+  #
+  # Sorted alphabetically: `sort_pub_dependencies` is enforced and
+  # `flutter analyze` exits non-zero on an info-level lint.
+
+  # Battery optimisation exemption (CLAUDE.md §5.3). Driver mode only, but a
+  # dependency is per-binary and there is one binary now.
+  android_intent_plus: ^5.2.0
+
+  firebase_auth: ^5.3.3
+  firebase_core: ^3.8.0
+  firebase_messaging: ^15.1.5
+
+  flutter:
+    sdk: flutter
+
+  # CLAUDE.md §5.3 - the location service must run as a FOREGROUND SERVICE with
+  # a persistent notification.
+  flutter_foreground_task: ^8.10.4
+
+  flutter_localizations:
+    sdk: flutter
+
+  geolocator: ^13.0.2
+  google_maps_flutter: ^2.9.0
+  path_provider: ^2.1.5
+  permission_handler: ^11.3.1
+
+  rideapp_core:
+    path: ../../packages/core
+
+  # Navigation hand-off. CLAUDE.md §2 keeps in-app navigation OUT of scope.
+  url_launcher: ^6.3.1
+
+  uuid: ^4.5.1
+  web_socket_channel: ^3.0.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  very_good_analysis: ^6.0.0
+
+flutter:
+  uses-material-design: true

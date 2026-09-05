@@ -1,0 +1,21 @@
+gradle-wrapper.jar
+/.gradle
+/captures/
+/gradlew
+/gradlew.bat
+/local.properties
+GeneratedPluginRegistrant.java
+.cxx/
+
+# Remember to never publicly share your keystore.
+# See https://flutter.dev/to/reference-keystore
+key.properties
+**/*.keystore
+**/*.jks
+
+# Per-project Firebase configuration. CLAUDE.md 9 forbids committed config, and
+# main.dart already documents that this file must not be in the repository:
+# committing it ties the checkout to one Firebase project and carries the
+# Android API key along with it.
+app/google-services.json
+google-services.json

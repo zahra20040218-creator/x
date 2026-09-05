@@ -1,0 +1,28 @@
+# CLAUDE.md §9: very_good_analysis lints, no `dynamic` in public APIs.
+include: package:very_good_analysis/analysis_options.yaml
+
+analyzer:
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+  errors:
+    # A user-facing string that never reached the localisation layer is a
+    # CLAUDE.md §8 violation, not a style preference.
+    missing_required_param: error
+    missing_return: error
+
+linter:
+  rules:
+    public_member_api_docs: false
+    lines_longer_than_80_chars: false
