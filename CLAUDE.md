@@ -6,6 +6,11 @@
 
 ---
 
+> **Not Claude-specific.** The filename is historical. Every rule below binds
+> any agent and any human touching this code. `AGENTS.md` and `GEMINI.md` point
+> here rather than copying it — two copies of a constitution are two
+> constitutions, and they drift apart at the worst possible moment.
+
 ## 0. How to use this file
 
 This is a **binding contract**, not documentation. Every rule here overrides your default behavior.
