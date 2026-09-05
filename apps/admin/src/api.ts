@@ -2,9 +2,16 @@ import {
   type AdminSession,
   type DriverDocuments,
   type DriverDocumentType,
+  type Dispute,
+  type DriverSubscription,
+  type SubscriptionPlan,
   createDataProvider,
+  fetchDisputes,
   fetchDriverDocuments,
+  fetchSubscriptionPlans,
+  grantSubscription,
   recordDriverDocument,
+  resolveDispute,
   topUpWallet,
 } from './data-provider';
 
@@ -47,4 +54,32 @@ export function saveDriverDocument(
   body: { status: 'PENDING' | 'VERIFIED' | 'REJECTED'; reference?: string; expiresAt?: string; note?: string },
 ): Promise<DriverDocuments> {
   return recordDriverDocument(API_BASE_URL, session, driverId, docType, body);
+}
+
+/** `fetchSubscriptionPlans` with the base URL and session already applied. */
+export function subscriptionPlans(): Promise<{ plans: SubscriptionPlan[] }> {
+  return fetchSubscriptionPlans(API_BASE_URL, session);
+}
+
+/** `grantSubscription` with the base URL and session already applied. */
+export function sellSubscription(
+  driverId: string,
+  body: { planCode: string; chargeIqd?: number; note?: string },
+): Promise<DriverSubscription> {
+  return grantSubscription(API_BASE_URL, session, driverId, body);
+}
+
+/** `fetchDisputes` with the base URL and session already applied. */
+export function disputes(
+  params: { status?: string; cursor?: string; limit?: number } = {},
+): Promise<{ items: Dispute[]; nextCursor?: string | null }> {
+  return fetchDisputes(API_BASE_URL, session, params);
+}
+
+/** `resolveDispute` with the base URL and session already applied. */
+export function closeDispute(
+  disputeId: string,
+  body: { outcome: 'RESOLVED' | 'REJECTED'; resolution: string },
+): Promise<Dispute> {
+  return resolveDispute(API_BASE_URL, session, disputeId, body);
 }

@@ -5,6 +5,7 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router';
 import { API_BASE_URL, dataProvider, session } from './api';
 import { createAuthProvider } from './auth-provider';
 import { ConfigPage } from './pages/config';
+import { DisputesPage } from './pages/disputes';
 import { DriversPage } from './pages/drivers';
 import { LoginPage } from './pages/login';
 import { RidesPage } from './pages/rides';
@@ -27,6 +28,7 @@ export function App(): JSX.Element {
         resources={[
           { name: 'drivers', list: '/drivers', meta: { label: 'السائقون' } },
           { name: 'rides', list: '/rides', meta: { label: 'الرحلات' } },
+          { name: 'disputes', list: '/disputes', meta: { label: 'الشكاوى' } },
           { name: 'config', list: '/config', meta: { label: 'الإعدادات' } },
         ]}
         options={{ disableTelemetry: true, warnWhenUnsavedChanges: true }}
@@ -44,6 +46,7 @@ export function App(): JSX.Element {
             <Route index element={<Navigate to="/drivers" replace />} />
             <Route path="/drivers" element={<DriversPage />} />
             <Route path="/rides" element={<RidesPage />} />
+            <Route path="/disputes" element={<DisputesPage />} />
             <Route path="/config" element={<ConfigPage />} />
             <Route path="*" element={<NotFound />} />
           </Route>
@@ -60,6 +63,7 @@ function Shell(): JSX.Element {
         <span className="brand">الإدارة</span>
         <a href="/drivers">السائقون</a>
         <a href="/rides">الرحلات</a>
+        <a href="/disputes">الشكاوى</a>
         <a href="/config">الإعدادات</a>
         <LogoutButton />
       </nav>

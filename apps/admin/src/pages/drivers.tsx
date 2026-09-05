@@ -3,6 +3,7 @@ import { useState } from 'react';
 
 import { topUp } from '../api';
 import { Documents } from './driver-documents';
+import { Subscription } from './driver-subscription';
 import { formatDateTime, formatIqd } from '../money';
 
 /**
@@ -102,6 +103,7 @@ function DriverRow({
   const { mutate: update, isLoading } = useUpdate();
   const [toppingUp, setToppingUp] = useState(false);
   const [showingDocuments, setShowingDocuments] = useState(false);
+  const [sellingSubscription, setSellingSubscription] = useState(false);
 
   function toggleSuspension(): void {
     const suspending = !driver.isSuspended;
@@ -149,6 +151,7 @@ function DriverRow({
         <td className="actions">
           <button onClick={() => setToppingUp((v) => !v)}>شحن</button>
           <button onClick={() => setShowingDocuments((v) => !v)}>الوثائق</button>
+          <button onClick={() => setSellingSubscription((v) => !v)}>الاشتراك</button>
           <button onClick={toggleSuspension} disabled={isLoading}>
             {driver.isSuspended ? 'إلغاء الإيقاف' : 'إيقاف'}
           </button>
@@ -171,6 +174,13 @@ function DriverRow({
         <tr>
           <td colSpan={9}>
             <Documents driverId={driver.id} />
+          </td>
+        </tr>
+      )}
+      {sellingSubscription && (
+        <tr>
+          <td colSpan={9}>
+            <Subscription driverId={driver.id} onGranted={onChanged} />
           </td>
         </tr>
       )}

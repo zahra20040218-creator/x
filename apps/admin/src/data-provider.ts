@@ -271,3 +271,137 @@ export function recordDriverDocument(
     { method: 'PUT', body: JSON.stringify(body) },
   );
 }
+
+// ---------------------------------------------------------------------------
+// Subscriptions
+// ---------------------------------------------------------------------------
+
+export interface SubscriptionPlan {
+  code: string;
+  nameAr: string;
+  nameEn: string;
+  /** Whole IQD. CLAUDE.md §6.1 — never a decimal type. */
+  priceIqd: number;
+  durationDays: number;
+}
+
+export interface DriverSubscription {
+  id: string;
+  planCode: string;
+  status: 'ACTIVE' | 'EXPIRED' | 'CANCELLED';
+  chargedIqd: number;
+  startedAt: string;
+  expiresAt: string;
+  /** The ledger transaction that paid for it; null for a free grant. */
+  transactionId: string | null;
+}
+
+/**
+ * The plans an operator can sell.
+ *
+ * Read from the DRIVER endpoint rather than an admin one. There is exactly one
+ * list of active plans, and adding a second admin-only path to return the same
+ * rows would be a contract change (CLAUDE.md §12.1) that buys nothing.
+ */
+export function fetchSubscriptionPlans(
+  baseUrl: string,
+  session: AdminSession,
+): Promise<{ plans: SubscriptionPlan[] }> {
+  return adminRequest<{ plans: SubscriptionPlan[] }>(
+    baseUrl,
+    session,
+    '/driver/subscription/plans',
+  );
+}
+
+/**
+ * Sell a driver a period, collected in cash.
+ *
+ * `Idempotency-Key` is REQUIRED and generated here, once per call. A retried
+ * grant must not charge twice: the ledger is append-only (CLAUDE.md §6.3), so a
+ * duplicate charge could never be deleted, only offset by a second transaction
+ * that a driver reading their statement would have to be talked through.
+ *
+ * `crypto.randomUUID` rather than a counter or a timestamp — two operators on
+ * two machines must not be able to generate the same key.
+ */
+export function grantSubscription(
+  baseUrl: string,
+  session: AdminSession,
+  driverId: string,
+  body: { planCode: string; chargeIqd?: number; note?: string },
+): Promise<DriverSubscription> {
+  return adminRequest<DriverSubscription>(
+    baseUrl,
+    session,
+    `/admin/drivers/${driverId}/subscription`,
+    {
+      method: 'POST',
+      headers: { 'Idempotency-Key': crypto.randomUUID() },
+      body: JSON.stringify(body),
+    },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Disputes
+// ---------------------------------------------------------------------------
+
+export interface Dispute {
+  id: string;
+  rideId: string;
+  openedBy?: string;
+  status: 'OPEN' | 'RESOLVED' | 'REJECTED';
+  reasonCode: string;
+  description?: string;
+  resolution: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+}
+
+/**
+ * Resolve one dispute.
+ *
+ * `outcome` and `resolution` are BOTH required by the contract, and the
+ * resolution has a minimum length: a dispute closed with an empty note is
+ * indistinguishable from one nobody looked at, and the note is the only record
+ * of what the operator actually decided.
+ */
+export function resolveDispute(
+  baseUrl: string,
+  session: AdminSession,
+  disputeId: string,
+  body: { outcome: 'RESOLVED' | 'REJECTED'; resolution: string },
+): Promise<Dispute> {
+  return adminRequest<Dispute>(
+    baseUrl,
+    session,
+    `/admin/disputes/${disputeId}/resolve`,
+    { method: 'POST', body: JSON.stringify(body) },
+  );
+}
+
+/**
+ * A page of disputes, newest first.
+ *
+ * Keyset paging on the cursor the server returns, never an offset — CLAUDE.md
+ * §3.5, and the same reason the ledger uses one: a row inserted while an
+ * operator pages would shift every subsequent offset and silently skip a
+ * dispute.
+ */
+export function fetchDisputes(
+  baseUrl: string,
+  session: AdminSession,
+  params: { status?: string; cursor?: string; limit?: number } = {},
+): Promise<{ items: Dispute[]; nextCursor?: string | null }> {
+  const query = new URLSearchParams();
+  if (params.status) query.set('status', params.status);
+  if (params.cursor) query.set('cursor', params.cursor);
+  query.set('limit', String(params.limit ?? 25));
+
+  return adminRequest<{ items: Dispute[]; nextCursor?: string | null }>(
+    baseUrl,
+    session,
+    `/admin/disputes?${query.toString()}`,
+  );
+}
