@@ -1,0 +1,42 @@
+-- 0013 the first subscription plan, and nothing else.
+--
+-- Owner decision, 2026-09-05, recorded in DECISIONS.md D-020.
+--
+-- ## Why a plan row is a migration and not a fixture
+--
+-- `subscription_plans` was empty in every environment, including production.
+-- The tables shipped in 0011, `CapabilityService` reads them, and the whole
+-- feature was a gate with nothing behind it: the system could refuse a driver
+-- for lacking a subscription and could not sell one at any price, because no
+-- price existed. The only figure anywhere in the tree was a 25,000 default in a
+-- test helper, which is not a business decision - it is a number somebody typed
+-- to make a fixture compile.
+--
+-- A seed script would not fix that. Seeds run on developer machines; the row
+-- has to exist in production for the admin grant path to have anything to
+-- charge against, and a migration is the only thing that runs there.
+--
+-- ## The price: 25,000 IQD per 30 days
+--
+-- Not 50,000, and the reasoning is in D-020. A larger charge is cheaper as a
+-- proportion of any future payment-processor fee - 3.7% at 50,000 against 4.9%
+-- at 25,000 - but that comparison optimises the wrong constraint. At zero
+-- drivers the binding constraint is supply acquisition, not processor fees.
+-- 25,000 is roughly five typical Baghdad fares at the tariff seeded in 0001
+-- (2,000 + 500/km + 50/min, minimum 3,000); 50,000 is roughly ten, which is a
+-- hard first ask of a driver who has not yet earned anything on the platform.
+--
+-- BIGINT whole dinars, per CLAUDE.md 6.1. Never a decimal type.
+--
+-- ## This does NOT switch the feature on
+--
+-- `subscription_required` stays 'false', seeded that way by 0011 and untouched
+-- here. Adding a purchasable plan and enforcing purchase are two decisions, and
+-- collapsing them into one migration would put every existing driver out of
+-- work on deploy - the same trap 0011 avoided by defaulting approval to
+-- APPROVED. The switch is now flippable from the admin API (see
+-- PlatformConfigService.setFlag), which it was not before this change.
+
+INSERT INTO subscription_plans (code, name_ar, name_en, price_iqd, duration_days, is_active)
+VALUES ('MONTHLY_25K', 'اشتراك شهري', 'Monthly subscription', 25000, 30, TRUE)
+ON CONFLICT (code) DO NOTHING;
