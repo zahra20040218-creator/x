@@ -156,7 +156,11 @@ it against the real onboarding flow, not a mock.
       your machine and fails for everyone who installs from the store. This is
       the single most commonly missed step.
 - [ ] Upload to **internal testing** first, never production.
-- [ ] Privacy policy URL — required, and must be live before submission.
+- [ ] Privacy policy URL. The text is written and matches this document
+      section for section — `docs/PRIVACY_POLICY.md`. It needs THREE things
+      before it counts: the bracketed operator name, address and contact email
+      filled in; a lawyer's review; and a public, stable URL. Play checks the
+      link resolves.
 - [ ] Check **Android Developer Verification** status for Iraq and for your
       distribution channel. Enforcement began 2026-09-30 in four countries and
       is expanding; confirm what applies rather than trusting any summary,
@@ -168,7 +172,7 @@ Recorded here so nobody discovers it during a submission window:
 
 | Item | State |
 |---|---|
-| Privacy policy | Not written. Needs a URL before submission. |
+| Privacy policy | **Written** (`docs/PRIVACY_POLICY.md`), Arabic and English. Needs operator details, legal review, and hosting at a public URL. |
 | Firebase App Check | Not implemented — `docs/EXTERNAL_SETUP.md` §5 |
 | Crashlytics | Not integrated, so the Diagnostics answer above is currently "none" |
 | Physical device testing | Never done. `docs/DEVICE_TEST_PLAN.md` |
