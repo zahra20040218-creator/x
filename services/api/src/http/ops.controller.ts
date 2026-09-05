@@ -12,7 +12,12 @@ import {
 import type { Response } from 'express';
 
 import type { AuthenticatedUser } from '../auth/auth.service.js';
-import { NotFoundProblem, NotImplementedError } from '../common/problem.js';
+import {
+  BadWebhookPayloadProblem,
+  NotFoundProblem,
+  NotImplementedError,
+  UnauthorizedProblem,
+} from '../common/problem.js';
 import { DATABASE, type Database } from '../db/db.port.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { processWebhook } from '../payments/webhook.js';
@@ -168,7 +173,20 @@ export class OpsController {
     });
 
     if (outcome.kind === 'REJECTED') {
-      throw new NotImplementedError(`Gateway webhook rejected: ${outcome.reason}`);
+      // The status `processWebhook` computed, not a blanket 501.
+      //
+      // Two things were wrong with rethrowing every rejection as
+      // NotImplementedError. It contradicted the published contract, which
+      // documents 400 for a malformed payload and 401 for a bad signature. And
+      // 5xx is the one class a retrying provider reads as "the far side is
+      // broken, send it again" - so a permanently-unverifiable request would be
+      // redelivered forever instead of being dropped after one try.
+      //
+      // The detail is deliberately constant. The old message named the reason,
+      // which told an unauthenticated caller whether a guessed secret was
+      // correct and whether a secret was configured at all.
+      if (outcome.status === 401) throw new UnauthorizedProblem('Webhook signature rejected.');
+      throw new BadWebhookPayloadProblem();
     }
     if (outcome.kind === 'IGNORED') return;
 

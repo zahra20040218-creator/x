@@ -114,6 +114,29 @@ export class NotFoundProblem extends ProblemError {
   }
 }
 
+/**
+ * A webhook whose body could not be understood.
+ *
+ * 400 rather than 422: the payload is not a validation failure in OUR schema,
+ * it is a message from another company's system that this handler does not
+ * model, and the contract documents 400 for it.
+ *
+ * The detail carries NO reason. `processWebhook` distinguishes
+ * MALFORMED_PAYLOAD from UNSUPPORTED_EVENT from INVALID_AMOUNT, and every one
+ * of those distinctions is useful to an attacker probing an unauthenticated
+ * endpoint and useless to a legitimate provider, which has our documentation.
+ */
+export class BadWebhookPayloadProblem extends ProblemError {
+  constructor() {
+    super({
+      type: 'bad-webhook-payload',
+      title: 'Bad webhook payload',
+      status: 400,
+      detail: 'The webhook payload could not be processed.',
+    });
+  }
+}
+
 export class ConflictProblem extends ProblemError {
   constructor(detail: string, extra?: Record<string, unknown>) {
     super({
@@ -145,6 +168,35 @@ export class DriverNotCompliantProblem extends ProblemError {
       status: 403,
       detail: 'One or more required driver documents are missing, rejected or expired.',
       extra: { missing, expired, rejected },
+    });
+  }
+}
+
+/**
+ * A driver-scoped action attempted by an account that may not currently drive.
+ *
+ * CLAUDE.md §1.1. Distinct from `DriverNotCompliantProblem`, which is the
+ * narrow documents case and keeps its own shape because the driver app already
+ * renders it: this covers approval, suspension, subscription and "not a driver
+ * at all", which is what a rider gets when their client enters Driver mode
+ * without asking the server.
+ *
+ * `blockers` is the full list, machine-readable, never prose - the app
+ * localises it (CLAUDE.md §8). `suspendedReason` is the one exception and is
+ * text an administrator typed, passed through so the driver can read what they
+ * were actually told rather than a generic refusal.
+ *
+ * 403 and not 404: unlike an offer they were never given, a driver IS entitled
+ * to know their own account is blocked and why.
+ */
+export class DriverModeUnavailableProblem extends ProblemError {
+  constructor(blockers: readonly string[], suspendedReason: string | null = null) {
+    super({
+      type: 'driver-mode-unavailable',
+      title: 'Driver mode unavailable',
+      status: 403,
+      detail: 'This account may not use driver mode.',
+      extra: { blockers, suspendedReason },
     });
   }
 }

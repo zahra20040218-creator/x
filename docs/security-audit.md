@@ -178,8 +178,19 @@ hold a user's bearer token. The HMAC signature is therefore the *only* control.
 
 Mitigations in place: signature verified over the **raw bytes** before parsing;
 `timingSafeEqual` rather than `===`; the 501 is returned **after** verification,
-so the endpoint cannot be used as an oracle for which rides exist; replay
-protection via a unique `(provider, external_id)`.
+so the endpoint cannot be used as an oracle for which rides exist.
+
+**Correction, 2026-09-05.** An earlier revision of this entry listed "replay
+protection via a unique `(provider, external_id)`" as a mitigation **in place**.
+That was false. The `payment_webhook_events` table and its unique index exist
+(`0004_operations.up.sql:23-30`) and nothing in `services/api/src` has ever read
+or written them — the pure function documents dedup as "the caller's job", and
+the caller never opens a database connection. Claiming a control that does not
+exist is worse than not having it, because it stops anyone looking again.
+
+**Why it is not yet built:** the handler ends in 501 before any ledger write, so
+there is nothing to replay *into*. Dedup must land in the same change that makes
+a gateway write reachable, never after it — see `DECISIONS.md` D-019.
 
 **Residual risk:** if `GATEWAY_WEBHOOK_SECRET` leaks, an attacker can submit
 arbitrary ledger commands. Since the gateway is stubbed in v1 and the handler
