@@ -306,4 +306,82 @@ describe('realtime gateway', () => {
       second.close();
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // The socket used to carry nothing
+  //
+  // Every test above publishes by calling `gateway.toRider` from the test
+  // itself. Nothing in the application did - the gateway was attached, clients
+  // authenticated and subscribed, and no ride event was ever published to it.
+  // The driver app polled every 5 seconds against a 15-second offer expiry, and
+  // the rider app held a handler for an event that never arrived.
+  //
+  // These assert on the shape the application now publishes, so a change that
+  // silently stops publishing fails here rather than in the field.
+  // ---------------------------------------------------------------------------
+
+  describe('the events the application publishes', () => {
+    it('delivers a ride offer to the chosen driver, and to nobody else', async () => {
+      const chosen = await authenticated('driver-chosen', 'DRIVER');
+      const other = await authenticated('driver-other', 'DRIVER');
+      const chosenSeen = collect(chosen);
+      const otherSeen = collect(other);
+
+      await gateway.toDriver('driver-chosen', {
+        type: 'ride.offer',
+        payload: {
+          rideId: 'ride-1',
+          expiresAt: '2026-08-24T09:00:15.000Z',
+          distanceM: 420,
+          requestedAt: '2026-08-24T09:00:00.000Z',
+        },
+      });
+      await new Promise((r) => setTimeout(r, 60));
+
+      expect(chosenSeen).toHaveLength(1);
+      const event = JSON.parse(chosenSeen[0]!);
+      expect(event.type).toBe('ride.offer');
+      expect(event.payload.rideId).toBe('ride-1');
+      // Carried so a client can measure its own end-to-end matching latency
+      // without correlating two separate requests.
+      expect(event.payload.requestedAt).toBe('2026-08-24T09:00:00.000Z');
+
+      // A driver must never see a ride they were not offered.
+      expect(otherSeen).toEqual([]);
+    });
+
+    it('a rider does not receive driver-channel events', async () => {
+      const rider = await authenticated('user-1', 'RIDER');
+      const seen = collect(rider);
+
+      // Same user id, driver channel. The channels are keyed by role as well
+      // as by user, and this is what stops one leaking into the other.
+      await gateway.toDriver('user-1', {
+        type: 'ride.offer',
+        payload: { rideId: 'ride-2' },
+      });
+      await new Promise((r) => setTimeout(r, 60));
+
+      expect(seen).toEqual([]);
+    });
+
+    it('delivers a status change to both parties', async () => {
+      const rider = await authenticated('rider-9', 'RIDER');
+      const driver = await authenticated('driver-9', 'DRIVER');
+      const riderSeen = collect(rider);
+      const driverSeen = collect(driver);
+
+      const event = {
+        type: 'ride.status_changed' as const,
+        payload: { rideId: 'ride-9', status: 'IN_PROGRESS', at: '2026-08-24T09:05:00.000Z' },
+      };
+      await gateway.toRider('rider-9', event);
+      await gateway.toDriver('driver-9', event);
+      await new Promise((r) => setTimeout(r, 60));
+
+      expect(JSON.parse(riderSeen[0]!).payload.status).toBe('IN_PROGRESS');
+      expect(JSON.parse(driverSeen[0]!).payload.status).toBe('IN_PROGRESS');
+    });
+  });
+
 });

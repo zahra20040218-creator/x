@@ -251,6 +251,16 @@ export class InMemoryRedis implements RedisPort {
     hash.set(field, value);
   }
 
+  async hSetMany(key: string, fields: Readonly<Record<string, string>>): Promise<void> {
+    this.assertOpen();
+    let hash = this.hashes.get(key);
+    if (!hash) {
+      hash = new Map();
+      this.hashes.set(key, hash);
+    }
+    for (const [field, value] of Object.entries(fields)) hash.set(field, value);
+  }
+
   async hGet(key: string, field: string): Promise<string | null> {
     this.assertOpen();
     return this.hashes.get(key)?.get(field) ?? null;

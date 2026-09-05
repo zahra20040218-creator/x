@@ -45,6 +45,9 @@ interface Connection {
 const AUTH_TIMEOUT_MS = 5_000;
 const CLOSE_UNAUTHENTICATED = 4401;
 
+/** The server could not attach this connection to its channel. */
+const CLOSE_SUBSCRIBE_FAILED = 4500;
+
 export class RealtimeGateway {
   private wss: WebSocketServer | null = null;
   private readonly connections = new Set<Connection>();
@@ -131,11 +134,30 @@ export class RealtimeGateway {
         ? RedisKeys.driverChannel(connection.userId)
         : RedisKeys.riderChannel(connection.userId);
 
-    connection.unsubscribe = await this.redis.subscribe(channel, (payload) => {
-      if (connection.socket.readyState === connection.socket.OPEN) {
-        connection.socket.send(payload);
-      }
-    });
+    // Defence in depth against a class of bug that has already happened here.
+    //
+    // `onMessage` is invoked from a `socket.on('message')` handler, so a throw
+    // out of it is an unhandled rejection - which took the whole API process
+    // down when the subscriber connection rejected a subscribe. One client
+    // connecting killed the server for everyone.
+    //
+    // The correct behaviour is to fail THIS connection and leave the process
+    // alone: a client that cannot subscribe gets nothing over the socket, and
+    // both apps already fall back to polling.
+    try {
+      connection.unsubscribe = await this.redis.subscribe(channel, (payload) => {
+        if (connection.socket.readyState === connection.socket.OPEN) {
+          connection.socket.send(payload);
+        }
+      });
+    } catch (error) {
+      this.logger?.error(
+        { event: 'realtime.subscribe_failed', user_id: connection.userId, err: error },
+        'could not subscribe this connection; closing it',
+      );
+      connection.socket.close(CLOSE_SUBSCRIBE_FAILED, 'could not subscribe');
+      return;
+    }
 
     this.connections.add(connection);
     connection.socket.send(JSON.stringify({ type: 'ready' }));
@@ -154,7 +176,17 @@ export class RealtimeGateway {
 
   /** Publish to a driver's own channel. */
   async toDriver(userId: string, event: RealtimeEvent): Promise<void> {
-    await this.redis.publish(RedisKeys.driverChannel(userId), JSON.stringify(event));
+    const receivers = await this.redis.publish(
+      RedisKeys.driverChannel(userId),
+      JSON.stringify(event),
+    );
+    // `receivers` is how many subscribers Redis handed it to. Zero means the
+    // driver is not connected to any API process - worth seeing, because it is
+    // indistinguishable from "not published" in every other symptom.
+    this.logger?.info(
+      { event: 'realtime.published', channel: 'driver', user_id: userId, kind: event.type, receivers },
+      'published a driver event',
+    );
   }
 
   async close(): Promise<void> {

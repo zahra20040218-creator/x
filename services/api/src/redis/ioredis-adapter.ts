@@ -18,6 +18,23 @@ export class IoRedisAdapter implements RedisPort {
    */
   private subscriber: Redis | null = null;
 
+  /**
+   * A separate connection for publishing.
+   *
+   * The command connection sets `enableOfflineQueue: false` on purpose, and the
+   * reason given is about LOCATION WRITES: one that queues while Redis is down
+   * is worse than one that fails fast, because the driver app buffers and
+   * retries anyway. That reasoning does not transfer to publishing a ride
+   * offer. Losing the event entirely is worse than delivering it fifty
+   * milliseconds late, and there is no client-side buffer behind it.
+   *
+   * Without this, `publish` on a connection that has not finished connecting
+   * rejects with the same "Stream isn't writeable" error that used to kill the
+   * API process from the subscribe path. A regression test in
+   * test/integration/real-redis-pubsub.test.ts covers both sides.
+   */
+  private publisher: Redis | null = null;
+
   private readonly handlers = new Map<string, Set<(message: string) => void>>();
 
   constructor(private readonly redis: Redis) {
@@ -199,6 +216,14 @@ export class IoRedisAdapter implements RedisPort {
     await this.redis.hset(key, field, value);
   }
 
+  async hSetMany(key: string, fields: Readonly<Record<string, string>>): Promise<void> {
+    const entries = Object.entries(fields);
+    if (entries.length === 0) return;
+    // HSET has taken multiple field/value pairs since Redis 4.0, so this is one
+    // command rather than a pipeline - and unlike a pipeline it is atomic.
+    await this.redis.hset(key, ...entries.flat());
+  }
+
   async hGet(key: string, field: string): Promise<string | null> {
     return this.redis.hget(key, field);
   }
@@ -241,7 +266,49 @@ export class IoRedisAdapter implements RedisPort {
 
   private ensureSubscriber(): Redis {
     if (!this.subscriber) {
-      this.subscriber = this.redis.duplicate();
+      // `enableOfflineQueue: true`, overriding the command connection's option.
+      //
+      // duplicate() copies the parent's options, and the parent sets it false
+      // on purpose - a location write that queues while Redis is down is worse
+      // than one that fails fast. For the SUBSCRIBER the same option is a bug:
+      // a duplicated connection is not connected yet, so the first subscribe()
+      // is issued before the stream is writeable and ioredis rejects it with
+      // "Stream isn't writeable and enableOfflineQueue options is false"
+      // instead of waiting for ready.
+      //
+      // That rejection killed the API process: the throw came out of the
+      // gateway's message handler, where nothing caught it. Any client
+      // connecting to the WebSocket took the server down with it.
+      //
+      // The only thing this queue ever holds is a subscribe waiting on the
+      // connection, which is exactly what it should wait for.
+      //
+      // `enableReadyCheck: false` for the same reason, and it is not optional.
+      //
+      // duplicate() copies the parent's options, and the parent sets
+      // `enableReadyCheck: true`. The ready check works by issuing INFO. On a
+      // connection that is already in subscriber mode - which this one is the
+      // moment it holds a subscription, and ioredis re-enters it automatically
+      // when it reconnects - the server refuses INFO with
+      //
+      //     Connection in subscriber mode, only subscriber commands may be used
+      //
+      // ioredis surfaces that as a connection error, every in-flight
+      // `subscribe()` rejects, and the gateway closes each of those sockets
+      // with 4500. The effect is that ONE Redis hiccup disconnects every driver
+      // trying to come online until the connection settles.
+      //
+      // The 16-minute soak logged this 215 times against 500 clients: 215
+      // drivers refused a realtime channel by a check that exists only to tell
+      // us the connection is up. Nothing else in the run was wrong - no
+      // authenticated socket was ever dropped.
+      //
+      // The check is redundant here anyway: `enableOfflineQueue` already makes
+      // a subscribe wait for the connection instead of failing early.
+      this.subscriber = this.redis.duplicate({
+        enableOfflineQueue: true,
+        enableReadyCheck: false,
+      });
       this.subscriber.on('message', (channel: string, message: string) => {
         const set = this.handlers.get(channel);
         if (!set) return;
@@ -251,8 +318,13 @@ export class IoRedisAdapter implements RedisPort {
     return this.subscriber;
   }
 
+  private ensurePublisher(): Redis {
+    this.publisher ??= this.redis.duplicate({ enableOfflineQueue: true });
+    return this.publisher;
+  }
+
   async publish(channel: string, message: string): Promise<number> {
-    return this.redis.publish(channel, message);
+    return this.ensurePublisher().publish(channel, message);
   }
 
   async subscribe(
@@ -293,9 +365,16 @@ export class IoRedisAdapter implements RedisPort {
   }
 
   async close(): Promise<void> {
+    // Each `quit` is independent: a subscriber that fails to close must not
+    // leave the command connection open, which on shutdown means a process
+    // that never exits.
     if (this.subscriber) {
       await this.subscriber.quit().catch(() => undefined);
       this.subscriber = null;
+    }
+    if (this.publisher) {
+      await this.publisher.quit().catch(() => undefined);
+      this.publisher = null;
     }
     await this.redis.quit().catch(() => undefined);
   }

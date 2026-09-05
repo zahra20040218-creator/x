@@ -107,6 +107,14 @@ export interface RedisPort {
   // -------------------------------------------------------------------------
 
   hSet(key: string, field: string, value: string): Promise<void>;
+  /**
+   * Set several fields in one round trip.
+   *
+   * `hSet` per field looked harmless and was not: writing a driver's last-known
+   * position set six fields, which is six sequential round trips on the request
+   * path, repeated for every location report from every online driver.
+   */
+  hSetMany(key: string, fields: Readonly<Record<string, string>>): Promise<void>;
   hGet(key: string, field: string): Promise<string | null>;
   hGetAll(key: string): Promise<Record<string, string>>;
   hDel(key: string, ...fields: string[]): Promise<number>;
