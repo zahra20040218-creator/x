@@ -11,36 +11,46 @@ environment:
   flutter: ">=3.24.0"
 
 dependencies:
-  flutter:
-    sdk: flutter
-  flutter_localizations:
-    sdk: flutter
+  # Sorted alphabetically, which `sort_pub_dependencies` enforces. Grouping by
+  # purpose read better but made the whole Flutter CI job fail: `flutter
+  # analyze` exits non-zero on an info-level lint, so one unsorted list was
+  # enough to keep the job red.
 
   # HTTP with an interceptor chain - needed for the auth-refresh and
   # idempotency-key behaviour in api_client.dart.
   dio: ^5.7.0
 
-  # Secure token storage. Refresh tokens must not sit in SharedPreferences,
-  # which is world-readable on a rooted device.
-  flutter_secure_storage: ^9.2.2
+  equatable: ^2.0.5
 
-  # The map widget lives here rather than in each app, because CLAUDE.md 1
-  # treats duplicated widget code between rider and driver as a defect — and
-  # both apps show a map.
-  # Push. The registration flow is shared: both apps obtain a token the same
-  # way and register it against the same endpoint, and CLAUDE.md 1 treats
+  # Push. The registration flow is shared: both modes obtain a token the same
+  # way and register it against the same endpoint, and CLAUDE.md §1.1 treats
   # duplicated logic between them as a defect.
   firebase_core: ^3.8.0
   firebase_messaging: ^15.1.5
 
-  google_maps_flutter: ^2.9.0
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # Secure token storage. Refresh tokens must not sit in SharedPreferences,
+  # which is world-readable on a rooted device.
+  flutter_secure_storage: ^9.2.2
 
   # Permission and position stream for the map's own location handling.
   geolocator: ^13.0.2
 
+  # The map widget lives here rather than in each app, because CLAUDE.md §1.1
+  # treats duplicated widget code between the two modes as a defect - and both
+  # modes show a map.
+  google_maps_flutter: ^2.9.0
+
   intl: ^0.20.3
   uuid: ^4.5.1
-  equatable: ^2.0.5
+
+  # The realtime socket, shared for the same reason as the map and push:
+  # `realtime_client.dart` serves both modes.
+  web_socket_channel: ^3.0.1
 
 dev_dependencies:
   flutter_test:

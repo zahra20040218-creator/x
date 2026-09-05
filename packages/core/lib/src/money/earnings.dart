@@ -1,6 +1,6 @@
-import '../models/models.dart';
-import '../l10n/dates.dart';
-import 'iqd.dart';
+import 'package:rideapp_core/src/l10n/dates.dart';
+import 'package:rideapp_core/src/models/models.dart';
+import 'package:rideapp_core/src/money/iqd.dart';
 
 /// Driver earnings, derived from the ledger.
 ///

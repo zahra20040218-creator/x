@@ -125,7 +125,7 @@ class CounterpartyCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(user.displayName,
-                      style: Theme.of(context).textTheme.titleLarge),
+                      style: Theme.of(context).textTheme.titleLarge,),
                   if (vehicle != null)
                     Text(
                       '${vehicle.model} · ${vehicle.color} · ${vehicle.plate}',

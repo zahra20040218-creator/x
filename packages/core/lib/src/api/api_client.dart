@@ -369,6 +369,40 @@ class ApiClient {
         await _send<Map<String, dynamic>>('GET', '/driver/wallet'),
       );
 
+  /// What this account may do, decided on the server (CLAUDE.md §1.1).
+  ///
+  /// Called on sign-in and whenever a driver-scoped action is refused, so the
+  /// app can render the reason instead of a generic error. Nothing in the tree
+  /// called this endpoint before, which meant `SUBSCRIPTION_REQUIRED` — and
+  /// every other blocker — could never reach a screen.
+  ///
+  /// Not cached here. This is an authorisation answer, and a cached one is a
+  /// stale one: a driver whose subscription was just activated must see the
+  /// change on their next look, not after a TTL.
+  Future<Capabilities> capabilities() async => Capabilities.fromJson(
+        await _send<Map<String, dynamic>>('GET', '/me/capabilities'),
+      );
+
+  /// Plans the driver may buy. Active only, cheapest first.
+  Future<List<SubscriptionPlan>> subscriptionPlans() async {
+    final json = await _send<Map<String, dynamic>>('GET', '/driver/subscription/plans');
+    final plans = json['plans'] as List<dynamic>? ?? const [];
+    return plans
+        .map((e) => SubscriptionPlan.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// The caller's live subscription, or null when they have none.
+  ///
+  /// Null is a normal answer, not an error: subscriptions are off by default
+  /// (`subscription_required` ships false), so most drivers have none and the
+  /// screen must read as "not subscribed", never as "something went wrong".
+  Future<DriverSubscription?> mySubscription() async {
+    final json = await _send<Map<String, dynamic>?>('GET', '/driver/subscription');
+    if (json == null || json.isEmpty) return null;
+    return DriverSubscription.fromJson(json);
+  }
+
   // ---------------------------------------------------------------------------
 
   /// Send a request, refreshing once on 401.

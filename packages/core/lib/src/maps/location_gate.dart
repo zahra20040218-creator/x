@@ -1,7 +1,6 @@
 import 'package:geolocator/geolocator.dart';
-
-import '../models/models.dart';
-import 'map_state.dart';
+import 'package:rideapp_core/src/maps/map_state.dart';
+import 'package:rideapp_core/src/models/models.dart';
 
 /// Turns the platform's location situation into a [MapState].
 ///

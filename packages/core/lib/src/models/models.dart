@@ -613,3 +613,172 @@ class LedgerPage {
 
   bool get hasMore => nextCursor != null;
 }
+
+// ---------------------------------------------------------------------------
+// Capabilities and subscriptions
+//
+// CLAUDE.md §1.1: ALY is one app with a Rider mode and a Driver mode, and the
+// mode is a SERVER decision. `GET /me/capabilities` is the authoritative
+// answer and the same evaluation the server enforces with — so the app renders
+// what this says and decides nothing itself.
+//
+// These models existed on the server and in the contract since 2026-08-25 and
+// had no Dart counterpart, which meant no app could ever learn WHY a driver was
+// refused. The driver saw a generic error.
+// ---------------------------------------------------------------------------
+
+/// One machine-readable reason driver mode is unavailable.
+///
+/// Deliberately a `String` and not an enum. The server ships weekly, the Play
+/// Store review does not, so a driver WILL receive a code their build has never
+/// seen. An enum would throw on parse; a string renders a generic row that
+/// still tells them to call support with the code. See
+/// `AppStrings.blockerTitle`.
+typedef CapabilityBlocker = String;
+
+/// Whether this account may drive, and every reason it may not.
+class DriverCapability {
+  const DriverCapability({
+    required this.allowed,
+    required this.blockers,
+    required this.suspendedReason,
+    required this.missingDocuments,
+    required this.expiredDocuments,
+    required this.rejectedDocuments,
+    required this.subscriptionExpiresAt,
+  });
+
+  factory DriverCapability.fromJson(Map<String, dynamic> json) => DriverCapability(
+        allowed: json['allowed'] as bool? ?? false,
+        blockers: _strings(json['blockers']),
+        suspendedReason: json['suspendedReason'] as String?,
+        missingDocuments: _strings(json['missingDocuments']),
+        expiredDocuments: _strings(json['expiredDocuments']),
+        rejectedDocuments: _strings(json['rejectedDocuments']),
+        subscriptionExpiresAt: json['subscriptionExpiresAt'] == null
+            ? null
+            : DateTime.parse(json['subscriptionExpiresAt'] as String),
+      );
+
+  /// True only when [blockers] is empty. Never set independently — the server
+  /// derives it, and re-deriving it here is how the two drift apart.
+  final bool allowed;
+
+  /// EVERY reason, in the server's order. A driver blocked for three reasons
+  /// who fixes one and is still blocked has learned nothing.
+  final List<CapabilityBlocker> blockers;
+
+  final String? suspendedReason;
+  final List<String> missingDocuments;
+  final List<String> expiredDocuments;
+  final List<String> rejectedDocuments;
+
+  /// Present whenever a subscription exists, whether or not one is required —
+  /// a driver should be able to see what they bought before it gates anything.
+  final DateTime? subscriptionExpiresAt;
+
+  static List<String> _strings(Object? value) =>
+      (value as List<dynamic>? ?? const []).map((e) => e as String).toList();
+}
+
+/// What this account may do, decided on the server.
+class Capabilities {
+  const Capabilities({
+    required this.userId,
+    required this.canRide,
+    required this.driver,
+  });
+
+  factory Capabilities.fromJson(Map<String, dynamic> json) => Capabilities(
+        userId: json['userId'] as String,
+        canRide: json['canRide'] as bool? ?? false,
+        driver: DriverCapability.fromJson(
+          (json['driver'] as Map<String, dynamic>?) ?? const {},
+        ),
+      );
+
+  final String userId;
+  final bool canRide;
+  final DriverCapability driver;
+}
+
+/// A plan a driver can buy.
+class SubscriptionPlan {
+  const SubscriptionPlan({
+    required this.code,
+    required this.nameAr,
+    required this.nameEn,
+    required this.priceIqd,
+    required this.durationDays,
+  });
+
+  factory SubscriptionPlan.fromJson(Map<String, dynamic> json) => SubscriptionPlan(
+        code: json['code'] as String,
+        nameAr: json['nameAr'] as String,
+        nameEn: json['nameEn'] as String,
+        priceIqd: IqdAmount.fromJson(json['priceIqd']),
+        durationDays: json['durationDays'] as int,
+      );
+
+  final String code;
+  final String nameAr;
+  final String nameEn;
+
+  /// Whole IQD. CLAUDE.md §6.1 — never a decimal.
+  final IqdAmount priceIqd;
+
+  final int durationDays;
+
+  /// The plan name in the app's language.
+  String nameFor(String languageCode) => languageCode == 'en' ? nameEn : nameAr;
+}
+
+/// A driver's purchased period.
+class DriverSubscription {
+  const DriverSubscription({
+    required this.id,
+    required this.planCode,
+    required this.status,
+    required this.chargedIqd,
+    required this.startedAt,
+    required this.expiresAt,
+    required this.transactionId,
+  });
+
+  factory DriverSubscription.fromJson(Map<String, dynamic> json) => DriverSubscription(
+        id: json['id'] as String,
+        planCode: json['planCode'] as String,
+        status: json['status'] as String,
+        chargedIqd: IqdAmount.fromJson(json['chargedIqd']),
+        startedAt: DateTime.parse(json['startedAt'] as String),
+        expiresAt: DateTime.parse(json['expiresAt'] as String),
+        transactionId: json['transactionId'] as String?,
+      );
+
+  final String id;
+  final String planCode;
+
+  /// `ACTIVE` / `EXPIRED` / `CANCELLED`. A string for the same reason
+  /// [CapabilityBlocker] is.
+  final String status;
+
+  final IqdAmount chargedIqd;
+  final DateTime startedAt;
+  final DateTime expiresAt;
+
+  /// The ledger transaction that paid for it. Null for a period an
+  /// administrator granted without charge.
+  final String? transactionId;
+
+  /// Whole days left, rounded DOWN, floored at zero.
+  ///
+  /// Computed against `DateTime.now()` at the call site rather than stored, so
+  /// a screen left open overnight does not keep showing yesterday's number.
+  /// Rounded down because telling a driver "1 day left" when it expires in
+  /// four hours is the safe direction of the error.
+  int daysRemainingAt(DateTime now) {
+    final remaining = expiresAt.difference(now);
+    if (remaining.isNegative) return 0;
+    return remaining.inDays;
+  }
+}

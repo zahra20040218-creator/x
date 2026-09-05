@@ -105,7 +105,7 @@ void main() {
     test('no state is both terminal and active', () {
       for (final status in RideStatus.values) {
         expect(status.isTerminal && status.isActive, isFalse,
-            reason: '${status.wire} cannot be both');
+            reason: '${status.wire} cannot be both',);
       }
     });
   });
@@ -114,7 +114,7 @@ void main() {
     // ACCEPTANCE_CHECKLIST.md check 5. The guarantee is structural: there is no
     // phone field to populate, so no server response can put one on screen.
     test('has no phone field, even when the server sends one', () {
-      final user = PublicUser.fromJson({
+      final user = PublicUser.fromJson(const {
         'id': 'u1',
         'displayName': 'أحمد',
         'rating': 4.8,
@@ -132,8 +132,8 @@ void main() {
       final offer = RideOffer.fromJson({
         'offerId': 'o1',
         'rideId': 'r1',
-        'pickup': {'lat': 33.3, 'lng': 44.4},
-        'dropoff': {'lat': 33.2, 'lng': 44.5},
+        'pickup': const {'lat': 33.3, 'lng': 44.4},
+        'dropoff': const {'lat': 33.2, 'lng': 44.5},
         'estimatedFareIqd': 5000,
         'distanceM': 1200,
         'expiresAt': now.add(const Duration(seconds: 15)).toIso8601String(),
@@ -149,8 +149,8 @@ void main() {
       final offer = RideOffer.fromJson({
         'offerId': 'o1',
         'rideId': 'r1',
-        'pickup': {'lat': 33.3, 'lng': 44.4},
-        'dropoff': {'lat': 33.2, 'lng': 44.5},
+        'pickup': const {'lat': 33.3, 'lng': 44.4},
+        'dropoff': const {'lat': 33.2, 'lng': 44.5},
         'estimatedFareIqd': 5000,
         'distanceM': 1200,
         'expiresAt': now.subtract(const Duration(seconds: 5)).toIso8601String(),
@@ -164,7 +164,7 @@ void main() {
     // If the parts do not sum to the total, the driver is shown arithmetic
     // that does not add up.
     test('parts sum to the total', () {
-      final breakdown = FareBreakdown.fromJson({
+      final breakdown = FareBreakdown.fromJson(const {
         'baseIqd': 2000,
         'distanceIqd': 1100,
         'timeIqd': 400,

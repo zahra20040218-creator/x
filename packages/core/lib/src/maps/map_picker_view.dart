@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart' as gmap;
-
-import '../design/theme.dart';
-import '../design/widgets.dart';
-import '../l10n/strings.dart';
-import '../models/models.dart';
-import 'location_gate.dart';
-import 'map_state.dart';
+import 'package:rideapp_core/src/design/theme.dart';
+import 'package:rideapp_core/src/design/widgets.dart';
+import 'package:rideapp_core/src/l10n/strings.dart';
+import 'package:rideapp_core/src/maps/location_gate.dart';
+import 'package:rideapp_core/src/maps/map_state.dart';
+import 'package:rideapp_core/src/models/models.dart';
 
 /// Pick a point on a map.
 ///

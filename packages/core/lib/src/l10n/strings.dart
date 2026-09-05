@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import 'package:rideapp_core/src/compliance/compliance_failure.dart';
-import '../models/models.dart';
+import 'package:rideapp_core/src/models/models.dart';
 
 /// The localisation layer.
 ///
@@ -211,6 +211,56 @@ abstract class AppStrings {
   /// the server enum must fail to compile here rather than show an Iraqi rider
   /// the string `DRIVER_NO_SHOW`.
   String disputeReasonLabel(DisputeReason reason);
+
+  // --- Driver mode: subscription and blockers (CLAUDE.md §1.1, §8) ----------
+  //
+  // These moved out of `design/components/driver.dart`, which hardcoded them in
+  // Arabic with no English path at all - a §8 violation that widget tests were
+  // asserting, so it would have shipped the moment those components were
+  // mounted on a screen.
+
+  String get subscriptionTitle;
+  String get subscriptionExpired;
+
+  /// `يتبقى يومان` / `2 days left`. Arabic needs the dual and the 3-10 plural,
+  /// which is why this is a method and not an interpolated getter.
+  String subscriptionRemaining(int days);
+
+  String get subscriptionExpiresOn;
+  String get subscriptionExpiredOn;
+  String get subscriptionHintActive;
+  String get subscriptionHintExpiringSoon;
+  String get subscriptionHintExpired;
+  String get renewSubscription;
+  String get noActiveSubscription;
+  String get noActiveSubscriptionHint;
+  String get availablePlans;
+
+  /// `30 يوماً` / `30 days`.
+  String planDuration(int days);
+
+  /// How a driver actually pays, which in v1 is in cash to an operator.
+  /// DECISIONS.md D-019 keeps a live payment rail out of scope.
+  String get subscriptionPurchaseHint;
+
+  String get cannotGoOnlineNow;
+  String get contactSupport;
+
+  /// What is wrong, for one server blocker code.
+  ///
+  /// A method taking the raw code rather than an enum, deliberately: the server
+  /// ships weekly and the Play Store review does not, so a driver WILL receive
+  /// a code their build has never seen. An enum would fail to parse; this
+  /// returns a real sentence for the unknown case and asks them to quote the
+  /// code to support.
+  String blockerTitle(String code);
+
+  /// What to DO about it. Never a restatement of [blockerTitle].
+  String blockerAction(String code);
+
+  /// The button, or null where there is genuinely nothing to press - a pending
+  /// review is waiting, and a button that "hurries it up" would be a lie.
+  String? blockerActionLabel(String code);
 
 }
 
@@ -529,6 +579,94 @@ class ArabicStrings implements AppStrings {
         DisputeReason.riderNoShow => 'الراكب لم يحضر',
         DisputeReason.unsafe => 'سلوك غير آمن',
         DisputeReason.other => 'مشكلة أخرى',
+      };
+
+  // --- Driver mode: subscription and blockers ------------------------------
+
+  @override
+  String get subscriptionTitle => 'الاشتراك';
+
+  @override
+  String get subscriptionExpired => 'انتهى الاشتراك';
+
+  @override
+  String subscriptionRemaining(int days) => 'يتبقى ${_arabicDays(days)}';
+
+  @override
+  String get subscriptionExpiresOn => 'ينتهي في';
+
+  @override
+  String get subscriptionExpiredOn => 'انتهى في';
+
+  @override
+  String get subscriptionHintActive => 'اشتراكك فعّال ويمكنك استقبال الطلبات.';
+
+  @override
+  String get subscriptionHintExpiringSoon => 'جدّد قبل انتهاء المدة حتى لا يتوقف عملك.';
+
+  @override
+  String get subscriptionHintExpired => 'لا يمكنك استقبال الطلبات حتى تجدّد اشتراكك.';
+
+  @override
+  String get renewSubscription => 'تجديد الاشتراك';
+
+  @override
+  String get noActiveSubscription => 'لا يوجد اشتراك فعّال';
+
+  @override
+  String get noActiveSubscriptionHint =>
+      'اشترك لتتمكن من استقبال الطلبات عندما يُفعّل الاشتراك الإلزامي.';
+
+  @override
+  String get availablePlans => 'الباقات المتاحة';
+
+  @override
+  String planDuration(int days) => _arabicDays(days);
+
+  @override
+  String get subscriptionPurchaseHint =>
+      'الدفع نقداً لدى مكتب الشركة. تواصل مع الدعم لتفعيل اشتراكك.';
+
+  @override
+  String get cannotGoOnlineNow => 'لا يمكنك الاتصال الآن';
+
+  @override
+  String get contactSupport => 'تواصل مع الدعم';
+
+  @override
+  String blockerTitle(String code) => switch (code) {
+        'ACCOUNT_DISABLED' => 'حسابك معطّل',
+        'NOT_A_DRIVER' => 'هذا الحساب ليس حساب سائق',
+        'APPROVAL_PENDING' => 'طلبك قيد المراجعة',
+        'APPROVAL_REJECTED' => 'تم رفض طلب الانضمام',
+        'SUSPENDED' => 'حسابك موقوف مؤقتاً',
+        'DOCUMENTS_INCOMPLETE' => 'مستنداتك غير مكتملة',
+        'SUBSCRIPTION_REQUIRED' => 'اشتراكك غير فعّال',
+        _ => 'هناك شرط غير مستوفٍ',
+      };
+
+  @override
+  String blockerAction(String code) => switch (code) {
+        'ACCOUNT_DISABLED' => 'تواصل مع الدعم لإعادة تفعيل حسابك قبل أن تتمكن من العمل.',
+        'NOT_A_DRIVER' =>
+          'سجّل الخروج وادخل برقم هاتف السائق، أو اطلب من الدعم تحويل حسابك.',
+        'APPROVAL_PENDING' =>
+          'أبقِ هاتفك متاحاً وانتظر إشعار الموافقة. لا حاجة لإرسال الطلب مرة أخرى.',
+        'APPROVAL_REJECTED' => 'اسأل الدعم عن سبب الرفض، ثم أعد التقديم بعد معالجة الملاحظات.',
+        'SUSPENDED' => 'تواصل مع الدعم لمعرفة سبب الإيقاف ومتى ينتهي.',
+        'DOCUMENTS_INCOMPLETE' =>
+          'زوّد الدعم بالهوية وسند السيارة وإجازة السوق ليكملوا ملفك.',
+        'SUBSCRIPTION_REQUIRED' => 'جدّد اشتراكك لتتمكن من استقبال الطلبات.',
+        _ => 'تواصل مع الدعم واذكر لهم الرمز الظاهر أدناه.',
+      };
+
+  @override
+  String? blockerActionLabel(String code) => switch (code) {
+        // Nothing to press: a review is already running, and a button implying
+        // the driver can speed it up would be a lie.
+        'APPROVAL_PENDING' => null,
+        'SUBSCRIPTION_REQUIRED' => renewSubscription,
+        _ => contactSupport,
       };
 
 }
@@ -850,6 +988,95 @@ class EnglishStrings implements AppStrings {
         DisputeReason.other => 'Something else',
       };
 
+  // --- Driver mode: subscription and blockers ------------------------------
+
+  @override
+  String get subscriptionTitle => 'Subscription';
+
+  @override
+  String get subscriptionExpired => 'Subscription expired';
+
+  @override
+  String subscriptionRemaining(int days) => days == 1 ? '1 day left' : '$days days left';
+
+  @override
+  String get subscriptionExpiresOn => 'Expires on';
+
+  @override
+  String get subscriptionExpiredOn => 'Expired on';
+
+  @override
+  String get subscriptionHintActive => 'Your subscription is active. You can take rides.';
+
+  @override
+  String get subscriptionHintExpiringSoon =>
+      'Renew before it runs out so your work is not interrupted.';
+
+  @override
+  String get subscriptionHintExpired => 'You cannot take rides until you renew.';
+
+  @override
+  String get renewSubscription => 'Renew subscription';
+
+  @override
+  String get noActiveSubscription => 'No active subscription';
+
+  @override
+  String get noActiveSubscriptionHint =>
+      'Subscribe so you can keep taking rides once subscriptions become required.';
+
+  @override
+  String get availablePlans => 'Available plans';
+
+  @override
+  String planDuration(int days) => days == 1 ? '1 day' : '$days days';
+
+  @override
+  String get subscriptionPurchaseHint =>
+      'Paid in cash at the office. Contact support to activate your subscription.';
+
+  @override
+  String get cannotGoOnlineNow => 'You cannot go online yet';
+
+  @override
+  String get contactSupport => 'Contact support';
+
+  @override
+  String blockerTitle(String code) => switch (code) {
+        'ACCOUNT_DISABLED' => 'Your account is disabled',
+        'NOT_A_DRIVER' => 'This is not a driver account',
+        'APPROVAL_PENDING' => 'Your application is under review',
+        'APPROVAL_REJECTED' => 'Your application was rejected',
+        'SUSPENDED' => 'Your account is temporarily suspended',
+        'DOCUMENTS_INCOMPLETE' => 'Your documents are incomplete',
+        'SUBSCRIPTION_REQUIRED' => 'Your subscription is not active',
+        _ => 'A requirement is not met',
+      };
+
+  @override
+  String blockerAction(String code) => switch (code) {
+        'ACCOUNT_DISABLED' =>
+          'Contact support to reactivate your account before you can work.',
+        'NOT_A_DRIVER' =>
+          'Sign out and sign in with the driver phone number, or ask support to convert your account.',
+        'APPROVAL_PENDING' =>
+          'Keep your phone available and wait for the approval notification. There is no need to apply again.',
+        'APPROVAL_REJECTED' =>
+          'Ask support why it was rejected, then reapply once it is resolved.',
+        'SUSPENDED' => 'Contact support to find out why and when it ends.',
+        'DOCUMENTS_INCOMPLETE' =>
+          'Give support your ID, vehicle registration and driving licence to complete your file.',
+        'SUBSCRIPTION_REQUIRED' => 'Renew your subscription so you can take rides.',
+        _ => 'Contact support and quote the code shown below.',
+      };
+
+  @override
+  String? blockerActionLabel(String code) => switch (code) {
+        'APPROVAL_PENDING' => null,
+        'SUBSCRIPTION_REQUIRED' => renewSubscription,
+        _ => contactSupport,
+      };
+
 }
 
 /// Delegate. Arabic is the default for any locale that is not English.
@@ -877,3 +1104,22 @@ class AppStringsDelegate extends LocalizationsDelegate<AppStrings> {
   @override
   bool shouldReload(AppStringsDelegate old) => false;
 }
+
+/// The driver's remaining days, in Arabic, with the plural forms actually used.
+///
+/// `يوم واحد` / `يومان` / `3 أيام` / `11 يوماً`.
+///
+/// Arabic has singular, dual and two plural agreements. `$n أيام` for every
+/// value reads as broken Arabic to a native speaker in exactly the way
+/// `1 days` reads in English - and this string sits on the element that tells a
+/// driver whether they can work tomorrow, so it is worth getting right.
+///
+/// Arabic counts in four shapes, not two: singular, dual, the 3-10 plural, and
+/// the 11+ accusative singular. Interpolating `$days أيام` is wrong for three
+/// of those four, which is why the caller is a method and not a getter.
+String _arabicDays(int days) => switch (days) {
+      1 => 'يوم واحد',
+      2 => 'يومان',
+      >= 3 && <= 10 => '$days أيام',
+      _ => '$days يوماً',
+    };

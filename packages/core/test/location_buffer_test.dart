@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rideapp_core/rideapp_core.dart';
-import 'package:rideapp_core/src/location/location_buffer.dart';
 
 /// CLAUDE.md §5.3 - "Buffer locations locally when offline and flush on
 /// reconnect."

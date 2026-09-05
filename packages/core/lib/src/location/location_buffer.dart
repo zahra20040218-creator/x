@@ -124,11 +124,10 @@ class LocationBuffer {
   }
 
   Future<void> _persist() {
-    _pending = _pending.then((_) async {
+    return _pending = _pending.then((_) async {
       await _storage.write(
         jsonEncode(_samples.map((s) => s.toJson()).toList()),
       );
     });
-    return _pending;
   }
 }

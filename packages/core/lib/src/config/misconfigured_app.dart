@@ -30,7 +30,7 @@ class MisconfiguredApp extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Icon(Icons.build_circle_outlined,
-                      color: Color(0xFFFFB4AB), size: 48),
+                      color: Color(0xFFFFB4AB), size: 48,),
                   const SizedBox(height: 16),
                   const Text(
                     'This build is misconfigured',

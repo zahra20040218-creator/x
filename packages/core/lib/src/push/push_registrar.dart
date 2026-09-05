@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import '../api/api_client.dart';
-import '../api/api_exception.dart';
+import 'package:rideapp_core/src/api/api_client.dart';
+import 'package:rideapp_core/src/api/api_exception.dart';
 
 /// Why a device is not receiving notifications.
 ///
@@ -77,20 +77,17 @@ class PushRegistrar {
   /// and a rider needs none of it to request a ride.
   Future<PushStatus> start() async {
     if (!_source.isConfigured) {
-      _status = PushStatus.notConfigured;
-      return _status;
+      return _status = PushStatus.notConfigured;
     }
 
     final granted = await _source.requestPermission();
     if (!granted) {
-      _status = PushStatus.permissionDenied;
-      return _status;
+      return _status = PushStatus.permissionDenied;
     }
 
     final token = await _source.getToken();
     if (token == null || token.isEmpty) {
-      _status = PushStatus.registrationFailed;
-      return _status;
+      return _status = PushStatus.registrationFailed;
     }
 
     _status = await _register(token);

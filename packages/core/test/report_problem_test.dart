@@ -97,7 +97,7 @@ void main() {
       await tester.pumpWidget(host(reasons: const [
         DisputeReason.fareWrong,
         DisputeReason.driverNoShow,
-      ]));
+      ],),);
       await openSheet(tester);
 
       expect(find.text('الأجرة غير صحيحة'), findsOneWidget);
@@ -156,7 +156,7 @@ void main() {
       await tester.pumpWidget(host(
         reasons: const [DisputeReason.other],
         onResult: (dispute) => result = dispute,
-      ));
+      ),);
       await openSheet(tester);
 
       await tester.tap(find.text('مشكلة أخرى'));

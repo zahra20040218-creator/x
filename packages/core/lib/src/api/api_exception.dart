@@ -18,6 +18,15 @@ enum ApiProblem {
   idempotencyKeyReused('idempotency-key-reused'),
   /// A required driver document is missing, rejected or expired.
   driverNotCompliant('driver-not-compliant'),
+
+  /// Driver mode is unavailable, with the full blocker list in `blockers`.
+  ///
+  /// The server has returned this since 2026-08-25 and no Dart build knew the
+  /// slug, so every refusal — unapproved, suspended, subscription lapsed —
+  /// fell through to [unknown] and showed a generic error. The driver could not
+  /// learn what to fix. CLAUDE.md §1.1: "hiding a button is not authorisation",
+  /// and neither is an error message that does not say why.
+  driverModeUnavailable('driver-mode-unavailable'),
   idempotencyInProgress('idempotency-in-progress'),
   notImplemented('not-implemented'),
   serviceUnavailable('service-unavailable'),
@@ -124,6 +133,19 @@ class ApiException implements Exception {
 
   /// The session is gone; the app must route to sign-in.
   bool get requiresReauthentication => problem == ApiProblem.unauthorized;
+
+  /// The blocker codes the server sent with a `driver-mode-unavailable`.
+  ///
+  /// Empty for any other problem, so a caller can read it unconditionally. The
+  /// codes stay raw strings on purpose - see `CapabilityBlocker`.
+  List<String> get driverBlockers {
+    final raw = extra['blockers'];
+    if (raw is! List) return const [];
+    return raw.whereType<String>().toList();
+  }
+
+  /// Why the account was suspended, when the server said so.
+  String? get suspendedReason => extra['suspendedReason'] as String?;
 
   @override
   String toString() =>

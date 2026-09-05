@@ -1,6 +1,6 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 
-import 'push_registrar.dart';
+import 'package:rideapp_core/src/push/push_registrar.dart';
 
 /// The real FCM token source.
 ///

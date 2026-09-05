@@ -22,7 +22,7 @@ void main() {
         'missing': ['NATIONAL_ID'],
         'expired': ['DRIVING_LICENCE'],
         'rejected': ['VEHICLE_REGISTRATION'],
-      }))!;
+      }),)!;
 
       // Kept apart because they send the driver to three different places:
       // bring it, renew it, or stop bringing that one.
@@ -36,7 +36,7 @@ void main() {
         'missing': ['DRIVING_LICENCE'],
         'expired': <String>[],
         'rejected': <String>[],
-      }))!;
+      }),)!;
 
       expect(failure.missing, [DriverDocumentType.drivingLicence]);
       expect(failure.expired, isEmpty);
@@ -60,7 +60,7 @@ void main() {
     test('reports a refusal it cannot name rather than an empty reason', () {
       final failure = ComplianceFailure.from(refusal({
         'missing': ['TAXI_MEDALLION'],
-      }))!;
+      }),)!;
 
       // The API can be deployed ahead of the app. Showing the driver a blank
       // reason, or silently letting them think they can work, are both worse
@@ -72,7 +72,7 @@ void main() {
     test('keeps the codes it does understand alongside the ones it does not', () {
       final failure = ComplianceFailure.from(refusal({
         'missing': ['DRIVING_LICENCE', 'TAXI_MEDALLION'],
-      }))!;
+      }),)!;
 
       expect(failure.missing, [DriverDocumentType.drivingLicence]);
       expect(failure.unknown, ['TAXI_MEDALLION']);
@@ -104,7 +104,7 @@ void main() {
     test('non-string entries are skipped without taking the rest with them', () {
       final failure = ComplianceFailure.from(refusal({
         'missing': [42, 'DRIVING_LICENCE', null],
-      }))!;
+      }),)!;
 
       expect(failure.missing, [DriverDocumentType.drivingLicence]);
     });

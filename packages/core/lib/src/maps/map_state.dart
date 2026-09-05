@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-import '../models/models.dart';
+import 'package:rideapp_core/src/models/models.dart';
 
 /// Every state a map screen can be in.
 ///
