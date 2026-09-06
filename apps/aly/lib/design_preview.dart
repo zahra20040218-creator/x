@@ -18,6 +18,7 @@ import 'package:rideapp_aly/screens/profile_screen.dart';
 import 'package:rideapp_aly/screens/request_ride_screen.dart';
 import 'package:rideapp_aly/screens/ride_history_screen.dart';
 import 'package:rideapp_aly/screens/ride_receipt_screen.dart';
+import 'package:rideapp_aly/screens/rider_shell.dart';
 import 'package:rideapp_aly/screens/subscription_screen.dart';
 import 'package:rideapp_aly/screens/track_ride_screen.dart';
 import 'package:rideapp_aly/screens/trip_screen.dart';
@@ -252,6 +253,10 @@ class _Gallery extends StatelessWidget {
     final strings = AppStrings.of(context);
 
     final entries = <MapEntry<String, Widget Function()>>[
+      MapEntry(
+        'الرئيسية - الراكب (تصميم جديد)',
+        () => RiderShell(api: api, onSignedOut: () {}),
+      ),
       MapEntry(
         'طلب رحلة - الراكب',
         () => RequestRideScreen(api: api, onSignedOut: () {}),

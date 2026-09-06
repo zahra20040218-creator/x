@@ -163,12 +163,41 @@ class _TripScreenState extends State<TripScreen> {
             ),
           ),
 
-          const SizedBox(height: AppSpacing.md),
-          AlyButton.secondary(
-              label: strings.navigateToPickup,
-              onPressed: _navigate,
-              icon: Icons.navigation_rounded,
+// The navigation strip. Filled with `primary`, not a new dark colour:
+          // the palette has no inverse surface and the design's intent — one
+          // high-contrast band a driver reads with the side of their eye — is
+          // what the brand colour already provides.
+          Container(
+            padding: const EdgeInsetsDirectional.all(AlySpacing.lg),
+            decoration: BoxDecoration(
+              color: AlyColors.of(context).primary,
+              borderRadius: BorderRadius.circular(AlyRadius.lg),
             ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.navigation_rounded,
+                  color: AlyColors.of(context).onPrimary,
+                ),
+                const SizedBox(width: AlySpacing.md),
+                Expanded(
+                  child: Text(
+                    strings.navigateToPickup,
+                    style: AlyTypography.title
+                        .copyWith(color: AlyColors.of(context).onPrimary),
+                  ),
+                ),
+                IconButton(
+                  onPressed: _navigate,
+                  icon: Icon(
+                    Icons.chevron_left_rounded,
+                    color: AlyColors.of(context).onPrimary,
+                  ),
+                  tooltip: strings.navigateToPickup,
+                ),
+              ],
+            ),
+          ),
 
           const SizedBox(height: AppSpacing.lg),
           AlyButton(label: actionLabel, onPressed: () => _act(action), isLoading: _busy),

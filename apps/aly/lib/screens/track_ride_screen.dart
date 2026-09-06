@@ -251,6 +251,36 @@ class _TrackRideScreenState extends State<TrackRideScreen> {
             const SizedBox(height: AlySpacing.lg),
           ],
 
+          // The status panel. The design puts a large arrival countdown here;
+          // there is no field for one — the server reports no driver ETA — and
+          // a number invented from the fare estimate would be a guess printed
+          // in the largest type on the screen. The status carries the panel
+          // instead, and the ETA lands when the contract has it (D-12).
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsetsDirectional.all(AlySpacing.lg),
+            decoration: BoxDecoration(
+              color: AlyColors.of(context).primaryMuted,
+              borderRadius: BorderRadius.circular(AlyRadius.lg),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.directions_car_rounded,
+                  color: AlyColors.of(context).primary,
+                ),
+                const SizedBox(height: AlySpacing.sm),
+                Text(
+                  _statusLabel(strings),
+                  style: AlyTypography.h3
+                      .copyWith(color: AlyColors.of(context).textPrimary),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AlySpacing.lg),
+
           AlyRouteSummary.forRide(_ride),
           const SizedBox(height: AlySpacing.lg),
 
@@ -293,7 +323,7 @@ class _TrackRideScreenState extends State<TrackRideScreen> {
 
           if (view.canRate) ...[
             const SizedBox(height: AlySpacing.xl),
-            _RatingCard(api: widget.api, rideId: _ride.id),
+            RideRatingCard(api: widget.api, rideId: _ride.id),
           ],
         ],
       ),
@@ -301,17 +331,32 @@ class _TrackRideScreenState extends State<TrackRideScreen> {
   }
 }
 
-class _RatingCard extends StatefulWidget {
-  const _RatingCard({required this.api, required this.rideId});
+/// Rate the driver.
+///
+/// Public and shared: the tracking screen shows it the moment a ride
+/// completes, and the receipt shows it for a ride the rider came back to
+/// later. CLAUDE.md §1 — a second copy of this, with its own 409 handling,
+/// is a defect waiting to disagree with the first.
+class RideRatingCard extends StatefulWidget {
+  const RideRatingCard({
+    required this.api,
+    required this.rideId,
+    super.key,
+    this.onSkip,
+  });
 
   final ApiClient api;
   final String rideId;
 
+  /// Declining to rate is a legitimate choice, not a failure to act. Null
+  /// hides the option — on the tracking screen there is nowhere to skip to.
+  final VoidCallback? onSkip;
+
   @override
-  State<_RatingCard> createState() => _RatingCardState();
+  State<RideRatingCard> createState() => _RideRatingCardState();
 }
 
-class _RatingCardState extends State<_RatingCard> {
+class _RideRatingCardState extends State<RideRatingCard> {
   int _score = 5;
   bool _submitted = false;
   bool _busy = false;
@@ -364,6 +409,14 @@ class _RatingCardState extends State<_RatingCard> {
             onPressed: _submit,
             isLoading: _busy,
           ),
+          if (widget.onSkip != null) ...[
+            const SizedBox(height: AlySpacing.sm),
+            AlyButton(
+              label: strings.skip,
+              onPressed: widget.onSkip,
+              variant: AlyButtonVariant.tertiary,
+            ),
+          ],
         ],
       ),
     );

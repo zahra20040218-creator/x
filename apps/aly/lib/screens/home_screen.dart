@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:rideapp_aly/location/location_service.dart';
+import 'package:rideapp_aly/screens/design_logic.dart';
 import 'package:rideapp_aly/screens/earnings_screen.dart';
 import 'package:rideapp_aly/screens/offer_sheet.dart';
 import 'package:rideapp_aly/screens/profile_screen.dart';
@@ -478,6 +479,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     final earnings = _earnings;
     final subscription = _subscription;
 
+    final greeting = switch (Greeting.forHour(DateTime.now().hour)) {
+      Greeting.morning => strings.goodMorning,
+      Greeting.evening => strings.goodEvening,
+    };
+
     // The server's list, verbatim. A suspended account is a blocker the
     // server also reports, so the local flag only ever adds to it.
     final blockers = <String>[
@@ -547,6 +553,36 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 message: strings.accountSuspended,
                 tone: BannerTone.danger,
               ),
+
+            const SizedBox(height: AlySpacing.lg),
+
+            // Who is working, and how they are regarded. The rating sits here
+            // rather than in the profile because it is the number a driver
+            // checks between rides, and it is one line.
+            Row(
+              children: [
+                AlyAvatar(name: me?.displayName ?? '؟'),
+                const SizedBox(width: AlySpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        greeting,
+                        style: AlyTypography.bodySmall
+                            .copyWith(color: AlyColors.of(context).textSecondary),
+                      ),
+                      Text(
+                        me?.displayName ?? '',
+                        style: AlyTypography.h3
+                            .copyWith(color: AlyColors.of(context).textPrimary),
+                      ),
+                    ],
+                  ),
+                ),
+                if (me?.rating != null) AlyRatingStars(value: me!.rating!),
+              ],
+            ),
 
             const SizedBox(height: AlySpacing.lg),
             // The one saturated fill on the screen. `onChanged` is null — not

@@ -100,7 +100,7 @@ class _OfferSheetState extends State<OfferSheet> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  strings.newRideOffer,
+                  strings.newRideRequest,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 DeadlineCountdown(
@@ -113,9 +113,32 @@ class _OfferSheetState extends State<OfferSheet> {
             ),
             const SizedBox(height: AppSpacing.lg),
 
-            // The fare is the number the driver decides on. It gets the
-            // largest type on the sheet.
-            Center(child: FareText(offer.estimatedFareIqd, large: true)),
+            // The fare is the number the driver decides on, and the distance
+            // is the one that decides whether it is worth it. Side by side,
+            // because a driver reads both in the same glance or neither.
+            Row(
+              children: [
+                Expanded(
+                  child: _OfferStat(
+                    label: strings.fare,
+                    child: FareText(offer.estimatedFareIqd, large: true),
+                  ),
+                ),
+                Expanded(
+                  child: _OfferStat(
+                    label: strings.distance,
+                    child: Text(
+                      '${(offer.distanceM / 1000).toStringAsFixed(1)} '
+                      '${strings.kilometreShort}',
+                      style: AlyTypography.h3.copyWith(
+                        color: AlyColors.of(context).textPrimary,
+                      ),
+                      textDirection: TextDirection.ltr,
+                    ),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: AppSpacing.lg),
 
             _Leg(
@@ -140,7 +163,7 @@ class _OfferSheetState extends State<OfferSheet> {
 
             const SizedBox(height: AppSpacing.lg),
             AlyButton(
-              label: strings.accept,
+              label: strings.acceptRequest,
               onPressed: _accept,
               isLoading: _busy,
             ),
@@ -195,6 +218,28 @@ class _Leg extends StatelessWidget {
         ),
         if (trailing != null)
           Text(trailing!, textDirection: TextDirection.ltr),
+      ],
+    );
+  }
+}
+
+/// One labelled figure on the offer sheet.
+class _OfferStat extends StatelessWidget {
+  const _OfferStat({required this.label, required this.child});
+
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AlyColors.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: AlyTypography.label.copyWith(color: c.textSecondary)),
+        const SizedBox(height: AlySpacing.xs),
+        child,
       ],
     );
   }

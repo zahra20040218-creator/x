@@ -177,20 +177,83 @@ class _ProfileScreenState extends State<ProfileScreen> {
         success: (context, me) => ListView(
           padding: const EdgeInsets.all(AppSpacing.md),
           children: [
+            // The identity header, screen 12. Teal carries the brand on the
+            // one screen that is about the person rather than the trip;
+            // everything below it stays quiet.
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsetsDirectional.all(AlySpacing.lg),
+              decoration: BoxDecoration(
+                color: AlyColors.of(context).primary,
+                borderRadius: BorderRadius.circular(AlyRadius.lg),
+              ),
+              child: Row(
+                children: [
+                  AlyAvatar(name: me.displayName, size: 56),
+                  const SizedBox(width: AlySpacing.lg),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          me.displayName,
+                          style: AlyTypography.h3.copyWith(
+                            color: AlyColors.of(context).onPrimary,
+                          ),
+                        ),
+                        Text(
+                          me.phone,
+                          // A phone number reads left-to-right in an RTL page.
+                          textDirection: TextDirection.ltr,
+                          style: AlyTypography.bodySmall.copyWith(
+                            color: AlyColors.of(context).onPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AlySpacing.lg),
+
+            // Cash, and only cash, in v1 (CLAUDE.md §2 — no live gateway).
+            // Shown rather than offered: a picker with one option is a
+            // question with one answer.
+            AlyCard(
+              padding: const EdgeInsetsDirectional.all(AlySpacing.md),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.payments_rounded,
+                    color: AlyColors.of(context).textSecondary,
+                  ),
+                  const SizedBox(width: AlySpacing.md),
+                  Expanded(
+                    child: Text(
+                      strings.paymentMethod,
+                      style: AlyTypography.body.copyWith(
+                        color: AlyColors.of(context).textPrimary,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    strings.cash,
+                    style: AlyTypography.bodySmall.copyWith(
+                      color: AlyColors.of(context).textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AlySpacing.lg),
+
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(AppSpacing.md),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(strings.phone, style: Theme.of(context).textTheme.bodySmall),
-                    Text(
-                      me.phone,
-                      // A phone number reads left-to-right inside an RTL page.
-                      textDirection: TextDirection.ltr,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: AppSpacing.md),
 
                     TextField(
                       controller: _nameController,

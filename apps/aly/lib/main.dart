@@ -9,7 +9,7 @@ import 'package:rideapp_aly/location/file_buffer_storage.dart';
 import 'package:rideapp_aly/location/location_service.dart';
 import 'package:rideapp_aly/screens/battery_exemption_screen.dart';
 import 'package:rideapp_aly/screens/home_screen.dart';
-import 'package:rideapp_aly/screens/request_ride_screen.dart';
+import 'package:rideapp_aly/screens/rider_shell.dart';
 import 'package:rideapp_aly/screens/sign_in_screen.dart';
 import 'package:rideapp_aly/screens/subscription_screen.dart';
 import 'package:rideapp_aly/screens/track_ride_screen.dart';
@@ -350,7 +350,10 @@ class _AlyAppState extends State<AlyApp> {
       return TrackRideScreen(api: widget.api, ride: active);
     }
 
-    return RequestRideScreen(
+    // The shell, not the request screen directly: the rider's home is now a
+    // dashboard with the three-tab bar, and requesting a ride is one tap off
+    // it (see RiderShell).
+    return RiderShell(
       api: widget.api,
       onSignedOut: () => unawaited(_handleSignedOut()),
     );

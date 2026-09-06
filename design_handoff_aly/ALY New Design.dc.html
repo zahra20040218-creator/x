@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style data-omelette-injected>html,body{background:transparent}</style><script data-omelette-injected>(()=>{{const n=new URLSearchParams(location.search).get("theme");if(n==="light"||n==="dark"){document.documentElement.dataset.theme=n}}{if(new URLSearchParams(location.search).get("_omthumb")==="1"){const n=(f)=>{const g=f.focus;if(!g)return;f.focus=function(h){g.call(this,{...h,preventScroll:true})}};n(HTMLElement.prototype);n(SVGElement.prototype);if(typeof MathMLElement!=="undefined"){n(MathMLElement.prototype)}const d=(f)=>{f.removeAttribute("autofocus");f.inert=true;if(!(f instanceof HTMLElement))f.removeAttribute("tabindex")};const p=(f)=>{if(f.hasAttribute("autofocus"))d(f);for(const g of f.querySelectorAll("[autofocus]")){d(g)}};p(document.documentElement);new MutationObserver((f)=>{for(const g of f){for(const h of g.addedNodes){if(h.nodeType===1)p(h)}}}).observe(document,{childList:true,subtree:true})}}{const n=()=>{try{if(document.querySelector('meta[name="color-scheme"]'))return;const d=getComputedStyle(document.documentElement).getPropertyValue("color-scheme").trim();if(d&&d!=="normal")return;const p=(y)=>{if(!y)return null;const m=getComputedStyle(y).backgroundColor.match(/^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+%?))?\s*\)$/);if(!m)return null;const w=m[4]==null?1:parseFloat(m[4])/(m[4].endsWith("%")?100:1);if(w<0.99)return null;return[+m[1],+m[2],+m[3]]};const f=p(document.body)||p(document.documentElement);if(!f)return;const g=(y)=>{const m=y/255;return m<=0.04045?m/12.92:((m+0.055)/1.055)**2.4};const h=0.2126*g(f[0])+0.7152*g(f[1])+0.0722*g(f[2]);document.documentElement.style.setProperty("color-scheme",h<0.4?"dark":"light")}catch{}};if(document.readyState==="complete")n();else window.addEventListener("load",n)}var I=["https://claude.ai","https://preview.claude.ai","https://a18eedaa-f896-45ae-bcde-89f6077bd5fa.claudeusercontent.com"];var B=true;var K=false;var C=()=>{};if(K===true){try{const n=setTimeout.bind(window);const d=1e4;const p=15;const f=1e4;const g=120000;const h=200;const y=(o)=>{try{let r;if(typeof o==="string")r=o;else if(o instanceof URL)r=o.href;else if(typeof Request!=="undefined"&&o instanceof Request)r=o.url;else return null;if(!r)return null;const l=document.baseURI;const i=new URL(r,l);if(i.protocol!=="http:"&&i.protocol!=="https:")return null;if(i.origin!==new URL(l).origin)return null;return i.origin+i.pathname}catch{return null}};const m=new Map;const w=(o)=>{let r=m.get(o);if(!r){if(m.size>=h){const l=m.keys().next().value;if(l!==undefined)m.delete(l)}r={fails:[],until:0,cooldown:f,hard:false};m.set(o,r)}return r};const R=(o)=>{const r=m.get(o);return r!==undefined&&r.until>Date.now()};const O=(o,r)=>{const l=Date.now();const i=w(o);if(r)i.hard=true;if(i.until>l)return;i.fails.push(l);while(i.fails.length>0&&i.fails[0]<=l-d)i.fails.shift();if(i.fails.length>=p){i.until=l+i.cooldown;if(i.hard)i.cooldown=Math.min(i.cooldown*2,g);i.fails.length=0;try{n(()=>{try{S(true)}catch{}},i.until-l+100)}catch{}console.warn("[omelette] asset circuit breaker: pausing requests to "+o+" for "+Math.round((i.until-l)/1000)+"s after "+p+" failures in "+d/1000+"s")}};const e=(o)=>{m.delete(o)};const t=100;const a=new WeakMap;const u=new Set;let s=null;const S=(o)=>{for(const r of Array.from(u)){try{const l=a.get(r);if(l===undefined){u.delete(r);continue}if(o){const i=y(l);if(i!==null&&R(i))continue}a.delete(r);u.delete(r);if(s!==null)s.call(r,l)}catch{}}};C=()=>{try{m.clear();S(false)}catch{}};document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")C()});const _=window.fetch;if(typeof _==="function"){const o=function(...r){let l=null;try{l=y(r[0])}catch{}if(l!==null&&R(l)){let c;try{if(r[1]&&r[1].signal!==undefined){c=r[1].signal||undefined}else if(typeof Request!=="undefined"&&r[0]instanceof Request){c=r[0].signal||undefined}}catch{c=undefined}return new Promise((k,b)=>{const E=()=>{try{return c.reason!==undefined?c.reason:new DOMException("The operation was aborted.","AbortError")}catch{return new DOMException("The operation was aborted.","AbortError")}};try{if(c&&c.aborted){b(E());return}}catch{}let T=false;const j=()=>{if(T)return;T=true;b(E())};try{if(c)c.addEventListener("abort",j,{once:true})}catch{}n(()=>{if(T)return;T=true;try{if(c)c.removeEventListener("abort",j)}catch{}let L;try{L=new Response(null,{status:429,statusText:"Too Many Requests",headers:{"Retry-After":"10"}})}catch{L={ok:false,status:429}}k(L)},250)})}const i=_.apply(window,r);if(l!==null){const c=l;i.then((k)=>{try{if(k.ok)e(c);else if(k.status===401||k.status===403||k.status===404||k.status===429){O(c,k.status!==404)}}catch{}},()=>{})}return i};window.fetch=o}const v=Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,"src");if(v!==undefined&&v.set!==undefined&&v.get!==undefined){const o=v.set;s=o;Object.defineProperty(HTMLImageElement.prototype,"src",{configurable:true,enumerable:v.enumerable,get:v.get,set(r){const l=`${r}`;try{const i=y(l);if(i!==null&&R(i)){a.set(this,l);if(u.size<t)u.add(this);return}}catch{}try{a.delete(this);u.delete(this)}catch{}o.call(this,l)}})}try{const o=HTMLImageElement.prototype.setAttribute;HTMLImageElement.prototype.setAttribute=function(r,l){if(arguments.length<2){o.apply(this,arguments);return}if(typeof r==="string"&&r.toLowerCase()==="src"){const i=`${l}`;try{const c=y(i);if(c!==null&&R(c)){a.set(this,i);if(u.size<t)u.add(this);return}a.delete(this);u.delete(this)}catch{}o.call(this,r,i);return}o.call(this,r,l)}}catch{}window.addEventListener("error",(o)=>{try{const r=o.target;if(r instanceof HTMLImageElement){const l=y(r.currentSrc||r.src||"");if(l!==null)O(l,true)}}catch{}},true);window.addEventListener("load",(o)=>{try{const r=o.target;if(r instanceof HTMLImageElement){const l=y(r.currentSrc||r.src||"");if(l!==null)e(l);const i=a.get(r);if(i!==undefined){let c=false;try{c=new URL(i,document.baseURI).href===new URL(r.currentSrc||r.src||"",document.baseURI).href}catch{c=false}if(c){a.delete(r);u.delete(r)}}}}catch{}},true)}catch{}}var J=30000;var G=3000;document.addEventListener("DOMContentLoaded",()=>{const n=window.Babel;const d="om-src-id";if(n&&n.registerPlugin&&!(n.availablePlugins&&n.availablePlugins[d])){n.registerPlugin(d,({types:h})=>({visitor:{JSXOpeningElement(y,m){const w=y.node;if(w.name&&w.name.type==="JSXMemberExpression")return;for(let t=0;t<w.attributes.length;t++){const a=w.attributes[t];if(a.type==="JSXAttribute"&&a.name&&a.name.name==="data-om-id")return}const R=m.file&&m.file.opts&&m.file.opts.filename||"?";const O=w.loc&&w.loc.start;const e=`jsx:${R}:${w.start??0}:${O?O.line:0}:${O?O.column+1:0}`;w.attributes.push(h.jsxAttribute(h.jsxIdentifier("data-om-id"),h.stringLiteral(e)))}}}))}const p="om-text-extract";let f=false;if(B&&n&&n.registerPlugin&&!(n.availablePlugins&&n.availablePlugins[p])){const h=window.React;if(h&&h.useSyncExternalStore&&h.createElement){f=true;const y={};const m=new Set;let w=0;window.__omTextO=y;window.__omTextSet=(e)=>{for(const t in e){const a=e[t];if(a==null)delete y[t];else y[t]=a}w++;m.forEach((t)=>t())};const R=(e)=>{m.add(e);return()=>m.delete(e)};const O=()=>w;window.__OmT=function e(t){h.useSyncExternalStore(R,O,O);return h.createElement("span",{"data-om-text":t.i,className:"__om-t"},t.i in y?y[t.i]:t.children)};n.registerPlugin(p,({types:e})=>{const t={style:1,script:1,noscript:1,textarea:1,title:1,option:1,text:1,tspan:1,textPath:1};const a={placeholder:1,alt:1,title:1,label:1,"aria-label":1,"aria-description":1,"aria-placeholder":1};const u=(o,r)=>e.logicalExpression("??",e.memberExpression(e.logicalExpression("||",e.memberExpression(e.identifier("window"),e.identifier("__omTextO")),e.objectExpression([])),e.stringLiteral(o),true),r);const s=(o)=>o.file&&o.file.opts&&o.file.opts.filename||"?";const S=(o)=>o.file&&o.file.code||"";const _=(o,r)=>{const l=(c)=>c&&c.start!=null&&c.end!=null&&(c.type==="StringLiteral"||c.type==="TemplateLiteral"&&c.expressions.length===0)?[c.start,c.end]:null;const i=l(r);if(i)return i;if(r&&r.type==="Identifier"){const c=o.scope.getBinding(r.name);if(c&&c.constant&&c.path.node.type==="VariableDeclarator"){return l(c.path.node.init)}}return null};const v=(o,r,l)=>{const i=o.node;let c=false;const k=(E,T)=>{c=true;return e.jsxElement(e.jsxOpeningElement(e.jsxIdentifier("__OmT"),[e.jsxAttribute(e.jsxIdentifier("i"),e.stringLiteral(E))],false),e.jsxClosingElement(e.jsxIdentifier("__OmT")),[T],false)};const b=i.children.map((E)=>{if(E.type==="JSXText"){if(E.start==null||E.end==null)return E;const T=l.slice(E.start,E.end);const j=T.length-T.trimStart().length;const L=T.length-T.trimEnd().length;if(j+L>=T.length)return E;return k(`txt:${r}:${E.start+j}:${E.end-L}`,E)}if(E.type==="JSXExpressionContainer"){const T=_(o,E.expression);if(T)return k(`str:${r}:${T[0]}:${T[1]}`,E)}return E});if(c)i.children=b};return{visitor:{JSXOpeningElement(o,r){const l=o.node;const i=s(r);const c={};for(let k=0;k<l.attributes.length;k++){const b=l.attributes[k];if(b.type!=="JSXAttribute"||!b.name)continue;const E=b.name.name;if(!a[E])continue;if(!b.value||b.value.type!=="StringLiteral")continue;if(b.value.start==null||b.value.end==null)continue;const T=`txt:${i}:${b.value.start}:${b.value.end}`;c[E]=T;b.value=e.jsxExpressionContainer(u(T,e.stringLiteral(b.value.value)))}if(Object.keys(c).length){l.attributes.push(e.jsxAttribute(e.jsxIdentifier("data-om-text-attrs"),e.stringLiteral(JSON.stringify(c))))}},JSXElement(o,r){const l=o.node.openingElement;const i=l&&l.name&&l.name.name;if(i==="__OmT")return;if(typeof i==="string"&&t[i])return;v(o,s(r),S(r))},JSXFragment(o,r){v(o,s(r),S(r))}}}})}}const g=f?["transform-react-jsx-source",d,p]:["transform-react-jsx-source",d];document.querySelectorAll('script[type="text/babel"],script[type="text/jsx"]').forEach((h,y)=>{const m=h.getAttribute("data-plugins")||"";const w=g.filter((R)=>m.indexOf(R)<0);if(w.length){h.setAttribute("data-plugins",m?`${m},${w.join(",")}`:w.join(","))}if(!h.hasAttribute("data-filename")){h.setAttribute("data-filename",h.getAttribute("src")||`inline-${y}`)}})});var A=window.parent;var U="not editable here — open the project in the Claude Design editor to save";var W=()=>Promise.resolve({persisted:false,noHost:true,reason:U});var H=W;var M="data/storage.json";var z=()=>{try{const n=new URL(document.baseURI);const d=n.pathname.match(/\/projects\/([^/]+)\/serve\//);if(d)return d[1];return n.hostname.split(".")[0]||""}catch{return location.hostname.split(".")[0]||""}};var Z=()=>{try{const n=new URL(document.baseURI);const d=n.pathname.indexOf("/serve/");if(d>=0)return n.origin+n.pathname.slice(0,d+"/serve/".length)+M}catch{}return"./"+M};var x=null;var N=()=>{if(!x){x=fetch(Z(),{cache:"no-store"}).then((n)=>{if(n.ok)return n.text();return n.status===404?"":null}).catch(()=>null).then((n)=>{if(n===null){x=null;return null}const d=new Map;if(!n)return d;let p;try{p=JSON.parse(n)}catch{console.warn("[omelette.storage] "+M+" is not valid JSON; treating the store as unreadable so a save cannot overwrite the "+"hand-edited bytes. Fix the JSON (or delete the file) to re-enable persistence.");x=null;return null}if(p===null||typeof p!=="object"||Array.isArray(p)){console.warn("[omelette.storage] "+M+" doesn't hold a JSON object; treating the store as unreadable so a save cannot "+"overwrite the hand-edited bytes. Make the top level a JSON object to re-enable persistence.");x=null;return null}const f=p;if("data"in f){const g=f.data;if(g===null||typeof g!=="object"||Array.isArray(g)){console.warn("[omelette.storage] "+M+' has a "data" field that is not a JSON object; treating the store as unreadable so a '+'save cannot overwrite the hand-edited bytes. Make "data" a JSON object to re-enable persistence.');x=null;return null}const h=f._meta;const y=h!==null&&typeof h==="object"?h.project:undefined;if(typeof y==="string"&&y!==""&&y!==z())return d;for(const m of Object.keys(g))d.set(m,g[m]);return d}for(const g of Object.keys(f)){if(g!=="_meta")d.set(g,f[g])}return d})}return x};var F=(n)=>H(M,JSON.stringify({_meta:{project:z(),version:1},data:Object.fromEntries(n)},null,2));var D=Promise.resolve();var $=(n)=>{const d=D.then(n);D=d.then(()=>{return},()=>{return});return d};var V=/sk-(?:ant-)?[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{20,}|xox[a-z]-[A-Za-z0-9][A-Za-z0-9-]{9,}|AIza[0-9A-Za-z_-]{30,}|-----BEGIN [A-Z ]*PRIVATE KEY-----/;var Y=/password|passwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|credential/i;var Q=(n,d,p)=>{if(V.test(d)||Y.test(n)&&typeof p==="string"&&p.length>=8){console.warn('[omelette.storage] the value for "'+n+'" looks like a credential. The storage file is a plaintext project file — visible to '+"everyone with project access and copied when the project is duplicated. Do not store secrets here.")}};var q={persisted:false,reason:"could not load the existing store — not overwriting it"};var X={persisted:false,reason:"stored value changed since a failed read — re-read this key before saving"};var P=new Set;var ee={get:(n)=>{if(typeof n!=="string"){return Promise.reject(new TypeError("storage.get: key must be a string"))}return $(N).then((d)=>{if(d===null){P.add(n);return null}P.delete(n);if(!d.has(n))return null;const p=d.get(n);return p==null?null:JSON.parse(JSON.stringify(p))})},set:(n,d)=>{if(typeof n!=="string"){return Promise.reject(new TypeError("storage.set: key must be a string"))}let p;try{p=JSON.stringify(d)}catch(g){return Promise.reject(new TypeError("storage.set: value must be JSON-serializable ("+String(g)+")"))}if(p===undefined){return Promise.reject(new TypeError("storage.set: value must be JSON-serializable"))}Q(n,p,d);const f=JSON.parse(p);return $(()=>N().then((g)=>{if(g===null)return q;if(P.has(n)){if(g.has(n))return X;P.delete(n)}g.set(n,f);return F(g)}))},delete:(n)=>{if(typeof n!=="string"){return Promise.reject(new TypeError("storage.delete: key must be a string"))}return $(()=>N().then((d)=>{if(d===null)return q;if(P.has(n)){if(d.has(n))return X;P.delete(n)}d.delete(n);return F(d)}))},keys:()=>$(N).then((n)=>n===null?[]:Array.from(n.keys()))};window.omelette={writeFile:(n,d)=>H(n,d).then((p)=>{if(!p.persisted&&!p.noHost){throw new Error(p.reason||"write failed")}}),storage:ee};if(A&&A!==window){const n=(e,t)=>{try{A.postMessage({__omelette_log:true,type:e,data:t},"*")}catch{}};["log","warn","error"].forEach((e)=>{const t=console[e];console[e]=(...a)=>{const u=a.map((s)=>{try{return typeof s==="object"?JSON.stringify(s):String(s)}catch{try{return String(s)}catch{return"[unstringifiable]"}}}).join(" ");n(e,u);t.apply(console,a)}});window.addEventListener("error",(e)=>{const t=e.target;if(t&&t!==window&&t.tagName){const a=t.src||t.href||"";n("resource_error",`${t.tagName} failed to load: ${a}`)}else{n("error",`${e.message||"Unknown error"} at ${e.filename||"?"}:${e.lineno||0}:${e.colno||0}`)}},true);window.addEventListener("unhandledrejection",(e)=>{const t=e.reason;const a=t instanceof Error?`${t.message} ${t.stack}`:String(t);n("error",`Unhandled rejection: ${a}`)});window.addEventListener("click",(e)=>{if(e.defaultPrevented||e.button!==0)return;if(e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;const t=e.composedPath?e.composedPath():[];const a=["button","input","select","textarea","summary","label"];let u=null;for(const v of t){if(!(v instanceof Element))continue;if(v.localName==="a"){if(!(v instanceof HTMLAnchorElement))return;u=v;break}if(a.indexOf(v.localName)!==-1)return}if(!u)return;if(u.isContentEditable)return;const s=u.closest("[contenteditable]");if(s&&s.getAttribute("contenteditable")!=="false")return;const S=(u.getAttribute("target")||"_self").toLowerCase();if(S!=="_self"&&S!=="_top"&&S!=="_parent")return;let _;try{_=new URL(u.href)}catch{return}if(_.protocol!=="http:"&&_.protocol!=="https:")return;if(location.origin==="null")return;if(_.origin===location.origin)return;e.preventDefault();window.open(_.href,"_blank","noopener,noreferrer")});const d=()=>{try{A.postMessage({type:"omelette:height",height:document.documentElement.scrollHeight},"*")}catch{}};if(window.ResizeObserver)new ResizeObserver(d).observe(document.documentElement);const p=()=>{d();if(!document.querySelector('script[type="text/babel"],script[type="text/jsx"]'))return;const e=()=>document.getElementById("root")||document.querySelector("body > div[id]");const t=e()?.firstElementChild??null;let a=0;const u=()=>{const s=e();if(s&&s.firstElementChild!==t||++a>30){d();return}setTimeout(u,100)};setTimeout(u,100)};if(document.readyState==="complete")p();else window.addEventListener("load",p);const f={};let g=0;const h=(e)=>new Promise((t,a)=>{if(!I.length){a(new Error("claude.complete: no parent origin"));return}const u=`c${++g}`;const s=()=>setTimeout(()=>{delete f[u];a(new Error(`claude.complete: no data for ${J/1000}s`))},J);const S=s();f[u]={resolve:t,reject:a,text:"",t:S,arm:s};try{for(const _ of I){A.postMessage({__om_api:true,id:u,body:e},_)}}catch(_){clearTimeout(S);delete f[u];a(_)}});const y=8;const m=async(e,t)=>{if(!Array.isArray(e.messages)){throw new Error("claude.complete: tools require a messages array")}const a=e.messages.slice();const u={...e,tools:e.tools.map((_)=>{if(_===null||typeof _!=="object")return _;const v={};for(const o of Object.keys(_)){if(typeof _[o]!=="function")v[o]=_[o]}return v})};const s=u.tool_choice;const S=s!=null&&(s.type==="any"||s.type==="tool")?{...u,tool_choice:s.disable_parallel_tool_use!==undefined?{type:"auto",disable_parallel_tool_use:s.disable_parallel_tool_use}:{type:"auto"}}:u;for(let _=0;_<y;_++){const v=await h({..._===0?u:S,messages:a});const o=v.message;const r=o&&Array.isArray(o.content)?o.content:null;const l=r?r.filter((c)=>c?.type==="tool_use"):[];if(o?.stop_reason!=="tool_use"||l.length===0){return v.text}const i=[];for(const c of l){const k=t.get(c.name);if(!k){i.push({type:"tool_result",tool_use_id:c.id,content:`no handler for tool "${c.name}"`,is_error:true});continue}try{const b=await k(c.input);const E=typeof b==="string"?b:O(b)??"";i.push({type:"tool_result",tool_use_id:c.id,content:E})}catch(b){i.push({type:"tool_result",tool_use_id:c.id,content:String(b?.message??b??"tool handler failed"),is_error:true})}}a.push({role:"assistant",content:r},{role:"user",content:i})}throw new Error(`claude.complete: exceeded ${y} tool turns`)};window.claude={complete(e){const t=e;if(t!==null&&typeof t==="object"&&Array.isArray(t.tools)&&t.tools.some((a)=>a!==null&&typeof a==="object"&&typeof a.run==="function")){const a=new Map;for(const u of t.tools){if(u!==null&&typeof u==="object"&&typeof u.run==="function"){a.set(String(u.name),u.run)}}return m(t,a)}return h(e).then((a)=>a.text)}};const w={};let R=0;H=(e,t)=>new Promise((a)=>{if(!I.length){a({persisted:false,noHost:true,reason:U});return}const u=`f${++R}`;const s=setTimeout(()=>{delete w[u];a({persisted:false,noHost:true,reason:U})},G);w[u]={settle:a,t:s};try{for(const S of I){A.postMessage({__om_file:true,id:u,op:"write",path:e,content:t},S)}}catch{clearTimeout(s);delete w[u];a({persisted:false,noHost:true,reason:U})}});const O=(e)=>{try{return JSON.stringify(e)}catch{return JSON.stringify(String(e))}};window.addEventListener("message",(e)=>{if(I.indexOf(e.origin)<0)return;if(e.source!==A)return;const t=e.data;if(!t)return;if(t.type==="omelette-preview-refresh"){if(typeof t.token!=="string"||!/^[0-9a-f.-]+(\.(rc|pr-[0-9]+))?(\.[0-9]+\.[0-9a-f]{16})?$/.test(t.token))return;const s=Math.max(1,Math.floor((t.expiresAt||0)-Date.now()/1000));document.cookie="__Host-omelette-preview="+t.token+"; Path=/; Secure; SameSite=None; Partitioned; Max-Age="+s;C();return}if(t.__om_file_r){const s=w[t.id];if(!s)return;clearTimeout(s.t);delete w[t.id];s.settle(t.ok?{persisted:true}:{persisted:false,reason:t.error||"write failed"});return}if(t.__om_api_r){const s=f[t.id];if(!s)return;if(t.error!=null){clearTimeout(s.t);delete f[t.id];s.reject(new Error(t.error));return}if(t.chunk!=null){clearTimeout(s.t);s.t=s.arm();s.text+=t.chunk;return}if(t.done){clearTimeout(s.t);delete f[t.id];s.resolve({text:t.text!=null?t.text:s.text,message:t.message});return}return}if(!t.__om_eval)return;const a=t;const u=(s)=>{e.source.postMessage({...s,__om_eval_r:1,id:a.id},e.origin)};try{const s=(0,eval)(a.code);if(s&&typeof s.then==="function"){s.then((S)=>u({ok:1,v:O(S)}),(S)=>u({ok:0,e:String(S)}))}else{u({ok:1,v:O(s)})}}catch(s){u({ok:0,e:String(s)})}})}})();
+</script>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=IBM+Plex+Mono:wght@400&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400..700,0..1,0&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400..700,0..1,0&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #EEF0F3; }
+  @keyframes alyspin { to { transform: rotate(360deg); } }
+  @keyframes alyshimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+  @keyframes alypulse { 0%, 100% { opacity: .3 } 50% { opacity: 1 } }
+  a { color: #0F7B6C; text-decoration: none; }
+  a:hover { color: #0A5C50; text-decoration: underline; }
+</style>
+</helmet>
+
+<div style="font-family:Cairo,Tajawal,'Noto Sans Arabic',sans-serif;background:#EEF0F3;color:#111827;padding:48px 40px 96px;min-height:100vh;box-sizing:border-box">
+
+  <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px">
+    <div style="font:600 12px/1.35 Cairo,sans-serif;letter-spacing:0.2px;color:#4B5563">NEW DESIGN · ALY</div>
+    <div style="font:700 34px/1.2 Cairo,sans-serif;letter-spacing:-0.5px">ALY <span style="color:#0F7B6C">الي</span> — التصميم الجديد</div>
+    <div dir="rtl" style="font:400 17px/1.5 Cairo,sans-serif;color:#4B5563;max-width:760px;text-wrap:pretty">١٥ شاشة أُعيد تصميمها بالكامل: بانرات وبطاقات وشبكة تنقّل سفلية، بألوان ونوع خط ALY حصراً (<span style="font-family:'IBM Plex Mono',monospace;font-size:14px">tokens/colors.dart</span> و<span style="font-family:'IBM Plex Mono',monospace;font-size:14px">typography.dart</span>) — لا لون ولا خط من خارج نظام التصميم. طبقة الخريطة جغرافيا بغداد الحقيقية (33.3152, 44.3661) — © OpenStreetMap contributors؛ حالات المنتقي الست في <a href="Map Picker.html">Map Picker</a>. توثيق الواجهة القديمة محفوظ في <a href="ALY App - Recreation (archive).dc.html">النسخة المؤرشفة</a>. Light mode، RTL، 412×892.</div>
+  </div>
+
+  <sc-if value="{{ showLegend }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex;flex-wrap:wrap;gap:24px;background:#fff;border:1px solid #E5E7EB;border-radius:16px;padding:24px;margin:32px 0 8px;box-shadow:0 1px 2px rgba(17,24,39,0.05),0 2px 6px rgba(17,24,39,0.04)">
+      <div style="display:flex;flex-direction:column;gap:12px;min-width:320px">
+        <div style="font:600 12px/1.35 Cairo,sans-serif;letter-spacing:0.2px;color:#4B5563">SEMANTIC ROLES — AlyColors.light</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          <div style="display:flex;flex-direction:column;gap:4px;width:88px"><div style="height:40px;border-radius:6px;background:#0F7B6C"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6B7280">primary<br>#0F7B6C</div></div>
+          <div style="display:flex;flex-direction:column;gap:4px;width:88px"><div style="height:40px;border-radius:6px;background:#0A5C50"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6B7280">hover<br>#0A5C50</div></div>
+          <div style="display:flex;flex-direction:column;gap:4px;width:88px"><div style="height:40px;border-radius:6px;background:#EDF9F7;border:1px solid #E5E7EB"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6B7280">muted<br>#EDF9F7</div></div>
+          <div style="display:flex;flex-direction:column;gap:4px;width:88px"><div style="height:40px;border-radius:6px;background:#C07C14"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6B7280">accent<br>#C07C14</div></div>
+          <div style="display:flex;flex-direction:column;gap:4px;width:88px"><div style="height:40px;border-radius:6px;background:#15803D"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6B7280">online<br>#15803D</div></div>
+          <div style="display:flex;flex-direction:column;gap:4px;width:88px"><div style="height:40px;border-radius:6px;background:#B91C1C"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6B7280">error<br>#B91C1C</div></div>
+          <div style="display:flex;flex-direction:column;gap:4px;width:88px"><div style="height:40px;border-radius:6px;background:#F9FAFB;border:1px solid #E5E7EB"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6B7280">background<br>#F9FAFB</div></div>
+          <div style="display:flex;flex-direction:column;gap:4px;width:88px"><div style="height:40px;border-radius:6px;background:#F3F4F6;border:1px solid #E5E7EB"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6B7280">sunken<br>#F3F4F6</div></div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;min-width:280px">
+        <div style="font:600 12px/1.35 Cairo,sans-serif;letter-spacing:0.2px;color:#4B5563">TYPE RAMP — AlyTypography</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="font:700 34px/1.2 Cairo,sans-serif;letter-spacing:-0.5px">display 34 · 12,500 د.ع</div>
+          <div style="font:700 24px/1.3 Cairo,sans-serif">h2 24 · إلى أين؟</div>
+          <div style="font:600 20px/1.35 Cairo,sans-serif">h3 20 · أنت متصل</div>
+          <div style="font:600 17px/1.4 Cairo,sans-serif">title 17 · وصل السائق</div>
+          <div style="font:400 15px/1.55 Cairo,sans-serif">body 15 · الأجرة التقديرية لهذه الرحلة</div>
+          <div style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563">bodySmall 13 · عادةً أقل من دقيقة.</div>
+          <div style="font:600 12px/1.35 Cairo,sans-serif;letter-spacing:0.2px;color:#4B5563">label 12 · وجهات سابقة</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;min-width:220px">
+        <div style="font:600 12px/1.35 Cairo,sans-serif;letter-spacing:0.2px;color:#4B5563">GRID</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.9;color:#4B5563">spacing&nbsp; 4 · 8 · 12 · 16 · 24 · 32 · 48<br>radius&nbsp;&nbsp;&nbsp; sm 6 · md 10 · lg 16 · sheet 20<br>tap&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 56 primary · 48 secondary<br>motion&nbsp;&nbsp;&nbsp; 150 · 250 · 400 ms</div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ══════════════════ رئيسية جديدة — بطاقات وبانرات (هوية ALY) ══════════════════ -->
+  <div style="display:flex;align-items:baseline;gap:12px;margin:72px 0 24px">
+    <div style="font:700 24px/1.3 Cairo,sans-serif">الشاشات — التصميم الجديد</div>
+    <div style="font:400 15px/1.55 Cairo,sans-serif;color:#4B5563">15 شاشة · وضع الراكب والسائق · هوية ALY حصراً</div>
+    <div style="flex:1;height:1px;background:#D1D5DB"></div>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start;zoom:{{ frameZoom }}">
+
+    <div style="display:flex;flex-direction:column;gap:12px;width:412px">
+      <div dir="rtl" style="font:600 17px/1.4 Cairo,sans-serif">1 · الرئيسية — تصميم مطوّر</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" hint-size="412px,892px">
+        <div dir="rtl" style="height:100%;background:#F9FAFB;box-sizing:border-box;display:flex;flex-direction:column;font-family:Cairo,Tajawal,sans-serif">
+          <div style="flex:1;overflow:hidden;display:flex;flex-direction:column">
+            <div style="padding:16px 16px 0">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+                <div>
+                  <div style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563">مساء الخير</div>
+                  <div style="font:700 20px/1.35 Cairo,sans-serif;color:#111827">ابو علي</div>
+                </div>
+                <div style="width:44px;height:44px;border-radius:999px;background:#EDF9F7;display:flex;align-items:center;justify-content:center">
+                  <span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#0F7B6C">person</span>
+                </div>
+              </div>
+
+              <!-- بانر رئيسي -->
+              <div style="background:#0F7B6C;border-radius:16px;padding:20px;display:flex;align-items:center;justify-content:space-between;overflow:hidden;position:relative;margin-bottom:12px">
+                <div style="position:relative;z-index:1">
+                  <div style="font:700 22px/1.3 Cairo,sans-serif;color:#fff;margin-bottom:4px">أول رحلة بخصم 20%</div>
+                  <div style="font:400 13px/1.5 Cairo,sans-serif;color:#D6F1EC">استخدم الكود ALY20 عند الطلب</div>
+                </div>
+                <div style="width:56px;height:56px;border-radius:16px;background:rgba(255,255,255,0.15);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                  <span style="font-family:'Material Symbols Rounded';font-size:28px;line-height:1;color:#fff">local_offer</span>
+                </div>
+              </div>
+
+              <!-- شبكة الخدمات -->
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px">
+                <div style="background:#fff;border:1px solid #E5E7EB;border-radius:14px;padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:8px">
+                  <div style="width:44px;height:44px;border-radius:12px;background:#EDF9F7;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#0F7B6C">directions_car</span></div>
+                  <div style="font:600 13px/1.3 Cairo,sans-serif;color:#111827">اطلب رحلة</div>
+                </div>
+                <div style="background:#fff;border:1px solid #E5E7EB;border-radius:14px;padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:8px">
+                  <div style="width:44px;height:44px;border-radius:12px;background:#FBEED5;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#9A6410">receipt_long</span></div>
+                  <div style="font:600 13px/1.3 Cairo,sans-serif;color:#111827">رحلاتي</div>
+                </div>
+                <div style="background:#fff;border:1px solid #E5E7EB;border-radius:14px;padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:8px">
+                  <div style="width:44px;height:44px;border-radius:12px;background:#DBEAFE;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#1D4ED8">support_agent</span></div>
+                  <div style="font:600 13px/1.3 Cairo,sans-serif;color:#111827">الدعم</div>
+                </div>
+              </div>
+
+              <!-- بطاقة كن سائقاً -->
+              <div style="background:#111827;border-radius:16px;padding:18px;display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                <div>
+                  <div style="font:700 17px/1.35 Cairo,sans-serif;color:#fff;margin-bottom:2px">كن سائقاً معنا</div>
+                  <div style="font:400 13px/1.5 Cairo,sans-serif;color:#9CA3AF">اربح بدوامك الحر ببغداد</div>
+                </div>
+                <div style="height:40px;padding:0 16px;border-radius:10px;background:#0F7B6C;display:flex;align-items:center;justify-content:center;font:600 14px/1.2 Cairo,sans-serif;color:#fff;flex-shrink:0">سجّل الآن</div>
+              </div>
+
+              <div style="font:600 15px/1.4 Cairo,sans-serif;color:#111827;margin-bottom:8px">وجهات سابقة</div>
+            </div>
+            <div style="padding:0 16px;flex:1;overflow:hidden">
+              <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #E5E7EB">
+                <span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1;color:#6B7280;font-variation-settings:'FILL' 1">star</span>
+                <div style="min-width:0"><div style="font:400 15px/1.55 Cairo,sans-serif;color:#111827">البيت</div><div style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563">الكرادة داخل، محلة 909</div></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;padding:12px 0">
+                <span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1;color:#6B7280">history</span>
+                <div style="min-width:0"><div style="font:400 15px/1.55 Cairo,sans-serif;color:#111827">جامعة بغداد</div><div style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563">باب المعظم</div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- شبكة تنقّل سفلية -->
+          <div style="height:64px;background:#fff;border-top:1px solid #E5E7EB;display:flex;align-items:center;justify-content:space-around;flex-shrink:0">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:2px"><span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#0F7B6C;font-variation-settings:'FILL' 1">home</span><span style="font:600 11px/1.2 Cairo,sans-serif;color:#0F7B6C">الرئيسية</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:2px"><span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#9CA3AF">receipt_long</span><span style="font:400 11px/1.2 Cairo,sans-serif;color:#9CA3AF">رحلاتي</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:2px"><span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#9CA3AF">account_balance_wallet</span><span style="font:400 11px/1.2 Cairo,sans-serif;color:#9CA3AF">المحفظة</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:2px"><span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#9CA3AF">person</span><span style="font:400 11px/1.2 Cairo,sans-serif;color:#9CA3AF">حسابي</span></div>
+          </div>
+        </div>
+      </x-import>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.6;color:#6B7280;display:{{ noteDisplay }}">تصميم جديد مقترح — ليس بالكود بعد. يستخدم AlyColors/AlyTypography فقط<br>بانر واحد فقط (لا تكديس بانرات)، شبكة خدمات ثابتة، شبكة تنقّل سفلية جديدة تحتاج IA قرار قبل التنفيذ</div>
+    </div>
+
+    <!-- ── 2 · طلب رحلة — بنفس الأسلوب ── -->
+    <div style="display:flex;flex-direction:column;gap:12px;width:412px">
+      <div dir="rtl" style="font:600 17px/1.4 Cairo,sans-serif">2 · طلب رحلة — تصميم مطوّر</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" hint-size="412px,892px">
+        <div dir="rtl" style="height:100%;position:relative;background:#EDF0F3;overflow:hidden;font-family:Cairo,Tajawal,sans-serif">
+          <div style="position:absolute;inset:0;background:#EDF0F3 url('assets/map-karrada.png') 48% 34%/cover no-repeat"></div>
+          <div style="position:absolute;top:22%;right:24%;width:12px;height:12px;border-radius:999px;border:2.5px solid #15803D;background:#fff;box-sizing:border-box"></div>
+          <div style="position:absolute;top:40%;left:30%;width:12px;height:12px;border-radius:999px;background:#B91C1C"></div>
+          <div style="position:absolute;top:16px;right:16px;width:44px;height:44px;border-radius:999px;background:#fff;box-shadow:0 3px 8px rgba(17,24,39,0.16);display:flex;align-items:center;justify-content:center">
+            <span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#111827">arrow_forward</span>
+          </div>
+          <div style="position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:20px 20px 0 0;box-shadow:0 -4px 16px rgba(17,24,39,0.10);padding:16px;box-sizing:border-box">
+            <div style="width:36px;height:4px;background:#E5E7EB;border-radius:999px;margin:0 auto 16px"></div>
+            <div style="display:flex;align-items:flex-start;margin-bottom:12px">
+              <div style="width:16px;display:flex;justify-content:center;padding-top:5px"><div style="width:12px;height:12px;border-radius:999px;border:2.5px solid #15803D;background:#fff;box-sizing:border-box"></div></div>
+              <div style="width:12px"></div>
+              <div style="flex:1;font:400 15px/1.55 Cairo,sans-serif;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">موقعك الحالي — الكرادة داخل</div>
+            </div>
+            <div style="display:flex;align-items:flex-start;margin-bottom:16px">
+              <div style="width:16px;display:flex;justify-content:center;padding-top:5px"><div style="width:12px;height:12px;border-radius:999px;background:#B91C1C"></div></div>
+              <div style="width:12px"></div>
+              <div style="flex:1;font:400 15px/1.55 Cairo,sans-serif;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">مول المنصور، شارع الأميرات</div>
+            </div>
+
+            <div style="border:2px solid #0F7B6C;background:#EDF9F7;border-radius:14px;padding:14px;display:flex;align-items:center;gap:12px;margin-bottom:8px">
+              <div style="width:44px;height:44px;border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1;color:#0F7B6C;font-variation-settings:'FILL' 1">local_taxi</span></div>
+              <div style="flex:1;min-width:0"><div style="font:600 17px/1.4 Cairo,sans-serif;color:#111827">عادي</div><div style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563">يصل خلال 4 دقائق</div></div>
+              <div dir="ltr" style="font:700 18px/1.3 Cairo,sans-serif;color:#0F7B6C;font-variant-numeric:tabular-nums">12,500 د.ع</div>
+            </div>
+            <div style="border:1px solid #E5E7EB;border-radius:14px;padding:14px;display:flex;align-items:center;gap:12px;margin-bottom:16px">
+              <div style="width:44px;height:44px;border-radius:12px;background:#F3F4F6;display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1;color:#4B5563">airport_shuttle</span></div>
+              <div style="flex:1;min-width:0"><div style="font:600 17px/1.4 Cairo,sans-serif;color:#111827">واسع</div><div style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563">يصل خلال 7 دقائق</div></div>
+              <div dir="ltr" style="font:700 18px/1.3 Cairo,sans-serif;color:#111827;font-variant-numeric:tabular-nums">17,000 د.ع</div>
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid #E5E7EB;margin-bottom:12px">
+              <div style="display:flex;align-items:center;gap:8px"><span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1;color:#4B5563">payments</span><span style="font:400 15px/1.55 Cairo,sans-serif;color:#111827">نقداً</span></div>
+              <span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1;color:#9CA3AF">chevron_left</span>
+            </div>
+            <div style="height:56px;border-radius:10px;background:#0F7B6C;display:flex;align-items:center;justify-content:center;font:600 16px/1.2 Cairo,sans-serif;color:#fff">اطلب الرحلة</div>
+          </div>
+        </div>
+      </x-import>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.6;color:#6B7280;display:{{ noteDisplay }}">مقترح — اختيار فئة المركبة غير موجود بالكود (v1 فئة واحدة، CLAUDE.md §2)<br>يحتاج قرار توسيع نطاق قبل التنفيذ؛ معروض هنا كاتجاه بصري لا كخطة</div>
+    </div>
+
+    <!-- ── 3 · تتبع الرحلة — بنفس الأسلوب ── -->
+    <div style="display:flex;flex-direction:column;gap:12px;width:412px">
+      <div dir="rtl" style="font:600 17px/1.4 Cairo,sans-serif">3 · تتبع الرحلة — تصميم مطوّر</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" hint-size="412px,892px">
+        <div dir="rtl" style="height:100%;position:relative;background:#EDF0F3;overflow:hidden;font-family:Cairo,Tajawal,sans-serif">
+          <div style="position:absolute;inset:0;background:#EDF0F3 url('assets/map-karrada.png') 36% 46%/cover no-repeat"></div>
+          <div style="position:absolute;top:14%;right:22%;width:44%;height:3px;background:#0F7B6C;transform:rotate(26deg);border-radius:999px"></div>
+          <div style="position:absolute;top:26%;left:34%;width:32px;height:32px;border-radius:10px;background:#111827;display:flex;align-items:center;justify-content:center">
+            <span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1;color:#fff;font-variation-settings:'FILL' 1">directions_car</span>
+          </div>
+          <div style="position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:20px 20px 0 0;box-shadow:0 -4px 16px rgba(17,24,39,0.10);padding:16px;box-sizing:border-box">
+            <div style="width:36px;height:4px;background:#E5E7EB;border-radius:999px;margin:0 auto 16px"></div>
+
+            <div style="background:#EDF9F7;border-radius:14px;padding:14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+              <div><div style="font:700 20px/1.35 Cairo,sans-serif;color:#0F7B6C">السائق في الطريق</div><div style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563">يصل بعد قليل</div></div>
+              <div style="text-align:center"><div dir="ltr" style="font:700 28px/1.2 Cairo,sans-serif;color:#0F7B6C;font-variant-numeric:tabular-nums">4</div><div style="font:400 12px/1.45 Cairo,sans-serif;color:#4B5563">دقيقة</div></div>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+              <div style="width:52px;height:52px;border-radius:999px;background:#EDF9F7;display:flex;align-items:center;justify-content:center;font:600 20px/1.35 Cairo,sans-serif;color:#0F7B6C;flex-shrink:0">ح</div>
+              <div style="flex:1;min-width:0">
+                <div style="font:600 17px/1.4 Cairo,sans-serif;color:#111827">حيدر ج.</div>
+                <div style="display:flex;align-items:center;gap:4px">
+                  <span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1;color:#C07C14;font-variation-settings:'FILL' 1">star</span>
+                  <span dir="ltr" style="font:600 15px/1.35 Cairo,sans-serif;color:#4B5563;font-variant-numeric:tabular-nums">4.8</span>
+                  <span style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563">· كيا ريو أبيض</span>
+                </div>
+              </div>
+              <div dir="ltr" style="background:#F3F4F6;border:1px solid #D1D5DB;border-radius:8px;padding:6px 10px;font:600 15px/1.35 Cairo,sans-serif;color:#111827;font-variant-numeric:tabular-nums;flex-shrink:0">22 A 4791</div>
+            </div>
+
+            <div style="display:flex;gap:10px;margin-bottom:16px">
+              <div style="flex:1;height:48px;border-radius:12px;border:1px solid #E5E7EB;display:flex;align-items:center;justify-content:center;gap:6px;font:600 15px/1.2 Cairo,sans-serif;color:#111827"><span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1;color:#0F7B6C">call</span>اتصال</div>
+              <div style="flex:1;height:48px;border-radius:12px;border:1px solid #E5E7EB;display:flex;align-items:center;justify-content:center;gap:6px;font:600 15px/1.2 Cairo,sans-serif;color:#111827"><span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1;color:#0F7B6C">share_location</span>مشاركة</div>
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;padding-top:12px;border-top:1px solid #E5E7EB;margin-bottom:12px">
+              <div style="font:400 15px/1.55 Cairo,sans-serif;color:#4B5563">الأجرة التقديرية · نقداً</div>
+              <div dir="ltr" style="font:700 20px/1.3 Cairo,sans-serif;color:#111827;font-variant-numeric:tabular-nums">12,500 د.ع</div>
+            </div>
+            <div style="height:48px;display:flex;align-items:center;justify-content:center;font:600 15px/1.2 Cairo,sans-serif;color:#B91C1C">إلغاء الرحلة</div>
+          </div>
+        </div>
+      </x-import>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.6;color:#6B7280;display:{{ noteDisplay }}">اللوحة العلوية تحوّل الـETA لرقم واحد كبير — يُقرأ من مسافة، بدل سطر نصي<br>"مشاركة" و"اتصال" جديدان: الاتصال يحتاج أرقاماً مقنّعة (v2)، فالزر مقترح لا منفّذ</div>
+    </div>
+
+    <!-- ── 4 · المحفظة — بنفس الأسلوب ── -->
+    <div style="display:flex;flex-direction:column;gap:12px;width:412px">
+      <div dir="rtl" style="font:600 17px/1.4 Cairo,sans-serif">4 · المحفظة — تصميم مطوّر</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" hint-size="412px,892px">
+        <div dir="rtl" style="height:100%;background:#F9FAFB;box-sizing:border-box;display:flex;flex-direction:column;font-family:Cairo,Tajawal,sans-serif">
+          <div style="flex:1;padding:16px;overflow:hidden">
+            <div style="font:700 24px/1.3 Cairo,sans-serif;color:#111827;margin-bottom:16px">المحفظة</div>
+
+            <div style="background:#0F7B6C;border-radius:16px;padding:20px;margin-bottom:16px">
+              <div style="font:600 12px/1.35 Cairo,sans-serif;letter-spacing:0.2px;color:#A8E2D9;margin-bottom:6px">الرصيد الحالي</div>
+              <div dir="ltr" style="text-align:right;font:700 34px/1.2 Cairo,sans-serif;letter-spacing:-0.5px;color:#fff;font-variant-numeric:tabular-nums;margin-bottom:16px">84,000 د.ع</div>
+              <div style="display:flex;gap:8px">
+                <div style="flex:1;height:44px;border-radius:10px;background:rgba(255,255,255,0.16);display:flex;align-items:center;justify-content:center;gap:6px;font:600 14px/1.2 Cairo,sans-serif;color:#fff"><span style="font-family:'Material Symbols Rounded';font-size:18px;line-height:1;color:#fff">add</span>إضافة رصيد</div>
+                <div style="flex:1;height:44px;border-radius:10px;background:rgba(255,255,255,0.16);display:flex;align-items:center;justify-content:center;gap:6px;font:600 14px/1.2 Cairo,sans-serif;color:#fff"><span style="font-family:'Material Symbols Rounded';font-size:18px;line-height:1;color:#fff">receipt_long</span>كشف الحساب</div>
+              </div>
+            </div>
+
+            <div style="display:flex;gap:8px;margin-bottom:16px">
+              <div style="flex:1;background:#fff;border:1px solid #E5E7EB;border-radius:14px;padding:14px">
+                <div style="font:400 12px/1.45 Cairo,sans-serif;color:#4B5563">أرباح اليوم</div>
+                <div dir="ltr" style="text-align:right;font:700 20px/1.3 Cairo,sans-serif;color:#111827;font-variant-numeric:tabular-nums">10,500 د.ع</div>
+              </div>
+              <div style="flex:1;background:#fff;border:1px solid #E5E7EB;border-radius:14px;padding:14px">
+                <div style="font:400 12px/1.45 Cairo,sans-serif;color:#4B5563">الرحلات المكتملة</div>
+                <div style="font:700 20px/1.3 Cairo,sans-serif;color:#111827;font-variant-numeric:tabular-nums">1</div>
+              </div>
+            </div>
+
+            <div style="font:600 15px/1.4 Cairo,sans-serif;color:#111827;margin-bottom:8px">آخر الحركات</div>
+            <div style="background:#fff;border:1px solid #E5E7EB;border-radius:14px;overflow:hidden">
+              <div style="display:flex;align-items:center;gap:12px;padding:14px;border-bottom:1px solid #E5E7EB">
+                <div style="width:36px;height:36px;border-radius:999px;background:#DCFCE7;display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="font-family:'Material Symbols Rounded';font-size:18px;line-height:1;color:#15803D">arrow_downward</span></div>
+                <div style="flex:1;min-width:0"><div style="font:400 15px/1.55 Cairo,sans-serif;color:#111827">اجرة رحلة</div><div style="font:400 12px/1.45 Cairo,sans-serif;color:#6B7280">منذ ساعة</div></div>
+                <div dir="ltr" style="font:600 15px/1.35 Cairo,sans-serif;color:#15803D;font-variant-numeric:tabular-nums">+10,500 د.ع</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;padding:14px">
+                <div style="width:36px;height:36px;border-radius:999px;background:#F3F4F6;display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="font-family:'Material Symbols Rounded';font-size:18px;line-height:1;color:#4B5563">arrow_upward</span></div>
+                <div style="flex:1;min-width:0"><div style="font:400 15px/1.55 Cairo,sans-serif;color:#111827">اشتراك شهري</div><div style="font:400 12px/1.45 Cairo,sans-serif;color:#6B7280">منذ يومين</div></div>
+                <div dir="ltr" style="font:600 15px/1.35 Cairo,sans-serif;color:#4B5563;font-variant-numeric:tabular-nums">−25,000 د.ع</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="height:64px;background:#fff;border-top:1px solid #E5E7EB;display:flex;align-items:center;justify-content:space-around;flex-shrink:0">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:2px"><span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#9CA3AF">home</span><span style="font:400 11px/1.2 Cairo,sans-serif;color:#9CA3AF">الرئيسية</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:2px"><span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#9CA3AF">receipt_long</span><span style="font:400 11px/1.2 Cairo,sans-serif;color:#9CA3AF">رحلاتي</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:2px"><span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#0F7B6C;font-variation-settings:'FILL' 1">account_balance_wallet</span><span style="font:600 11px/1.2 Cairo,sans-serif;color:#0F7B6C">المحفظة</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:2px"><span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#9CA3AF">person</span><span style="font:400 11px/1.2 Cairo,sans-serif;color:#9CA3AF">حسابي</span></div>
+          </div>
+        </div>
+      </x-import>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.6;color:#6B7280;display:{{ noteDisplay }}">"إضافة رصيد" مقترح فقط — التعبئة تصير نقداً عبر مشغّل (D-019)، لا بوابة دفع<br>الرصيد على تعبئة تركوازية: الرقم الوحيد اللي يستحق سطحاً ملوّناً بالشاشة</div>
+    </div>
+
+    <!-- ── 5 · اختيار المدينة ── -->
+    <div style="display:flex;flex-direction:column;gap:12px;width:412px">
+      <div dir="rtl" style="font:600 17px/1.4 Cairo,sans-serif">5 · اختيار المدينة</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" hint-size="412px,892px">
+        <div dir="rtl" style="height:100%;background:#fff;box-sizing:border-box;padding:20px 16px;font-family:Cairo,Tajawal,sans-serif">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+            <div style="font:700 20px/1.35 Cairo,sans-serif;color:#111827">اختر المدينة</div>
+            <span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1;color:#111827">close</span>
+          </div>
+          <div style="height:52px;background:#F3F4F6;border-radius:6px;display:flex;align-items:center;gap:10px;padding:0 14px;margin-bottom:20px">
+            <span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1;color:#6B7280">search</span>
+            <span style="font:400 15px/1.55 Cairo,sans-serif;color:#6B7280">ابحث في المدن…</span>
+          </div>
+          <div style="font:600 12px/1.35 Cairo,sans-serif;letter-spacing:0.2px;color:#4B5563;margin-bottom:8px">المدن المتاحة</div>
+          <div style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid #E5E7EB">
+            <span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#0F7B6C;font-variation-settings:'FILL' 1">location_on</span>
+            <div style="flex:1"><div style="font:600 17px/1.4 Cairo,sans-serif;color:#111827">بغداد</div><div style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563">الخدمة فعّالة الآن</div></div>
+            <span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#0F7B6C">check_circle</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid #E5E7EB">
+            <span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#9CA3AF">location_on</span>
+            <div style="flex:1"><div style="font:600 17px/1.4 Cairo,sans-serif;color:#9CA3AF">البصرة</div><div style="font:400 13px/1.5 Cairo,sans-serif;color:#6B7280">قريباً</div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid #E5E7EB">
+            <span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#9CA3AF">location_on</span>
+            <div style="flex:1"><div style="font:600 17px/1.4 Cairo,sans-serif;color:#9CA3AF">النجف</div><div style="font:400 13px/1.5 Cairo,sans-serif;color:#6B7280">قريباً</div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;padding:14px 0">
+            <span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#9CA3AF">location_on</span>
+            <div style="flex:1"><div style="font:600 17px/1.4 Cairo,sans-serif;color:#9CA3AF">أربيل</div><div style="font:400 13px/1.5 Cairo,sans-serif;color:#6B7280">قريباً</div></div>
+          </div>
+        </div>
+      </x-import>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.6;color:#6B7280;display:{{ noteDisplay }}">v1 مدينة واحدة (CLAUDE.md §2) — المدن الأخرى مُعطَّلة بوضوح لا مخفيّة<br>"قريباً" أصدق من قائمة تقبل اختياراً ثم ترفض الطلب</div>
+    </div>
+
+    <!-- ── 6 · بحث بنتائج مصنّفة ── -->
+    <div style="display:flex;flex-direction:column;gap:12px;width:412px">
+      <div dir="rtl" style="font:600 17px/1.4 Cairo,sans-serif">6 · البحث — نتائج مصنّفة ومفضّلات</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" hint-size="412px,892px">
+        <div dir="rtl" style="height:100%;background:#fff;box-sizing:border-box;display:flex;flex-direction:column;font-family:Cairo,Tajawal,sans-serif">
+          <div style="padding:20px 16px 12px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+              <div style="font:700 20px/1.35 Cairo,sans-serif;color:#111827">إلى أين؟</div>
+              <span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1;color:#111827">close</span>
+            </div>
+            <div style="height:52px;background:#F3F4F6;border-radius:6px;display:flex;align-items:center;gap:10px;padding:0 14px;margin-bottom:14px">
+              <div style="width:12px;height:12px;border-radius:999px;background:#B91C1C;flex-shrink:0"></div>
+              <span style="flex:1;font:400 17px/1.5 Cairo,sans-serif;color:#111827">شارع</span>
+              <span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1;color:#6B7280">search</span>
+            </div>
+            <div style="display:flex;gap:10px">
+              <div style="display:flex;align-items:center;gap:8px"><div style="width:32px;height:32px;border-radius:999px;background:#EDF9F7;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:18px;line-height:1;color:#0F7B6C;font-variation-settings:'FILL' 1">star</span></div><span style="font:600 14px/1.2 Cairo,sans-serif;color:#111827">البيت</span></div>
+              <div style="display:flex;align-items:center;gap:8px"><div style="width:32px;height:32px;border-radius:999px;background:#EDF9F7;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:18px;line-height:1;color:#0F7B6C;font-variation-settings:'FILL' 1">star</span></div><span style="font:600 14px/1.2 Cairo,sans-serif;color:#111827">العمل</span></div>
+              <div style="display:flex;align-items:center;gap:8px"><div style="width:32px;height:32px;border-radius:999px;background:#F3F4F6;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:18px;line-height:1;color:#6B7280">add</span></div><span style="font:600 14px/1.2 Cairo,sans-serif;color:#4B5563">إضافة</span></div>
+            </div>
+          </div>
+          <div style="flex:1;overflow:hidden;padding:0 16px">
+            <div style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid #E5E7EB">
+              <div style="width:36px;text-align:center;flex-shrink:0"><span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1;color:#6B7280">history</span><div class="tab-num" style="font:400 12px/1.45 Cairo,sans-serif;color:#6B7280" dir="ltr">2 KM</div></div>
+              <div style="flex:1;min-width:0"><div style="font:600 17px/1.4 Cairo,sans-serif;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">شارع الكرادة داخل</div><div style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563">الكرادة، بغداد</div></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid #E5E7EB">
+              <div style="width:36px;text-align:center;flex-shrink:0"><div style="width:26px;height:26px;border-radius:999px;background:#0F7B6C;display:inline-flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1;color:#fff">road</span></div><div style="font:400 12px/1.45 Cairo,sans-serif;color:#6B7280" dir="ltr">3 KM</div></div>
+              <div style="flex:1;min-width:0"><div style="font:600 17px/1.4 Cairo,sans-serif;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">شارع أبو نواس</div><div style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563">الكرادة الشرقية، بغداد</div></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid #E5E7EB">
+              <div style="width:36px;text-align:center;flex-shrink:0"><div style="width:26px;height:26px;border-radius:999px;background:#B91C1C;display:inline-flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1;color:#fff">local_hospital</span></div><div style="font:400 12px/1.45 Cairo,sans-serif;color:#6B7280" dir="ltr">4 KM</div></div>
+              <div style="flex:1;min-width:0"><div style="font:600 17px/1.4 Cairo,sans-serif;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">مستشفى ابن النفيس</div><div style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563">باب الشيخ، بغداد</div></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid #E5E7EB">
+              <div style="width:36px;text-align:center;flex-shrink:0"><div style="width:26px;height:26px;border-radius:999px;background:#C07C14;display:inline-flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1;color:#fff">school</span></div><div style="font:400 12px/1.45 Cairo,sans-serif;color:#6B7280" dir="ltr">5 KM</div></div>
+              <div style="flex:1;min-width:0"><div style="font:600 17px/1.4 Cairo,sans-serif;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">جامعة بغداد</div><div style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563">الجادرية، بغداد</div></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;padding:14px 0">
+              <div style="width:36px;text-align:center;flex-shrink:0"><div style="width:26px;height:26px;border-radius:999px;background:#1D4ED8;display:inline-flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1;color:#fff">storefront</span></div><div style="font:400 12px/1.45 Cairo,sans-serif;color:#6B7280" dir="ltr">6 KM</div></div>
+              <div style="flex:1;min-width:0"><div style="font:600 17px/1.4 Cairo,sans-serif;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">مول المنصور</div><div style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563">المنصور، شارع الأميرات</div></div>
+            </div>
+          </div>
+        </div>
+      </x-import>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.6;color:#6B7280;display:{{ noteDisplay }}">قرص الفئة بألوان ALY الدلالية فقط (تركوازي/أحمر/عنبري/أزرق) — لا لوحة سبعة ألوان جديدة<br>السطر سطر واحد مقصوص: اسم بثلاث صيغ لا يجوز يمدّ الصف لـ120px</div>
+    </div>
+
+    <!-- ── 7 · خيارات الرحلة ── -->
+    <div style="display:flex;flex-direction:column;gap:12px;width:412px">
+      <div dir="rtl" style="font:600 17px/1.4 Cairo,sans-serif">7 · خيارات الرحلة — لوحة سفلية</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" hint-size="412px,892px">
+        <div dir="rtl" style="height:100%;position:relative;background:#EDF0F3;overflow:hidden;font-family:Cairo,Tajawal,sans-serif">
+          <div style="position:absolute;inset:0;background:#EDF0F3 url('assets/map-karrada.png') 48% 34%/cover no-repeat"></div>
+          <div style="position:absolute;inset:0;background:rgba(17,24,39,0.4)"></div>
+          <div style="position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:20px 20px 0 0;padding:20px 16px;box-sizing:border-box">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+              <div style="font:700 20px/1.35 Cairo,sans-serif;color:#111827">خيارات الرحلة</div>
+              <span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1;color:#111827">close</span>
+            </div>
+            <div style="background:#FBEED5;border-radius:10px;padding:12px;display:flex;gap:8px;align-items:flex-start;margin-bottom:16px">
+              <span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1;color:#9A6410">info</span>
+              <div style="font:400 13px/1.5 Cairo,sans-serif;color:#111827;flex:1">لا يمكن تغيير هذه الخيارات بعد بدء الرحلة.</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid #E5E7EB">
+              <span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#4B5563">add_location_alt</span>
+              <div style="flex:1;font:400 17px/1.5 Cairo,sans-serif;color:#111827">وجهة ثانية</div>
+              <span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#9CA3AF">chevron_left</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid #E5E7EB">
+              <span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#4B5563">timer</span>
+              <div style="flex:1"><div style="font:400 17px/1.5 Cairo,sans-serif;color:#111827">فترة توقف</div><div style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563">تُحتسب على الأجرة</div></div>
+              <span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#9CA3AF">chevron_left</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid #E5E7EB">
+              <span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#4B5563">u_turn_left</span>
+              <div style="flex:1;font:400 17px/1.5 Cairo,sans-serif;color:#111827">ذهاب وإياب</div>
+              <div style="width:48px;height:28px;border-radius:999px;background:#D1D5DB;position:relative;flex-shrink:0"><div style="position:absolute;top:3px;right:3px;width:22px;height:22px;border-radius:999px;background:#fff"></div></div>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 0">
+              <div style="font:400 15px/1.55 Cairo,sans-serif;color:#4B5563">مبلغ الرحلة</div>
+              <div dir="ltr" style="font:700 20px/1.3 Cairo,sans-serif;color:#111827;font-variant-numeric:tabular-nums">12,500 د.ع</div>
+            </div>
+            <div style="height:56px;border-radius:10px;background:#0F7B6C;display:flex;align-items:center;justify-content:center;font:600 16px/1.2 Cairo,sans-serif;color:#fff;margin-bottom:8px">تأكيد</div>
+            <div style="height:48px;display:flex;align-items:center;justify-content:center;font:600 15px/1.2 Cairo,sans-serif;color:#0F7B6C">إلغاء</div>
+          </div>
+        </div>
+      </x-import>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.6;color:#6B7280;display:{{ noteDisplay }}">الوجهة الثانية وفترة التوقف تغيّران الأجرة — لذا التحذير قبل الخيارات لا بعدها<br>كلها خارج نطاق v1 حالياً؛ الشاشة اتجاه لا خطة</div>
+    </div>
+
+    <!-- ── 8 · الدعم والمشكلات ── -->
+    <div style="display:flex;flex-direction:column;gap:12px;width:412px">
+      <div dir="rtl" style="font:600 17px/1.4 Cairo,sans-serif">8 · الدعم — تصنيف المشكلات</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" hint-size="412px,892px">
+        <div dir="rtl" style="height:100%;background:#fff;box-sizing:border-box;display:flex;flex-direction:column;font-family:Cairo,Tajawal,sans-serif">
+          <div style="height:56px;border-bottom:1px solid #E5E7EB;display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0">
+            <div style="font:600 17px/1.4 Cairo,sans-serif;color:#111827">الدعم</div>
+            <span style="position:absolute;right:16px;font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#111827">arrow_forward</span>
+          </div>
+          <div style="display:flex;border-bottom:1px solid #E5E7EB;flex-shrink:0">
+            <div style="flex:1;height:48px;display:flex;align-items:center;justify-content:center;font:600 15px/1.2 Cairo,sans-serif;color:#0F7B6C;position:relative">المشكلات<div style="position:absolute;left:20%;right:20%;bottom:0;height:3px;border-radius:2px;background:#0F7B6C"></div></div>
+            <div style="flex:1;height:48px;display:flex;align-items:center;justify-content:center;font:600 15px/1.2 Cairo,sans-serif;color:#9CA3AF">قيد المراجعة</div>
+            <div style="flex:1;height:48px;display:flex;align-items:center;justify-content:center;font:600 15px/1.2 Cairo,sans-serif;color:#9CA3AF">منتهية</div>
+          </div>
+          <div style="flex:1;padding:16px;overflow:hidden">
+            <div style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid #E5E7EB">
+              <div style="width:40px;height:40px;border-radius:10px;background:#EDF9F7;display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1;color:#0F7B6C">directions_car</span></div>
+              <div style="flex:1"><div style="font:600 17px/1.4 Cairo,sans-serif;color:#111827">الرحلات</div><div style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563">أجرة، سائق، إلغاء</div></div>
+              <span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#9CA3AF">chevron_left</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid #E5E7EB">
+              <div style="width:40px;height:40px;border-radius:10px;background:#FBEED5;display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1;color:#9A6410">account_balance_wallet</span></div>
+              <div style="flex:1"><div style="font:600 17px/1.4 Cairo,sans-serif;color:#111827">المحفظة والرصيد</div><div style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563">أرباح، كشف حساب، اشتراك</div></div>
+              <span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#9CA3AF">chevron_left</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid #E5E7EB">
+              <div style="width:40px;height:40px;border-radius:10px;background:#DBEAFE;display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1;color:#1D4ED8">badge</span></div>
+              <div style="flex:1"><div style="font:600 17px/1.4 Cairo,sans-serif;color:#111827">الحساب والوثائق</div><div style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563">تسجيل، موافقة، إيقاف</div></div>
+              <span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#9CA3AF">chevron_left</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;padding:14px 0">
+              <div style="width:40px;height:40px;border-radius:10px;background:#F3F4F6;display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1;color:#4B5563">help</span></div>
+              <div style="flex:1"><div style="font:600 17px/1.4 Cairo,sans-serif;color:#111827">مشكلة أخرى</div></div>
+              <span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#9CA3AF">chevron_left</span>
+            </div>
+          </div>
+          <div style="padding:16px;border-top:1px solid #E5E7EB;flex-shrink:0">
+            <div style="background:#EDF9F7;border-radius:10px;padding:14px;display:flex;align-items:center;gap:12px">
+              <span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#0F7B6C">call</span>
+              <div style="flex:1"><div style="font:600 15px/1.4 Cairo,sans-serif;color:#111827">الاتصال بالدعم</div><div style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563">لم تجد مشكلتك؟ اتصل بنا</div></div>
+            </div>
+          </div>
+        </div>
+      </x-import>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.6;color:#6B7280;display:{{ noteDisplay }}">تصنيف يطابق مصادر البلاغات الفعلية بالكود (disputes/report_problem_sheet.dart)<br>التصنيفات الأربعة تغطي كل رموز DisputeReason الموجودة — لا صنف بلا مقابل بالخادم</div>
+    </div>
+
+    <!-- ── 9 · تسجيل الدخول — الرمز ── -->
+    <div style="display:flex;flex-direction:column;gap:12px;width:412px">
+      <div dir="rtl" style="font:600 17px/1.4 Cairo,sans-serif">9 · تسجيل الدخول — الرمز</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" hint-size="412px,892px">
+        <div dir="rtl" style="height:100%;background:#fff;box-sizing:border-box;padding:32px 20px;display:flex;flex-direction:column;font-family:Cairo,Tajawal,sans-serif">
+          <div style="width:64px;height:64px;border-radius:20px;background:#EDF9F7;display:flex;align-items:center;justify-content:center;margin-bottom:24px">
+            <span style="font-family:'Material Symbols Rounded';font-size:32px;line-height:1;color:#0F7B6C">sms</span>
+          </div>
+          <div style="font:700 28px/1.25 Cairo,sans-serif;letter-spacing:-0.3px;color:#111827;margin-bottom:8px">أدخل رمز التحقق</div>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:32px">
+            <span style="font:400 15px/1.55 Cairo,sans-serif;color:#4B5563">أُرسل الرمز إلى</span>
+            <span dir="ltr" style="font:600 15px/1.35 Cairo,sans-serif;color:#111827;font-variant-numeric:tabular-nums">07712345678</span>
+            <span style="font:600 15px/1.35 Cairo,sans-serif;color:#0F7B6C">تعديل</span>
+          </div>
+          <div dir="ltr" style="display:flex;gap:10px;justify-content:center;margin-bottom:24px">
+            <div style="width:48px;height:56px;border-radius:10px;background:#fff;border:2px solid #0F7B6C;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font:700 24px/1.2 Cairo,sans-serif;color:#111827;font-variant-numeric:tabular-nums">4</div>
+            <div style="width:48px;height:56px;border-radius:10px;background:#F3F4F6;display:flex;align-items:center;justify-content:center;font:700 24px/1.2 Cairo,sans-serif;color:#111827;font-variant-numeric:tabular-nums">1</div>
+            <div style="width:48px;height:56px;border-radius:10px;background:#F3F4F6;display:flex;align-items:center;justify-content:center;font:700 24px/1.2 Cairo,sans-serif;color:#111827;font-variant-numeric:tabular-nums">9</div>
+            <div style="width:48px;height:56px;border-radius:10px;background:#F3F4F6"></div>
+            <div style="width:48px;height:56px;border-radius:10px;background:#F3F4F6"></div>
+            <div style="width:48px;height:56px;border-radius:10px;background:#F3F4F6"></div>
+          </div>
+          <div style="text-align:center;font:400 15px/1.55 Cairo,sans-serif;color:#4B5563;margin-bottom:32px">إعادة إرسال الرمز خلال <span dir="ltr" style="font-variant-numeric:tabular-nums;font-weight:600;color:#111827">01:58</span></div>
+          <div style="height:56px;border-radius:10px;background:#0F7B6C;display:flex;align-items:center;justify-content:center;font:600 16px/1.2 Cairo,sans-serif;color:#fff">تحقّق</div>
+        </div>
+      </x-import>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.6;color:#6B7280;display:{{ noteDisplay }}">AlyOtpInput موجود بالكود — هذا تطوير بصري لا مكوّن جديد<br>العدّاد يمنع "إعادة إرسال" قبل انتهائه بدل رسالة خطأ بعد الضغط</div>
+    </div>
+
+    <!-- ── 10 · رحلاتي ── -->
+    <div style="display:flex;flex-direction:column;gap:12px;width:412px">
+      <div dir="rtl" style="font:600 17px/1.4 Cairo,sans-serif">10 · رحلاتي</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" hint-size="412px,892px">
+        <div dir="rtl" style="height:100%;background:#F9FAFB;box-sizing:border-box;display:flex;flex-direction:column;font-family:Cairo,Tajawal,sans-serif">
+          <div style="flex:1;padding:16px;overflow:hidden">
+            <div style="font:700 24px/1.3 Cairo,sans-serif;color:#111827;margin-bottom:16px">رحلاتي</div>
+
+            <div style="background:#fff;border:1px solid #E5E7EB;border-radius:14px;padding:16px;margin-bottom:10px;box-shadow:0 1px 2px rgba(17,24,39,0.05)">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                <div style="display:inline-flex;align-items:center;gap:6px;background:#DCFCE7;border-radius:999px;padding:4px 10px">
+                  <span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1;color:#15803D">check_circle</span>
+                  <span style="font:600 12px/1.35 Cairo,sans-serif;color:#15803D">مكتملة</span>
+                </div>
+                <div style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563">أمس · 7:42 م</div>
+              </div>
+              <div style="display:flex;align-items:flex-start;margin-bottom:8px">
+                <div style="width:14px;display:flex;justify-content:center;padding-top:5px"><div style="width:10px;height:10px;border-radius:999px;border:2.5px solid #15803D;background:#fff;box-sizing:border-box"></div></div>
+                <div style="width:10px"></div>
+                <div style="flex:1;font:400 15px/1.55 Cairo,sans-serif;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">الكرادة داخل، محلة 909</div>
+              </div>
+              <div style="display:flex;align-items:flex-start;margin-bottom:12px">
+                <div style="width:14px;display:flex;justify-content:center;padding-top:5px"><div style="width:10px;height:10px;border-radius:999px;background:#B91C1C"></div></div>
+                <div style="width:10px"></div>
+                <div style="flex:1;font:400 15px/1.55 Cairo,sans-serif;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">مول المنصور، شارع الأميرات</div>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding-top:12px;border-top:1px solid #E5E7EB">
+                <div dir="ltr" style="font:700 20px/1.3 Cairo,sans-serif;color:#111827;font-variant-numeric:tabular-nums">12,500 د.ع</div>
+                <div style="display:flex;align-items:center;gap:4px"><span style="font:600 14px/1.2 Cairo,sans-serif;color:#0F7B6C">الإيصال</span><span style="font-family:'Material Symbols Rounded';font-size:18px;line-height:1;color:#0F7B6C">chevron_left</span></div>
+              </div>
+            </div>
+
+            <div style="background:#fff;border:1px solid #E5E7EB;border-radius:14px;padding:16px;margin-bottom:10px;box-shadow:0 1px 2px rgba(17,24,39,0.05)">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                <div style="display:inline-flex;align-items:center;gap:6px;background:#FEE2E2;border-radius:999px;padding:4px 10px">
+                  <span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1;color:#B91C1C">cancel</span>
+                  <span style="font:600 12px/1.35 Cairo,sans-serif;color:#B91C1C">ملغاة</span>
+                </div>
+                <div style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563">2 سبتمبر · 9:15 ص</div>
+              </div>
+              <div style="display:flex;align-items:flex-start;margin-bottom:8px">
+                <div style="width:14px;display:flex;justify-content:center;padding-top:5px"><div style="width:10px;height:10px;border-radius:999px;border:2.5px solid #15803D;background:#fff;box-sizing:border-box"></div></div>
+                <div style="width:10px"></div>
+                <div style="flex:1;font:400 15px/1.55 Cairo,sans-serif;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">جامعة بغداد، الجادرية</div>
+              </div>
+              <div style="display:flex;align-items:flex-start">
+                <div style="width:14px;display:flex;justify-content:center;padding-top:5px"><div style="width:10px;height:10px;border-radius:999px;background:#B91C1C"></div></div>
+                <div style="width:10px"></div>
+                <div style="flex:1;font:400 15px/1.55 Cairo,sans-serif;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">باب المعظم، شارع الرشيد</div>
+              </div>
+            </div>
+
+            <div style="background:#fff;border:1px solid #E5E7EB;border-radius:14px;padding:16px;box-shadow:0 1px 2px rgba(17,24,39,0.05)">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                <div style="display:inline-flex;align-items:center;gap:6px;background:#DCFCE7;border-radius:999px;padding:4px 10px">
+                  <span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1;color:#15803D">check_circle</span>
+                  <span style="font:600 12px/1.35 Cairo,sans-serif;color:#15803D">مكتملة</span>
+                </div>
+                <div style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563">28 أغسطس · 4:03 م</div>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <div dir="ltr" style="font:700 20px/1.3 Cairo,sans-serif;color:#111827;font-variant-numeric:tabular-nums">8,000 د.ع</div>
+                <div style="display:flex;align-items:center;gap:4px"><span style="font:600 14px/1.2 Cairo,sans-serif;color:#0F7B6C">الإيصال</span><span style="font-family:'Material Symbols Rounded';font-size:18px;line-height:1;color:#0F7B6C">chevron_left</span></div>
+              </div>
+            </div>
+          </div>
+          <div style="height:64px;background:#fff;border-top:1px solid #E5E7EB;display:flex;align-items:center;justify-content:space-around;flex-shrink:0">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:2px"><span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#9CA3AF">home</span><span style="font:400 11px/1.2 Cairo,sans-serif;color:#9CA3AF">الرحلة</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:2px"><span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#0F7B6C;font-variation-settings:'FILL' 1">receipt_long</span><span style="font:600 11px/1.2 Cairo,sans-serif;color:#0F7B6C">رحلاتي</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:2px"><span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#9CA3AF">person</span><span style="font:400 11px/1.2 Cairo,sans-serif;color:#9CA3AF">حسابي</span></div>
+          </div>
+        </div>
+      </x-import>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.6;color:#6B7280;display:{{ noteDisplay }}">شبكة ثلاثية (الرحلة/رحلاتي/حسابي) — بلا المحفظة: مسار سائق لا راكب<br>شارة الحالة تسبق التاريخ: أول ما يبحث عنه الراكب هو "هل تمّت؟"</div>
+    </div>
+
+    <!-- ── 11 · لوحة السائق — غير متصل ── -->
+    <div style="display:flex;flex-direction:column;gap:12px;width:412px">
+      <div dir="rtl" style="font:600 17px/1.4 Cairo,sans-serif">11 · لوحة السائق — غير متصل</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" hint-size="412px,892px">
+        <div dir="rtl" style="height:100%;background:#F9FAFB;box-sizing:border-box;padding:16px;font-family:Cairo,Tajawal,sans-serif">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+            <div>
+              <div style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563">صباح الخير</div>
+              <div style="font:700 20px/1.35 Cairo,sans-serif;color:#111827">حيدر ج.</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;background:#fff;border:1px solid #E5E7EB;border-radius:999px;padding:6px 12px">
+              <span style="font-family:'Material Symbols Rounded';font-size:18px;line-height:1;color:#C07C14;font-variation-settings:'FILL' 1">star</span>
+              <span dir="ltr" style="font:600 15px/1.35 Cairo,sans-serif;color:#111827;font-variant-numeric:tabular-nums">4.8</span>
+            </div>
+          </div>
+
+          <div style="min-height:56px;border-radius:999px;background:#fff;border:1px solid #E5E7EB;padding:16px;box-sizing:border-box;display:flex;align-items:center;gap:12px;margin-bottom:8px">
+            <div style="width:20px;height:20px;display:flex;align-items:center;justify-content:center"><div style="width:14px;height:14px;border-radius:999px;background:#D1D5DB"></div></div>
+            <div style="flex:1;font:600 20px/1.35 Cairo,sans-serif;color:#4B5563">أنت غير متصل</div>
+            <span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1;color:#9CA3AF">power_settings_new</span>
+          </div>
+          <div style="padding:0 8px;font:400 13px/1.5 Cairo,sans-serif;color:#4B5563;margin-bottom:24px">اتصل لتصلك طلبات الرحلات.</div>
+
+          <div style="background:#fff;border:1px solid #E5E7EB;border-radius:16px;padding:16px;margin-bottom:12px">
+            <div style="font:600 12px/1.35 Cairo,sans-serif;letter-spacing:0.2px;color:#4B5563">أرباح اليوم</div>
+            <div style="height:4px"></div>
+            <div dir="ltr" style="text-align:right;font:700 34px/1.2 Cairo,sans-serif;letter-spacing:-0.5px;color:#111827;font-variant-numeric:tabular-nums">0 د.ع</div>
+            <div style="height:8px"></div>
+            <div style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563">لم تبدأ يومك بعد</div>
+            <div style="height:16px"></div>
+            <div style="height:1px;background:#E5E7EB"></div>
+            <div style="height:16px"></div>
+            <div style="display:flex;gap:32px;flex-wrap:wrap">
+              <div>
+                <div dir="ltr" style="text-align:right;font:600 20px/1.3 Cairo,sans-serif;color:#111827;font-variant-numeric:tabular-nums">0</div>
+                <div style="font:400 12px/1.45 Cairo,sans-serif;color:#4B5563">الرحلات</div>
+              </div>
+              <div>
+                <div style="font:600 20px/1.3 Cairo,sans-serif;color:#111827;font-variant-numeric:tabular-nums">0 س 00 د</div>
+                <div style="font:400 12px/1.45 Cairo,sans-serif;color:#4B5563">مدة الاتصال</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="background:#fff;border:1px solid #E5E7EB;border-radius:16px;padding:16px;display:flex;align-items:flex-start;gap:12px">
+            <span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1.2;color:#4B5563">card_membership</span>
+            <div style="flex:1;min-width:0">
+              <div style="font:600 12px/1.35 Cairo,sans-serif;letter-spacing:0.2px;color:#4B5563">اشتراك شهري</div>
+              <div style="height:4px"></div>
+              <div style="font:600 20px/1.35 Cairo,sans-serif;color:#111827">يتبقى 18 يوماً</div>
+              <div style="height:4px"></div>
+              <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">
+                <span style="font:400 15px/1.55 Cairo,sans-serif;color:#4B5563">ينتهي في</span>
+                <span dir="ltr" style="font:600 15px/1.35 Cairo,sans-serif;color:#111827;font-variant-numeric:tabular-nums">24/09/2026</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </x-import>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.6;color:#6B7280;display:{{ noteDisplay }}">"غير متصل" رمادية بلا لون تحذيري — حالة لا خطأ<br>الأرباح الصفرية بنفس التخطيط لا بحالة فراغ: يمنع القفزة عند أول رحلة</div>
+    </div>
+
+    <!-- ── 12 · حسابي ── -->
+    <div style="display:flex;flex-direction:column;gap:12px;width:412px">
+      <div dir="rtl" style="font:600 17px/1.4 Cairo,sans-serif">12 · حسابي</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" hint-size="412px,892px">
+        <div dir="rtl" style="height:100%;background:#F9FAFB;box-sizing:border-box;display:flex;flex-direction:column;font-family:Cairo,Tajawal,sans-serif">
+          <div style="flex:1;padding:16px;overflow:hidden">
+            <div style="background:#0F7B6C;border-radius:16px;padding:20px;display:flex;align-items:center;gap:14px;margin-bottom:16px">
+              <div style="width:56px;height:56px;border-radius:999px;background:rgba(255,255,255,0.18);display:flex;align-items:center;justify-content:center;font:700 22px/1.2 Cairo,sans-serif;color:#fff;flex-shrink:0">ح</div>
+              <div style="flex:1;min-width:0">
+                <div style="font:700 20px/1.35 Cairo,sans-serif;color:#fff">حسين علي</div>
+                <div dir="ltr" style="text-align:right;font:400 15px/1.55 Cairo,sans-serif;color:#D6F1EC;font-variant-numeric:tabular-nums">+964 771 234 5678</div>
+              </div>
+              <span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#fff">edit</span>
+            </div>
+
+            <div style="background:#fff;border:1px solid #E5E7EB;border-radius:14px;overflow:hidden;margin-bottom:12px">
+              <div style="display:flex;align-items:center;gap:12px;padding:14px;border-bottom:1px solid #E5E7EB">
+                <div style="width:36px;height:36px;border-radius:10px;background:#EDF9F7;display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1;color:#0F7B6C;font-variation-settings:'FILL' 1">star</span></div>
+                <div style="flex:1;min-width:0"><div style="font:400 15px/1.55 Cairo,sans-serif;color:#111827">الأماكن المحفوظة</div><div style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563">البيت · العمل</div></div>
+                <span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1;color:#9CA3AF">chevron_left</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;padding:14px;border-bottom:1px solid #E5E7EB">
+                <div style="width:36px;height:36px;border-radius:10px;background:#F3F4F6;display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1;color:#4B5563">payments</span></div>
+                <div style="flex:1;min-width:0"><div style="font:400 15px/1.55 Cairo,sans-serif;color:#111827">طريقة الدفع</div><div style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563">نقداً للسائق</div></div>
+                <span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1;color:#9CA3AF">chevron_left</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;padding:14px;border-bottom:1px solid #E5E7EB">
+                <div style="width:36px;height:36px;border-radius:10px;background:#F3F4F6;display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1;color:#4B5563">language</span></div>
+                <div style="flex:1;min-width:0"><div style="font:400 15px/1.55 Cairo,sans-serif;color:#111827">اللغة</div><div style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563">العربية</div></div>
+                <span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1;color:#9CA3AF">chevron_left</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;padding:14px">
+                <div style="width:36px;height:36px;border-radius:10px;background:#DBEAFE;display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1;color:#1D4ED8">support_agent</span></div>
+                <div style="flex:1;min-width:0"><div style="font:400 15px/1.55 Cairo,sans-serif;color:#111827">الدعم</div></div>
+                <span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1;color:#9CA3AF">chevron_left</span>
+              </div>
+            </div>
+
+            <div style="height:56px;border-radius:10px;background:#fff;border:1px solid #E5E7EB;display:flex;align-items:center;justify-content:center;gap:8px;font:600 16px/1.2 Cairo,sans-serif;color:#B91C1C;margin-bottom:8px">
+              <span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1;color:#B91C1C">logout</span>
+              تسجيل الخروج
+            </div>
+            <div style="height:48px;display:flex;align-items:center;justify-content:center;font:400 14px/1.2 Cairo,sans-serif;color:#6B7280">حذف الحساب</div>
+          </div>
+          <div style="height:64px;background:#fff;border-top:1px solid #E5E7EB;display:flex;align-items:center;justify-content:space-around;flex-shrink:0">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:2px"><span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#9CA3AF">home</span><span style="font:400 11px/1.2 Cairo,sans-serif;color:#9CA3AF">الرحلة</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:2px"><span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#9CA3AF">receipt_long</span><span style="font:400 11px/1.2 Cairo,sans-serif;color:#9CA3AF">رحلاتي</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:2px"><span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#0F7B6C;font-variation-settings:'FILL' 1">person</span><span style="font:600 11px/1.2 Cairo,sans-serif;color:#0F7B6C">حسابي</span></div>
+          </div>
+        </div>
+      </x-import>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.6;color:#6B7280;display:{{ noteDisplay }}">"حذف الحساب" نص هادئ لا زر — مطلوب من Google Play بلا تنافس بصري<br>الرأس التركوازي يحمل الهوية؛ باقي الشاشة أبيض هادئ</div>
+    </div>
+
+    <!-- ── 13 · عرض رحلة للسائق ── -->
+    <div style="display:flex;flex-direction:column;gap:12px;width:412px">
+      <div dir="rtl" style="font:600 17px/1.4 Cairo,sans-serif">13 · عرض رحلة — للسائق</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" hint-size="412px,892px">
+        <div dir="rtl" style="height:100%;position:relative;background:#F9FAFB;overflow:hidden;font-family:Cairo,Tajawal,sans-serif">
+          <div style="position:absolute;inset:0;background:#EDF0F3 url('assets/map-karrada.png') 46% 30%/cover no-repeat;filter:brightness(0.9)"></div>
+          <div style="position:absolute;inset:0;background:rgba(17,24,39,0.35)"></div>
+          <div style="position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:20px 20px 0 0;box-shadow:0 -4px 16px rgba(17,24,39,0.16);padding:16px;box-sizing:border-box">
+            <div style="height:6px;border-radius:999px;background:#E5E7EB;overflow:hidden;margin-bottom:16px"><div style="width:62%;height:100%;background:#C07C14"></div></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+              <div style="font:700 20px/1.35 Cairo,sans-serif;color:#111827">طلب رحلة جديد</div>
+              <div style="display:flex;align-items:baseline;gap:4px"><span dir="ltr" style="font:700 24px/1.3 Cairo,sans-serif;color:#C07C14;font-variant-numeric:tabular-nums">11</span><span style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563">ثانية</span></div>
+            </div>
+
+            <div style="background:#EDF9F7;border-radius:14px;padding:16px;display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+              <div>
+                <div style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563;margin-bottom:2px">الأجرة</div>
+                <div dir="ltr" style="font:700 28px/1.2 Cairo,sans-serif;letter-spacing:-0.3px;color:#0F7B6C;font-variant-numeric:tabular-nums">12,500 د.ع</div>
+              </div>
+              <div style="text-align:center">
+                <div style="font:400 12px/1.45 Cairo,sans-serif;color:#4B5563">المسافة</div>
+                <div dir="ltr" style="font:700 20px/1.3 Cairo,sans-serif;color:#111827;font-variant-numeric:tabular-nums">6.8 كم</div>
+              </div>
+            </div>
+
+            <div style="display:flex;align-items:flex-start;margin-bottom:10px">
+              <div style="width:16px;display:flex;justify-content:center;padding-top:5px"><div style="width:12px;height:12px;border-radius:999px;border:2.5px solid #15803D;background:#fff;box-sizing:border-box"></div></div>
+              <div style="width:12px"></div>
+              <div style="flex:1;min-width:0"><div style="font:400 15px/1.55 Cairo,sans-serif;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">الكرادة داخل، محلة 909</div><div style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563">3 دقائق منك</div></div>
+            </div>
+            <div style="display:flex;align-items:flex-start;margin-bottom:16px">
+              <div style="width:16px;display:flex;justify-content:center;padding-top:5px"><div style="width:12px;height:12px;border-radius:999px;background:#B91C1C"></div></div>
+              <div style="width:12px"></div>
+              <div style="flex:1;min-width:0"><div style="font:400 15px/1.55 Cairo,sans-serif;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">مول المنصور، شارع الأميرات</div></div>
+            </div>
+
+            <div style="height:56px;border-radius:10px;background:#0F7B6C;display:flex;align-items:center;justify-content:center;font:600 16px/1.2 Cairo,sans-serif;color:#fff;margin-bottom:8px">قبول الطلب</div>
+            <div style="height:48px;display:flex;align-items:center;justify-content:center;font:600 15px/1.2 Cairo,sans-serif;color:#B91C1C">رفض</div>
+          </div>
+        </div>
+      </x-import>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.6;color:#6B7280;display:{{ noteDisplay }}">offer_sheet.dart — الشريط ينزف مقابل مهلة الخادم لا مؤقّت محلي<br>"3 دقائق منك" تحت الانطلاق: أهم رقم للسائق بعد الأجرة</div>
+    </div>
+
+    <!-- ── 14 · الرحلة الجارية — للسائق ── -->
+    <div style="display:flex;flex-direction:column;gap:12px;width:412px">
+      <div dir="rtl" style="font:600 17px/1.4 Cairo,sans-serif">14 · الرحلة الجارية — للسائق</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" hint-size="412px,892px">
+        <div dir="rtl" style="height:100%;position:relative;background:#EDF0F3;overflow:hidden;font-family:Cairo,Tajawal,sans-serif">
+          <div style="position:absolute;inset:0;background:#EDF0F3 url('assets/map-karrada.png') 40% 42%/cover no-repeat"></div>
+          <div style="position:absolute;top:18%;right:20%;width:46%;height:3px;background:#0F7B6C;transform:rotate(22deg);border-radius:999px"></div>
+          <div style="position:absolute;top:16px;left:16px;right:16px;background:#111827;border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:12px;box-shadow:0 4px 12px rgba(17,24,39,0.24)">
+            <span style="font-family:'Material Symbols Rounded';font-size:26px;line-height:1;color:#fff">navigation</span>
+            <div style="flex:1;min-width:0">
+              <div style="font:600 17px/1.4 Cairo,sans-serif;color:#fff">اتجه إلى شارع الأميرات</div>
+              <div style="font:400 13px/1.5 Cairo,sans-serif;color:#9CA3AF">بعد 400 م انعطف يميناً</div>
+            </div>
+          </div>
+          <div style="position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:20px 20px 0 0;box-shadow:0 -4px 16px rgba(17,24,39,0.10);padding:16px;box-sizing:border-box">
+            <div style="width:36px;height:4px;background:#E5E7EB;border-radius:999px;margin:0 auto 16px"></div>
+            <div style="display:inline-flex;align-items:center;gap:6px;background:#DCFCE7;border-radius:999px;padding:5px 12px;margin-bottom:14px">
+              <div style="width:8px;height:8px;border-radius:999px;background:#15803D"></div>
+              <span style="font:600 12px/1.35 Cairo,sans-serif;color:#15803D">الراكب على متن السيارة</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+              <div style="width:48px;height:48px;border-radius:999px;background:#EDF9F7;display:flex;align-items:center;justify-content:center;font:600 18px/1.35 Cairo,sans-serif;color:#0F7B6C;flex-shrink:0">ح</div>
+              <div style="flex:1;min-width:0"><div style="font:600 17px/1.4 Cairo,sans-serif;color:#111827">حسين ع.</div><div style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563">راكب واحد · نقداً</div></div>
+              <div dir="ltr" style="font:700 20px/1.3 Cairo,sans-serif;color:#111827;font-variant-numeric:tabular-nums">12,500 د.ع</div>
+            </div>
+            <div style="display:flex;align-items:flex-start;padding-top:12px;border-top:1px solid #E5E7EB;margin-bottom:16px">
+              <div style="width:16px;display:flex;justify-content:center;padding-top:5px"><div style="width:12px;height:12px;border-radius:999px;background:#B91C1C"></div></div>
+              <div style="width:12px"></div>
+              <div style="flex:1;min-width:0"><div style="font:400 15px/1.55 Cairo,sans-serif;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">مول المنصور، شارع الأميرات</div><div style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563">يتبقى 12 دقيقة</div></div>
+            </div>
+            <div style="height:56px;border-radius:10px;background:#0F7B6C;display:flex;align-items:center;justify-content:center;gap:8px;font:600 16px/1.2 Cairo,sans-serif;color:#fff">
+              <span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1;color:#fff">flag</span>
+              إنهاء الرحلة
+            </div>
+          </div>
+        </div>
+      </x-import>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.6;color:#6B7280;display:{{ noteDisplay }}">trip_screen.dart — لوحة الملاحة داكنة أعلى الشاشة: تُقرأ بالشمس وبطرف العين<br>"إنهاء الرحلة" الفعل الوحيد المتاح في هذه الحالة، فلا زر ثانٍ ينافسه</div>
+    </div>
+
+    <!-- ── 15 · الإيصال والتقييم ── -->
+    <div style="display:flex;flex-direction:column;gap:12px;width:412px">
+      <div dir="rtl" style="font:600 17px/1.4 Cairo,sans-serif">15 · الإيصال والتقييم</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" hint-size="412px,892px">
+        <div dir="rtl" style="height:100%;background:#F9FAFB;box-sizing:border-box;padding:24px 16px;font-family:Cairo,Tajawal,sans-serif;display:flex;flex-direction:column">
+          <div style="text-align:center;margin-bottom:20px">
+            <div style="width:64px;height:64px;border-radius:999px;background:#DCFCE7;display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px"><span style="font-family:'Material Symbols Rounded';font-size:34px;line-height:1;color:#15803D">check_circle</span></div>
+            <div style="font:700 24px/1.3 Cairo,sans-serif;color:#111827">وصلت بسلامة</div>
+            <div style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563">أمس · 7:42 م</div>
+          </div>
+
+          <div style="background:#fff;border:1px solid #E5E7EB;border-radius:14px;padding:16px;margin-bottom:12px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+              <div style="font:400 15px/1.55 Cairo,sans-serif;color:#4B5563">أجرة الرحلة</div>
+              <div dir="ltr" style="font:600 15px/1.35 Cairo,sans-serif;color:#111827;font-variant-numeric:tabular-nums">12,500 د.ع</div>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+              <div style="font:400 15px/1.55 Cairo,sans-serif;color:#4B5563">المسافة · المدة</div>
+              <div dir="ltr" style="font:400 15px/1.55 Cairo,sans-serif;color:#111827;font-variant-numeric:tabular-nums">6.8 كم · 22 د</div>
+            </div>
+            <div style="height:1px;background:#E5E7EB;margin-bottom:12px"></div>
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <div style="font:600 17px/1.4 Cairo,sans-serif;color:#111827">المدفوع نقداً</div>
+              <div dir="ltr" style="font:700 24px/1.3 Cairo,sans-serif;color:#111827;font-variant-numeric:tabular-nums">12,500 د.ع</div>
+            </div>
+          </div>
+
+          <div style="background:#fff;border:1px solid #E5E7EB;border-radius:14px;padding:16px;margin-bottom:12px">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+              <div style="width:44px;height:44px;border-radius:999px;background:#EDF9F7;display:flex;align-items:center;justify-content:center;font:600 17px/1.35 Cairo,sans-serif;color:#0F7B6C;flex-shrink:0">ح</div>
+              <div style="flex:1;min-width:0"><div style="font:600 15px/1.4 Cairo,sans-serif;color:#111827">حيدر ج.</div><div style="font:400 13px/1.5 Cairo,sans-serif;color:#4B5563">كيا ريو أبيض · 22 A 4791</div></div>
+            </div>
+            <div style="font:600 15px/1.4 Cairo,sans-serif;color:#111827;text-align:center;margin-bottom:12px">كيف كانت رحلتك؟</div>
+            <div dir="ltr" style="display:flex;justify-content:center;gap:12px">
+              <span style="font-family:'Material Symbols Rounded';font-size:34px;line-height:1;color:#C07C14;font-variation-settings:'FILL' 1">star</span>
+              <span style="font-family:'Material Symbols Rounded';font-size:34px;line-height:1;color:#C07C14;font-variation-settings:'FILL' 1">star</span>
+              <span style="font-family:'Material Symbols Rounded';font-size:34px;line-height:1;color:#C07C14;font-variation-settings:'FILL' 1">star</span>
+              <span style="font-family:'Material Symbols Rounded';font-size:34px;line-height:1;color:#C07C14;font-variation-settings:'FILL' 1">star</span>
+              <span style="font-family:'Material Symbols Rounded';font-size:34px;line-height:1;color:#D1D5DB">star</span>
+            </div>
+          </div>
+
+          <div style="flex:1"></div>
+          <div style="height:56px;border-radius:10px;background:#0F7B6C;display:flex;align-items:center;justify-content:center;font:600 16px/1.2 Cairo,sans-serif;color:#fff;margin-bottom:8px">إرسال التقييم</div>
+          <div style="height:48px;display:flex;align-items:center;justify-content:center;font:600 15px/1.2 Cairo,sans-serif;color:#4B5563">تخطّي</div>
+        </div>
+      </x-import>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.6;color:#6B7280;display:{{ noteDisplay }}">ride_receipt_screen.dart — الإيصال والتقييم بشاشة واحدة لا شاشتين متتاليتين<br>النجوم LTR دائماً: 1 الأسوأ يساراً و5 الأفضل يميناً بكل اللغات</div>
+    </div>
+
+  </div>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;showLegend&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Presentation&quot;},&quot;showNotes&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Presentation&quot;},&quot;frameScale&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:1,&quot;min&quot;:0.5,&quot;max&quot;:1.25,&quot;step&quot;:0.05,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Presentation&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const scale = this.props.frameScale ?? 1;
+    return {
+      showLegend: this.props.showLegend ?? true,
+      noteDisplay: (this.props.showNotes ?? true) ? 'block' : 'none',
+      frameZoom: String(scale),
+    };
+  }
+}
+</script>
+</body>
+</html>

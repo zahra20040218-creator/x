@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:rideapp_aly/screens/track_ride_screen.dart';
 import 'package:rideapp_core/rideapp_core.dart';
 
 /// The receipt for a finished ride.
@@ -56,6 +57,18 @@ class RideReceiptScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.md),
         children: [
+          // Screen 15 of the new design: the outcome first, in words, before
+          // any figure. A rider opening this wants to know the trip ended
+          // well; the arithmetic is what they check second.
+          if (ride.status == RideStatus.completed) ...[
+            AlyEmptyState(
+              icon: Icons.check_circle_rounded,
+              title: strings.arrivedSafely,
+              message: formatDateTimeAr(ride.completedAt ?? ride.requestedAt),
+            ),
+            const SizedBox(height: AlySpacing.lg),
+          ],
+
           _Section(
             title: strings.statusLabel(ride.status),
             child: Column(
@@ -145,6 +158,18 @@ class RideReceiptScreen extends StatelessWidget {
             ),
 
           const SizedBox(height: AppSpacing.sm),
+          // The rating lives on the receipt now rather than on a screen of its
+          // own: one thing arrived, one thing to say about it.
+          if (ride.status == RideStatus.completed) ...[
+            const SizedBox(height: AlySpacing.lg),
+            RideRatingCard(
+              api: api,
+              rideId: ride.id,
+              onSkip: () => Navigator.of(context).maybePop(),
+            ),
+          ],
+
+          const SizedBox(height: AlySpacing.lg),
           AlyButton.secondary(
               label: strings.reportProblem,
               onPressed: () => _report(context),

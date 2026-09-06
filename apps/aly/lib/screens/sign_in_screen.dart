@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:rideapp_aly/screens/design_logic.dart';
 import 'package:rideapp_core/rideapp_core.dart';
 
 /// Rider phone OTP sign-in.
@@ -29,8 +30,18 @@ class _SignInScreenState extends State<SignInScreen> {
   String? _error;
   bool _busy = false;
 
+  /// Two minutes, matching the design's 01:58 counter.
+  ///
+  /// A countdown rather than a refusal after the fact: telling someone "too
+  /// many requests" *after* they press is worse than not offering the press
+  /// until it can succeed. See [ResendCountdown].
+  final ResendCountdown _resend =
+      ResendCountdown(window: const Duration(minutes: 2));
+  Timer? _tick;
+
   @override
   void dispose() {
+    _tick?.cancel();
     _phoneController.dispose();
     _codeController.dispose();
     _nameController.dispose();
@@ -80,6 +91,17 @@ class _SignInScreenState extends State<SignInScreen> {
         setState(() {
           _busy = false;
           _verificationId = verificationId;
+          _resend.sentAt = DateTime.now();
+        });
+        // One second, and only while a code is outstanding — the timer is
+        // cancelled the moment the window closes so a screen left open is not
+        // repainting once a second forever.
+        _tick?.cancel();
+        _tick = Timer.periodic(const Duration(seconds: 1), (timer) {
+          if (!mounted || _resend.canResendAt(DateTime.now())) {
+            timer.cancel();
+          }
+          if (mounted) setState(() {});
         });
       },
       codeAutoRetrievalTimeout: (verificationId) {
@@ -272,8 +294,15 @@ class _SignInScreenState extends State<SignInScreen> {
                 ),
               ] else ...[
                 Text(
+                  strings.enterVerificationCode,
+                  style: AlyTypography.h2
+                      .copyWith(color: AlyColors.of(context).textPrimary),
+                ),
+                const SizedBox(height: AlySpacing.xs),
+                Text(
                   '${strings.codeSentTo} ${_phoneController.text}',
-                  style: Theme.of(context).textTheme.bodyMedium,
+                  style: AlyTypography.bodySmall
+                      .copyWith(color: AlyColors.of(context).textSecondary),
                 ),
                 const SizedBox(height: AlySpacing.lg),
                 // The six-box input from the design system, not one centred
@@ -296,12 +325,26 @@ class _SignInScreenState extends State<SignInScreen> {
                   isLoading: _busy,
                 ),
                 const SizedBox(height: AlySpacing.sm),
-                AlyButton(
-                  label: strings.resendCode,
-                  onPressed:
-                      _busy ? null : () => setState(() => _verificationId = null),
-                  variant: AlyButtonVariant.tertiary,
-                ),
+                // Either the counter or the button, never both: a control that
+                // is visible but refuses to work teaches the rider to distrust
+                // every other control on the screen.
+                if (!_resend.canResendAt(DateTime.now()))
+                  Center(
+                    child: Text(
+                      '${strings.resendCodeIn} '
+                      '${ResendCountdown.format(_resend.remainingAt(DateTime.now()))}',
+                      style: AlyTypography.bodySmall
+                          .copyWith(color: AlyColors.of(context).textSecondary),
+                    ),
+                  )
+                else
+                  AlyButton(
+                    label: strings.resendCode,
+                    onPressed: _busy
+                        ? null
+                        : () => setState(() => _verificationId = null),
+                    variant: AlyButtonVariant.tertiary,
+                  ),
               ],
             ],
           ),

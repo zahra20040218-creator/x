@@ -136,6 +136,51 @@ abstract class AppStrings {
   /// Why nobody came, and what the rider can do about it. The status alone
   /// reads as a fault; this says it is not one.
   String get noDriversFoundBody;
+
+  /// Header greeting before noon.
+  /// Heading over the rider's previous drop-offs.
+  /// Unit suffix on a distance. Short because it sits beside a number.
+  String get kilometreShort;
+
+  String get recentDestinations;
+
+  String get goodMorning;
+
+  /// After noon, and through the night — Arabic uses one greeting for both.
+  String get goodEvening;
+  String get requestARide;
+  String get support;
+
+  /// The driver recruitment card on the rider home.
+  String get becomeADriver;
+  String get becomeADriverBody;
+
+  /// Bottom navigation. Short by necessity: three labels share one row.
+  String get navHome;
+  String get navTrips;
+  String get navAccount;
+
+  /// Precedes the mm:ss counter, so the rider knows what the number is.
+  String get resendCodeIn;
+  String get enterVerificationCode;
+  String get edit;
+
+  /// Declining to rate is a legitimate choice, not a failure to act.
+  String get skip;
+  String get arrivedSafely;
+  String get howWasYourTrip;
+  String get paidInCash;
+  String get distanceAndDuration;
+  String get goOnlineToReceive;
+
+  /// Shown beside a zero, so the zero reads as "not yet" rather than as a loss.
+  String get dayNotStarted;
+  String get endTrip;
+  String get passengerOnBoard;
+  String get acceptRequest;
+  String get newRideRequest;
+  String get secondsUnit;
+  String get minutesUnit;
   String get driverOnTheWay;
   String get driverHasArrived;
   String get onTrip;
@@ -478,6 +523,62 @@ class ArabicStrings implements AppStrings {
   @override
   String get noDriversFoundBody =>
       'لم يقبل أي سائق قريب طلبك. جرّب بعد قليل أو غيّر نقطة الانطلاق.';
+  @override
+  @override
+  @override
+  String get kilometreShort => 'كم';
+  @override
+  String get recentDestinations => 'وجهات سابقة';
+  @override
+  String get goodMorning => 'صباح الخير';
+  @override
+  String get goodEvening => 'مساء الخير';
+  @override
+  String get requestARide => 'اطلب رحلة';
+  @override
+  String get support => 'الدعم';
+  @override
+  String get becomeADriver => 'كن سائقاً معنا';
+  @override
+  String get becomeADriverBody => 'اربح بدوامك الحر ببغداد';
+  @override
+  String get navHome => 'الرحلة';
+  @override
+  String get navTrips => 'رحلاتي';
+  @override
+  String get navAccount => 'حسابي';
+  @override
+  String get resendCodeIn => 'إعادة إرسال الرمز خلال';
+  @override
+  String get enterVerificationCode => 'أدخل رمز التحقق';
+  @override
+  String get edit => 'تعديل';
+  @override
+  String get skip => 'تخطّي';
+  @override
+  String get arrivedSafely => 'وصلت بسلامة';
+  @override
+  String get howWasYourTrip => 'كيف كانت رحلتك؟';
+  @override
+  String get paidInCash => 'المدفوع نقداً';
+  @override
+  String get distanceAndDuration => 'المسافة · المدة';
+  @override
+  String get goOnlineToReceive => 'اتصل لتصلك طلبات الرحلات.';
+  @override
+  String get dayNotStarted => 'لم تبدأ يومك بعد';
+  @override
+  String get endTrip => 'إنهاء الرحلة';
+  @override
+  String get passengerOnBoard => 'الراكب على متن السيارة';
+  @override
+  String get acceptRequest => 'قبول الطلب';
+  @override
+  String get newRideRequest => 'طلب رحلة جديد';
+  @override
+  String get secondsUnit => 'ثانية';
+  @override
+  String get minutesUnit => 'دقيقة';
   @override
   String get driverOnTheWay => 'السائق في الطريق إليك';
   @override
@@ -909,6 +1010,62 @@ class EnglishStrings implements AppStrings {
   String get noDriversFoundBody =>
       'No nearby driver took your request. Try again shortly, or move your '
       'pickup point.';
+  @override
+  @override
+  @override
+  String get kilometreShort => 'km';
+  @override
+  String get recentDestinations => 'Recent destinations';
+  @override
+  String get goodMorning => 'Good morning';
+  @override
+  String get goodEvening => 'Good evening';
+  @override
+  String get requestARide => 'Request a ride';
+  @override
+  String get support => 'Support';
+  @override
+  String get becomeADriver => 'Drive with ALY';
+  @override
+  String get becomeADriverBody => 'Earn on your own hours in Baghdad';
+  @override
+  String get navHome => 'Ride';
+  @override
+  String get navTrips => 'Trips';
+  @override
+  String get navAccount => 'Account';
+  @override
+  String get resendCodeIn => 'Resend code in';
+  @override
+  String get enterVerificationCode => 'Enter your code';
+  @override
+  String get edit => 'Edit';
+  @override
+  String get skip => 'Skip';
+  @override
+  String get arrivedSafely => 'You have arrived';
+  @override
+  String get howWasYourTrip => 'How was your trip?';
+  @override
+  String get paidInCash => 'Paid in cash';
+  @override
+  String get distanceAndDuration => 'Distance · Duration';
+  @override
+  String get goOnlineToReceive => 'Go online to start receiving requests.';
+  @override
+  String get dayNotStarted => "Your day hasn't started yet";
+  @override
+  String get endTrip => 'End trip';
+  @override
+  String get passengerOnBoard => 'Passenger on board';
+  @override
+  String get acceptRequest => 'Accept';
+  @override
+  String get newRideRequest => 'New ride request';
+  @override
+  String get secondsUnit => 'seconds';
+  @override
+  String get minutesUnit => 'minutes';
   @override
   String get driverOnTheWay => 'Your driver is on the way';
   @override
