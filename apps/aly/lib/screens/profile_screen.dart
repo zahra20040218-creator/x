@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:rideapp_aly/screens/support_screen.dart';
 import 'package:rideapp_core/rideapp_core.dart';
 
 /// The rider's own account.
@@ -242,6 +243,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     style: AlyTypography.bodySmall.copyWith(
                       color: AlyColors.of(context).textSecondary,
                     ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AlySpacing.lg),
+
+            AlyCard(
+              padding: const EdgeInsetsDirectional.all(AlySpacing.md),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => SupportScreen(api: widget.api),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.support_agent_rounded,
+                    color: AlyColors.of(context).textSecondary,
+                  ),
+                  const SizedBox(width: AlySpacing.md),
+                  Expanded(
+                    child: Text(
+                      strings.supportTitle,
+                      style: AlyTypography.body.copyWith(
+                        color: AlyColors.of(context).textPrimary,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_left_rounded,
+                    color: AlyColors.of(context).textTertiary,
                   ),
                 ],
               ),

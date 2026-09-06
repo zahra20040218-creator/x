@@ -140,6 +140,17 @@ abstract class AppStrings {
   /// Header greeting before noon.
   /// Heading over the rider's previous drop-offs.
   /// Unit suffix on a distance. Short because it sits beside a number.
+  String get supportTitle;
+  String get supportIssues;
+  String get supportRides;
+  String get supportRidesBody;
+  String get supportWallet;
+  String get supportWalletBody;
+  String get supportAccount;
+  String get supportAccountBody;
+  String get supportOther;
+  String get supportPickRide;
+
   String get kilometreShort;
 
   String get recentDestinations;
@@ -525,6 +536,27 @@ class ArabicStrings implements AppStrings {
       'لم يقبل أي سائق قريب طلبك. جرّب بعد قليل أو غيّر نقطة الانطلاق.';
   @override
   @override
+  @override
+  @override
+  String get supportTitle => 'الدعم';
+  @override
+  String get supportIssues => 'المشكلات';
+  @override
+  String get supportRides => 'الرحلات';
+  @override
+  String get supportRidesBody => 'أجرة، سائق، إلغاء';
+  @override
+  String get supportWallet => 'المحفظة والرصيد';
+  @override
+  String get supportWalletBody => 'أرباح، كشف حساب، اشتراك';
+  @override
+  String get supportAccount => 'الحساب والوثائق';
+  @override
+  String get supportAccountBody => 'تسجيل، موافقة، إيقاف';
+  @override
+  String get supportOther => 'مشكلة أخرى';
+  @override
+  String get supportPickRide => 'اختر الرحلة التي تخص المشكلة';
   @override
   String get kilometreShort => 'كم';
   @override
@@ -1012,6 +1044,27 @@ class EnglishStrings implements AppStrings {
       'pickup point.';
   @override
   @override
+  @override
+  @override
+  String get supportTitle => 'Support';
+  @override
+  String get supportIssues => 'Issues';
+  @override
+  String get supportRides => 'Rides';
+  @override
+  String get supportRidesBody => 'Fare, driver, cancellation';
+  @override
+  String get supportWallet => 'Wallet and balance';
+  @override
+  String get supportWalletBody => 'Earnings, statement, subscription';
+  @override
+  String get supportAccount => 'Account and documents';
+  @override
+  String get supportAccountBody => 'Sign-up, approval, suspension';
+  @override
+  String get supportOther => 'Something else';
+  @override
+  String get supportPickRide => 'Choose the ride this is about';
   @override
   String get kilometreShort => 'km';
   @override

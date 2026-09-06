@@ -92,7 +92,11 @@ changes rules elsewhere in this file and those changes are noted here.
 
 ### OUT OF SCOPE — do not build, do not scaffold, do not "prepare for"
 - In-app navigation (deep-link to Google Maps instead)
-- Live payment gateway integration (build the interface only — see §7)
+- ~~Live payment gateway integration~~ — **moved IN SCOPE 2026-09-06, narrowly.**
+  ONE live rail, for **driver-side collections only** (subscriptions and wallet
+  top-ups). Rider fares stay cash: at the seeded tariff a 5,250 IQD fare costs
+  731 IQD in processor fees — 13.9% — against a commission of 0. See §7 and
+  DECISIONS.md D-024.
 - Surge pricing, scheduled rides, ride sharing, multiple vehicle classes
 - In-app chat, SOS, referrals, promo codes
 - Multi-city, multi-currency, i18n beyond Arabic + English
@@ -183,7 +187,12 @@ Android kills background work aggressively. The driver location service must:
 
 ## 7. Payment provider abstraction
 
-Build the interface. Do not integrate a live gateway.
+Build the interface. **One** live gateway is now permitted, under the terms in
+§2: driver-side collections only, never a rider fare.
+
+`GatewayProvider` stays a throwing stub. The live rail is a SEPARATE provider
+and does not touch the ride settlement path — that is what keeps a bug in the
+gateway from being able to corrupt a fare.
 
 ```typescript
 interface PaymentProvider {

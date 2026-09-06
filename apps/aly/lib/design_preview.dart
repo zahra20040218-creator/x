@@ -20,6 +20,7 @@ import 'package:rideapp_aly/screens/ride_history_screen.dart';
 import 'package:rideapp_aly/screens/ride_receipt_screen.dart';
 import 'package:rideapp_aly/screens/rider_shell.dart';
 import 'package:rideapp_aly/screens/subscription_screen.dart';
+import 'package:rideapp_aly/screens/support_screen.dart';
 import 'package:rideapp_aly/screens/track_ride_screen.dart';
 import 'package:rideapp_aly/screens/trip_screen.dart';
 import 'package:rideapp_core/rideapp_core.dart';
@@ -300,6 +301,7 @@ class _Gallery extends StatelessWidget {
         ),
       ),
       MapEntry('الارباح والمحفظة', () => EarningsScreen(api: api)),
+      MapEntry('الدعم', () => SupportScreen(api: api)),
       MapEntry('الاشتراك', () => SubscriptionScreen(api: api)),
       MapEntry('سجل الرحلات', () => RideHistoryScreen(api: api)),
       MapEntry(

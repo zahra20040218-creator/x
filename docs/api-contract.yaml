@@ -1006,6 +1006,95 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /driver/subscription/checkout:
+    post:
+      tags: [driver]
+      operationId: startSubscriptionCheckout
+      summary: |
+        Start paying for a subscription through the live payment rail.
+
+        Returns a hosted-checkout URL the app opens EXTERNALLY. The rider/driver
+        leaves ALY, pays on the provider's page, and returns; confirmation
+        arrives asynchronously and the app learns about it by polling
+        `/driver/subscription/checkout/{reference}` or over the socket.
+
+        **Driver-side collections only** (CLAUDE.md §2, as amended 2026-09-06).
+        There is deliberately no equivalent for a rider fare: at the seeded
+        tariff the processor takes 13.9% of a typical 5,250 IQD trip against a
+        commission of 0, so a card fare loses money on every ride.
+
+        `Idempotency-Key` is REQUIRED. A retry must return the SAME checkout
+        link, not open a second one the driver could also pay.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [planCode]
+              properties:
+                planCode: { type: string, maxLength: 64 }
+      responses:
+        '201':
+          description: Checkout opened.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GatewayCheckout' }
+        '200':
+          description: Idempotency-Key replay; the original checkout.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GatewayCheckout' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: No such active plan.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '409':
+          description: |
+            A checkout for this driver is already open and unpaid, or the
+            driver already holds a live subscription.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '501':
+          description: |
+            No live rail is configured on this deployment. The provider is
+            optional; without credentials the endpoint says so rather than
+            failing later and less clearly.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /driver/subscription/checkout/{reference}:
+    parameters:
+      - name: reference
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [driver]
+      operationId: getSubscriptionCheckout
+      summary: |
+        Where a checkout got to.
+
+        The app polls this after returning from the provider's page. It reads
+        ALY's own record, never the provider — the reconciliation job owns
+        talking to them, so a driver refreshing a screen cannot generate
+        outbound traffic to a third party (CLAUDE.md §3.2).
+      responses:
+        '200':
+          description: The caller's own checkout.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GatewayCheckout' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /driver/subscription/plans:
     get:
       tags: [driver]
@@ -2122,6 +2211,36 @@ components:
           description: |
             Whole IQD. Derived as SUM(credits) - SUM(debits) over the ledger
             (CLAUDE.md §6.4). May be negative when a driver owes commission.
+
+    GatewayCheckout:
+      type: object
+      required: [reference, status, amountIqd, planCode, createdAt]
+      properties:
+        reference:
+          type: string
+          format: uuid
+          description: |
+            ALY's own id for this attempt, and the `referenceId` the provider
+            echoes back. Generated here rather than taken from the provider so
+            a reply that never arrives still has something to reconcile against.
+        status:
+          type: string
+          enum: [PENDING, PAID, FAILED, EXPIRED, REFUNDED]
+        amountIqd:
+          type: integer
+          description: Whole IQD (CLAUDE.md §6.1) — what the driver is charged.
+        planCode: { type: string }
+        checkoutUrl:
+          type: string
+          nullable: true
+          description: |
+            Open EXTERNALLY, never in a webview. The page is the provider's,
+            and putting it in an in-app browser makes ALY look responsible for
+            a form it does not control.
+            Null once the attempt is settled.
+        expiresAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+        settledAt: { type: string, format: date-time, nullable: true }
 
     SubscriptionPlan:
       type: object

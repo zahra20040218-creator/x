@@ -95,6 +95,7 @@ describe('the real migration set', () => {
       '0013_seed_subscription_plan',
       '0014_location_retention',
       '0015_account_deletion',
+      '0016_gateway_payments',
     ]);
   });
 

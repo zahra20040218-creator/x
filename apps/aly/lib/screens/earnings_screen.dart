@@ -131,28 +131,52 @@ class _EarningsScreenState extends State<EarningsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      // The balance, on the one coloured surface of the
+                      // screen. Screen 4 of the new design: it is the single
+                      // number a driver opens this for, and everything else
+                      // here explains how it got that way.
+                      Container(
+                        padding: const EdgeInsetsDirectional.all(AlySpacing.lg),
+                        decoration: BoxDecoration(
+                          color: AlyColors.of(context).primary,
+                          borderRadius: BorderRadius.circular(AlyRadius.lg),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              strings.balance,
+                              style: AlyTypography.label.copyWith(
+                                color: AlyColors.of(context).onPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: AlySpacing.xs),
+                            FareText(
+                              data.balance,
+                              style: AlyTypography.display.copyWith(
+                                color: AlyColors.of(context).onPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: AlySpacing.md),
                       Row(
                         children: [
-                          Expanded(
-                            child: _Stat(
-                              label: strings.totalEarnings,
-                              amount: data.balance,
-                              emphasis: true,
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
                           Expanded(
                             child: _Stat(
                               label: strings.todayEarnings,
                               amount: data.summary.today,
                             ),
                           ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: _Stat(
+                              label: strings.completedRides,
+                              count: data.summary.rideCount,
+                            ),
+                          ),
                         ],
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      _Stat(
-                        label: strings.completedRides,
-                        count: data.summary.rideCount,
                       ),
                       const SizedBox(height: AppSpacing.lg),
                       Text(
@@ -218,17 +242,11 @@ class _Earnings {
 }
 
 class _Stat extends StatelessWidget {
-  const _Stat({
-    required this.label,
-    this.amount,
-    this.count,
-    this.emphasis = false,
-  });
+  const _Stat({required this.label, this.amount, this.count});
 
   final String label;
   final IqdAmount? amount;
   final int? count;
-  final bool emphasis;
 
   @override
   Widget build(BuildContext context) => Card(
@@ -240,7 +258,7 @@ class _Stat extends StatelessWidget {
               Text(label, style: Theme.of(context).textTheme.bodySmall),
               const SizedBox(height: AppSpacing.xs),
               if (amount != null)
-                FareText(amount!, large: emphasis)
+                FareText(amount!)
               else
                 Text(
                   '${count ?? 0}',
