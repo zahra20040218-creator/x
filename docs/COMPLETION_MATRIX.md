@@ -114,7 +114,7 @@ curl -s http://localhost:4123/v1/health/ready  # degraded, PG+Redis fail  503
 | PII never logged | **DONE** | structural redaction at depth; coords coarsened to ~110 m | `logger.test.ts` | `npx vitest run` | 38 pass |
 | Webhook signature | **DONE** | HMAC over raw bytes, `timingSafeEqual`, checked before parsing; now also exercised over real HTTP with a secret configured | `webhook.test.ts`, `webhook.e2e.test.ts` | `npx vitest run` | 47 + 8 pass |
 | Webhook rejection status codes | **DONE** | 401 bad/missing signature, 400 malformed, reason not disclosed; was 501 for every rejection, which contradicted the contract and made a retrying provider loop forever | `webhook.e2e.test.ts` | `npx vitest run` | 8 pass |
-| **Webhook replay dedup** | **ABSENT** | `payment_webhook_events` and its UNIQUE `(provider, external_id)` exist; NO code reads or writes them. `docs/security-audit.md` claimed this was in place — corrected 2026-09-05. Latent, not live: the handler 501s before any ledger write. MUST land in the same change that makes a gateway write reachable — DECISIONS.md D-019 | — | — | **not implemented** |
+| **Webhook replay dedup** | **DONE** | `claimWebhookEvent` writes `payment_webhook_events` with `ON CONFLICT (provider, external_id) DO NOTHING`, so two deliveries racing on two API instances collide at the constraint rather than between a read and a write. D-019 required this to land in the same change that made a gateway write reachable; it did. Necessary because Wayl's signature carries no timestamp — a captured request stays cryptographically valid forever, so the signature is necessary and not sufficient | `gateway-payment.service.test.ts`, `real-gateway-ledger.test.ts` | `REAL_INFRA=1 npx vitest run` | 13 + 10 pass |
 | CORS allowlist, wildcard refused | **DONE** | `loadConfig` throws on `*` | `config.test.ts` | `npx vitest run` | pass |
 | Secrets in ENV only | **DONE** | no secret in repo; `.env.example` committed | grep scan | see below | 0 hits |
 
@@ -124,6 +124,28 @@ $ grep -rnE "\+9647[0-9]{9}" services/api/src --include=*.ts | grep -v .test.
 ```
 
 ---
+
+
+## Wayl payment gateway — driver-side collection
+
+Scope amendment of 2026-09-06, recorded in DECISIONS.md D-024. Subscriptions and
+wallet top-ups only; ride fares stay cash. Off until BOTH `WAYL_TOKEN` /
+`WAYL_WEBHOOK_SECRET` are set AND `platform_config.gateway_enabled` is `true`.
+
+| Item | State | Notes | Tests | Command | Result |
+|---|---|---|---|---|---|
+| `gateway_payments` table | **DONE** | Separate table, not a row in `payments`, whose `ride_id` is `NOT NULL UNIQUE` — a subscription is not a ride, and forcing it there means dropping a constraint that protects every ride payment. `provider` is TEXT, so no enum value was added and the down migration is a real `DROP TABLE` (PostgreSQL has no `DROP VALUE`) | migration up+down on a fresh DB | `pnpm migrate:up` / `:down` | applied clean |
+| Wayl HTTP client | **DONE** | Translation only — no DB, no ledger, no decisions. Transient (network/timeout/5xx/429/non-JSON) vs permanent (4xx) separated, because a transient error treated as permanent is a driver charged with nothing to show for it. Every call bounded by `WAYL_TIMEOUT_MS` | `wayl.client.test.ts` | `npx vitest run` | 25 pass |
+| Unknown status never reads as PAID | **DONE** | Anything unrecognised maps to `PENDING`. "I do not know" means "not yet", leaving the row for the next sweep; the alternatives are granting a subscription nobody paid for or cancelling one somebody did | `wayl.client.test.ts` | `npx vitest run` | 25 pass |
+| Fee booked without inventing an account type | **DONE** | §6.2 fixes four account types and none is "processor fee". Two transactions: gross `MANUAL_ADJUSTMENT`→`PLATFORM_REVENUE`, then fee `PLATFORM_REVENUE`→`MANUAL_ADJUSTMENT`. Revenue nets to 23,775 while gross and fee each survive as queryable rows — a single netted entry balances fine and permanently destroys "what did the processor cost us", permanently because §6.3 forbids going back to split it | `gateway-payment.service.test.ts`, `real-gateway-ledger.test.ts` | `REAL_INFRA=1 npx vitest run` | 13 + 10 pass |
+| `DRIVER_WALLET` untouched | **DONE** | The driver paid a processor, not out of earnings; a wallet debit charges them twice — the trap D-020 documents for cash | both above | same | pass |
+| Settlement is idempotent | **DONE** | `FOR UPDATE OF g`, then `ALREADY_SETTLED` for anything not `PENDING`. A sweep and a webhook confirming the same payment is the ordinary case | both above | same | pass |
+| Subscription granted in the same transaction, at charge 0 | **DONE** | A payment with no subscription is not a state any retry repairs. Charge 0 because the money is already on the ledger; letting `grant` write its own cash pair records 25,000 twice | both above | same | pass |
+| One open checkout per driver | **DONE** | `gateway_payments_one_pending_uq`, a partial unique index. In the database, not in whichever code path remembers to check: a driver who taps twice otherwise holds two payable links and the second payment has no subscription left to buy | `real-gateway-ledger.test.ts` | `REAL_INFRA=1 npx vitest run` | 10 pass |
+| Ledger verified against real triggers | **DONE** | Ten tests on real PostgreSQL 18 + PostGIS 3.6, exercising the deferred balance trigger, the append-only triggers and the partial unique index — none of which any fake models. **Mutation-checked**: reversing the fee pair's direction failed 2 of 10, while the balance check still passed. Balance is not correctness, and twice in this repository a fake agreed with a bug | `real-gateway-ledger.test.ts` | `REAL_INFRA=1 npx vitest run` | 10 pass |
+| Polling authoritative over webhooks | **DONE** | A webhook that never arrives leaves money collected and a subscription ungranted; the sweep cannot miss because it asks. The webhook is a latency optimisation | `wayl.client.test.ts` | `npx vitest run` | 25 pass |
+| Live settlement reconciled against Wayl's dashboard | **NOT DONE** | Requires a signed agreement and a live merchant account. `WAYL_TEST_MODE` stays `true` until one real payment has been reconciled end to end | — | — | **owner action, outside the repository** |
+
 
 ## Platform / infra
 

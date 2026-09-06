@@ -65,7 +65,7 @@ export interface LinkStatus {
 
 /** A call that failed in a way worth retrying — network, timeout, 5xx. */
 export class WaylTransientError extends Error {
-  constructor(message: string, readonly cause?: unknown) {
+  constructor(message: string, override readonly cause?: unknown) {
     super(message);
     this.name = 'WaylTransientError';
   }
