@@ -35,3 +35,17 @@ export class ZodValidationPipe<T> implements PipeTransform<unknown, T> {
 export function zodBody<T>(schema: ZodType<T>): ZodValidationPipe<T> {
   return new ZodValidationPipe(schema);
 }
+
+/**
+ * The same pipe for a path parameter: `@Param('id', zodParam(UuidSchema))`.
+ *
+ * Calling `schema.parse(param)` inside a handler instead looks equivalent and
+ * is not. A bare `parse` throws a raw `ZodError`, which no filter in this
+ * application maps, so a malformed id in a URL answered **500** — telling the
+ * caller the server broke when in fact they sent something invalid, and
+ * spending an error budget on a client mistake. Going through the pipe raises
+ * `ValidationProblem` and returns the 400 the contract publishes.
+ */
+export function zodParam<T>(schema: ZodType<T>): ZodValidationPipe<T> {
+  return new ZodValidationPipe(schema);
+}

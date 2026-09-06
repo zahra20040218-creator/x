@@ -12,6 +12,8 @@ import {
 import type { Response } from 'express';
 
 import type { AuthenticatedUser } from '../auth/auth.service.js';
+import { createHash } from 'node:crypto';
+
 import {
   BadWebhookPayloadProblem,
   NotFoundProblem,
@@ -20,7 +22,10 @@ import {
 } from '../common/problem.js';
 import { DATABASE, type Database } from '../db/db.port.js';
 import { LedgerService } from '../ledger/ledger.service.js';
+import { GatewayPaymentService } from '../payments/gateway-payment.service.js';
+import { WaylClient } from '../payments/wayl.client.js';
 import { processWebhook } from '../payments/webhook.js';
+import { QueueRegistry } from '../queue/queues.js';
 import { REDIS, type RedisPort } from '../redis/redis.port.js';
 import { RideRepository } from '../rides/ride.repository.js';
 import { CurrentUser, Public } from './auth.guard.js';
@@ -39,6 +44,10 @@ export class OpsController {
     @Inject('GATEWAY_WEBHOOK_SECRET') private readonly gatewaySecret: string | undefined,
     @Inject('METRICS_TOKEN') private readonly metricsToken: string | undefined,
     @Inject(METRICS) private readonly metricsRegistry: MetricsRegistry,
+    // Both optional: a deployment with no payment provider is the normal one.
+    @Inject('WAYL_CLIENT') private readonly wayl: WaylClient | null,
+    @Inject('GATEWAY_PAYMENTS') private readonly gatewayPayments: GatewayPaymentService | null,
+    private readonly queues: QueueRegistry,
   ) {}
 
   /** Liveness. Deliberately touches nothing — it answers "is the process up". */
@@ -151,11 +160,46 @@ export class OpsController {
   // make us perform one.
   @RateLimit({ limit: 120, windowSeconds: 60, by: 'ip', tier: 'CRITICAL' })
   @HttpCode(204)
-  webhook(
+  async webhook(
     @Param('provider') provider: string,
     @Headers('x-signature') signature: string | undefined,
     @Body() rawBody: unknown,
-  ): void {
+  ): Promise<void> {
+    // The live rail. Verified, deduplicated, and settled - unlike the stub
+    // below it, this one can write to the ledger, which is why the replay
+    // dedup DECISIONS.md D-019 deferred had to land in the same change.
+    if (provider === 'wayl') {
+      if (!this.wayl || !this.gatewayPayments) {
+        throw new NotImplementedError('Gateway payments');
+      }
+
+      const raw = (rawBody as { __raw?: string }).__raw ?? JSON.stringify(rawBody);
+      if (!this.wayl.verifyWebhook(raw, signature)) {
+        // 401, and a constant detail. Naming the reason tells an
+        // unauthenticated caller whether a guessed secret was correct.
+        throw new UnauthorizedProblem('Webhook signature rejected.');
+      }
+
+      const body = rawBody as { id?: unknown; referenceId?: unknown; status?: unknown };
+      const eventId = typeof body.id === 'string' ? body.id : null;
+      const reference = typeof body.referenceId === 'string' ? body.referenceId : null;
+      if (!eventId || !reference) throw new BadWebhookPayloadProblem();
+
+      // Wayl's signature carries no timestamp, so a captured request stays
+      // cryptographically valid forever. This does not make it invalid, it
+      // makes it INERT: the first replay finds the id already recorded and
+      // changes nothing.
+      const fresh = await this.gatewayPayments.claimWebhookEvent(eventId, sha256(raw));
+      if (!fresh) return;
+
+      // Never trusted for the AMOUNT or the fee. The webhook says something
+      // happened; the reconciliation call asks the provider what, and that
+      // answer is the one that reaches the ledger. A forged-but-signed body
+      // therefore cannot invent money, only trigger a lookup.
+      await this.queues.enqueueGatewayReconcileNow(reference);
+      return;
+    }
+
     if (provider !== 'gateway') throw new NotFoundProblem('Provider');
 
     if (!this.gatewaySecret) {
@@ -200,4 +244,14 @@ interface OpenDisputeBody {
   rideId: string;
   reasonCode: 'FARE_WRONG' | 'DRIVER_NO_SHOW' | 'RIDER_NO_SHOW' | 'UNSAFE' | 'OTHER';
   description?: string | undefined;
+}
+
+/**
+ * A stable fingerprint of the delivered bytes.
+ *
+ * Stored alongside the event id so a provider that reuses an id with different
+ * content is visible in the table rather than silently deduplicated away.
+ */
+function sha256(raw: string): string {
+  return createHash('sha256').update(raw, 'utf8').digest('hex');
 }

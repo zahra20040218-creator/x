@@ -176,6 +176,17 @@ export const GrantSubscriptionSchema = z.object({
   note: z.string().max(200).optional(),
 });
 
+/**
+ * Starting a gateway checkout.
+ *
+ * Only the plan. The AMOUNT is read from the plan on the server and never
+ * accepted from the client — a caller who could name their own price would set
+ * it to 1 IQD and buy a month.
+ */
+export const StartCheckoutSchema = z.object({
+  planCode: z.string().min(1).max(64),
+});
+
 export const UpdateConfigSchema = z
   .object({
     commission_bps: z.number().int().min(0).max(10_000).optional(),
@@ -192,6 +203,7 @@ export const UpdateConfigSchema = z
     // `subscription_required` could be changed only by hand with psql against
     // production, so the subscription gate had no way to be switched on.
     subscription_required: z.boolean().optional(),
+    gateway_enabled: z.boolean().optional(),
     negotiation_enabled: z.boolean().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, {

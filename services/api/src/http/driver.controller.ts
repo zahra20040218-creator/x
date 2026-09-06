@@ -30,13 +30,17 @@ import {
   PaginationSchema,
   ReportLocationSchema,
   SetAvailabilitySchema,
+  StartCheckoutSchema,
+  UuidSchema,
 } from './schemas.js';
+import { QueueRegistry } from '../queue/queues.js';
 import { requireUuid } from './rides.controller.js';
 import { decodeKeysetCursor, nextKeysetCursor } from './cursor.js';
 import { DriverComplianceService } from '../compliance/driver-compliance.service.js';
 import { CapabilityService } from '../capabilities/capability.service.js';
+import { GatewayPaymentService } from '../payments/gateway-payment.service.js';
 import { SubscriptionService } from '../subscriptions/subscription.service.js';
-import { zodBody } from './zod.pipe.js';
+import { zodBody, zodParam } from './zod.pipe.js';
 
 /** Driver-side endpoints. Every path is in `docs/api-contract.yaml`. */
 @Controller()
@@ -50,6 +54,8 @@ export class DriverController {
     private readonly compliance: DriverComplianceService,
     private readonly capabilities: CapabilityService,
     private readonly subscriptions: SubscriptionService,
+    private readonly gateway: GatewayPaymentService,
+    private readonly queues: QueueRegistry,
     @Inject(DATABASE) private readonly db: Database,
   ) {}
 
@@ -378,6 +384,57 @@ export class DriverController {
   }
 
   /**
+   * Start paying for a subscription through the live rail.
+   *
+   * Returns immediately with a reference and NO link. Creating the link is a
+   * foreign HTTP round trip and CLAUDE.md §3.2 keeps it off the request path;
+   * a job does it and the app learns the URL by polling the reference below.
+   *
+   * That looks like an extra step and it is the difference between a slow
+   * provider costing one driver a few seconds and a slow provider holding a
+   * connection-pool slot per waiting driver on a 4-core VPS (§3.3).
+   */
+  @Post('driver/subscription/checkout')
+  @RateLimit({ limit: 10, windowSeconds: 3_600, by: 'user', tier: 'CRITICAL' })
+  @HttpCode(201)
+  async startCheckout(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(zodBody(StartCheckoutSchema)) body: { planCode: string },
+  ) {
+    const checkout = await this.gateway.openCheckout({
+      userId: user.id,
+      planCode: body.planCode,
+    });
+
+    await this.queues.enqueueGatewayCheckout({
+      reference: checkout.reference,
+      amountIqd: checkout.amountIqd,
+      description: `ALY subscription ${checkout.planCode ?? ''}`.trim(),
+    });
+
+    return presentCheckout(checkout);
+  }
+
+  /**
+   * Where a checkout got to.
+   *
+   * Reads ALY's own row, never the provider. Letting a driver's refresh button
+   * generate outbound traffic to a third party is how a stuck screen becomes a
+   * rate-limit ban on the whole platform.
+   */
+  @Get('driver/subscription/checkout/:reference')
+  async getCheckout(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('reference', zodParam(UuidSchema)) reference: string,
+  ) {
+    const found = await this.gateway.findForUser(user.id, reference);
+    // 404 for someone else's reference as well as for one that does not exist -
+    // the same rule that stops a rider enumerating other riders' rides.
+    if (!found) throw new NotFoundProblem('Checkout');
+    return presentCheckout(found);
+  }
+
+  /**
    * The caller's own live period, or null.
    *
    * Scoped to the authenticated user and not to a path parameter: there is no
@@ -404,4 +461,27 @@ interface ReportLocationBody {
     speedMps?: number | undefined;
     recordedAt: Date;
   }>;
+}
+
+/** Dates as ISO strings; money as a plain integer. */
+function presentCheckout(c: {
+  reference: string;
+  status: string;
+  amountIqd: number;
+  planCode: string | null;
+  checkoutUrl: string | null;
+  expiresAt: Date | null;
+  createdAt: Date;
+  settledAt: Date | null;
+}) {
+  return {
+    reference: c.reference,
+    status: c.status,
+    amountIqd: c.amountIqd,
+    planCode: c.planCode,
+    checkoutUrl: c.checkoutUrl,
+    expiresAt: c.expiresAt?.toISOString() ?? null,
+    createdAt: c.createdAt.toISOString(),
+    settledAt: c.settledAt?.toISOString() ?? null,
+  };
 }

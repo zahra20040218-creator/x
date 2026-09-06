@@ -9,7 +9,7 @@ import { CurrentUser, Roles } from './auth.guard.js';
 import { presentRide } from './presenters.js';
 import { RateLimit } from './rate-limit.js';
 import { PlaceBidSchema, UuidSchema } from './schemas.js';
-import { zodBody } from './zod.pipe.js';
+import { zodBody, zodParam } from './zod.pipe.js';
 
 /**
  * Fare negotiation: a rider proposes, drivers bid, the rider picks one.
@@ -60,9 +60,8 @@ export class NegotiationController {
   @Roles('RIDER')
   async listBids(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('rideId') rideId: string,
+    @Param('rideId', zodParam(UuidSchema)) id: string,
   ) {
-    const id = UuidSchema.parse(rideId);
     const bids = await this.negotiation.listBidsForRider(id, user.id);
 
     // The proposal is returned alongside, because a list of bids with nothing
@@ -91,12 +90,12 @@ export class NegotiationController {
   @HttpCode(201)
   async placeBid(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('rideId') rideId: string,
+    @Param('rideId', zodParam(UuidSchema)) rideId: string,
     @Body(zodBody(PlaceBidSchema))
     body: { amountIqd: number; etaSeconds?: number; distanceM?: number },
   ) {
     const bid = await this.negotiation.placeBid({
-      rideId: UuidSchema.parse(rideId),
+      rideId,
       driverId: user.id,
       amountIqd: body.amountIqd,
       etaSeconds: body.etaSeconds ?? null,
@@ -119,14 +118,10 @@ export class NegotiationController {
   @HttpCode(200)
   async acceptBid(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('rideId') rideId: string,
-    @Param('bidId') bidId: string,
+    @Param('rideId', zodParam(UuidSchema)) rideId: string,
+    @Param('bidId', zodParam(UuidSchema)) bidId: string,
   ) {
-    const ride = await this.negotiation.acceptBid(
-      UuidSchema.parse(rideId),
-      UuidSchema.parse(bidId),
-      user.id,
-    );
+    const ride = await this.negotiation.acceptBid(rideId, bidId, user.id);
     return presentRide(ride);
   }
 
