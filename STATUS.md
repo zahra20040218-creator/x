@@ -15,14 +15,16 @@ worth reading, and none is authoritative any more.
 |---|---|---|
 | Backend unit | `pnpm test:unit` | **759 / 759** in 7.3s |
 | Flutter core | `flutter test` | **339 / 339** |
-| Flutter app | `flutter test` | **40 / 40** |
+| Flutter app (aly) | `flutter test` | **40 / 40** |
+| Flutter rider | `flutter test` | **18 / 18** |
+| Flutter driver | `flutter test` | **6 / 6** |
 | Backend types | `pnpm typecheck` | clean |
 | Backend lint | `pnpm lint` | clean |
 | Flutter analyze | `flutter analyze` | clean, both packages |
 | Backend integration | `pnpm test:integration` | **163 / 163** on REAL Postgres + Redis |
 | Backend e2e | `pnpm test:e2e` | **106 / 106** |
 
-**1,407 tests pass in total.**
+**1,431 tests pass in total.**
 
 Integration and e2e were reported for weeks as blocked on Docker. Docker is
 indeed not installed — and it was never needed. PostgreSQL 17 and Redis 8.0.5
@@ -35,6 +37,16 @@ REAL_INFRA=1 TEST_REDIS_URL=redis://127.0.0.1:6379 TEST_DATABASE_URL=postgresql:
 
 The harness prints what it actually touched, and it printed
 `[REAL_INFRA=on] postgres=REAL redis=REAL`.
+
+CI already sets `REAL_INFRA: '1'` with Postgres and Redis service containers,
+and fails the build if any integration test skips — a skipped concurrency
+proof reads as verification, which is worse than a red build. Two gaps in that
+job were closed on 2026-09-07: the e2e suite was never run by CI at all, and
+the Flutter job detected its packages with `ls a b c d`, which is false when
+ANY of the four is missing. Since CLAUDE.md §1.1 has `apps/rider` and
+`apps/driver` being merged away, that job would have gone silent the day they
+were deleted, announcing "no Flutter packages yet" over 24,000 lines of Dart.
+It now finds packages instead of naming them, and fails when it finds none.
 
 ## Code
 

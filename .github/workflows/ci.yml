@@ -137,6 +137,26 @@ jobs:
           fi
           echo "OK: real-Redis conformance executed and nothing skipped." 
 
+      # The e2e suite was never in this file. 106 tests that drive the API over
+      # real HTTP against real Postgres and real Redis - the only place the
+      # webhook signature check, the problem+json shape and the full ride
+      # lifecycle are exercised end to end - ran on a developer machine and
+      # nowhere else. A suite CI does not run is a suite that rots.
+      - name: E2E tests (real Postgres + real Redis, over HTTP)
+        run: pnpm --filter @rideapp/api test:e2e
+
+      - name: Assert no e2e test skipped
+        run: |
+          OUT=$(pnpm --filter @rideapp/api test:e2e --reporter=basic 2>&1)
+          echo "$OUT"
+          if echo "$OUT" | grep -qE "[1-9][0-9]* skipped"; then
+            echo "FAIL: e2e tests were skipped."
+            echo "REAL_INFRA is set for this job, so a skip means a helper opted"
+            echo "out rather than connecting. Refusing to pass."
+            exit 1
+          fi
+          echo "OK: e2e executed and nothing skipped."
+
       - name: Upload coverage
         if: always()
         uses: actions/upload-artifact@v4
@@ -154,29 +174,49 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # `ls a b c d` is false when ANY of the four is missing, and CLAUDE.md
+      # §1.1 says apps/rider and apps/driver are being merged into apps/aly and
+      # will be deleted. On the day that happens this job would have gone
+      # quiet, announcing "no Flutter packages yet" over 24,000 lines of Dart.
+      #
+      # Find them instead of naming them, and fail loudly if none is found -
+      # a repository with no pubspec is a repository where something went
+      # wrong, not one that should be waved through.
       - name: Detect Flutter packages
         id: detect
         run: |
-          if ls packages/core/pubspec.yaml apps/aly/pubspec.yaml apps/rider/pubspec.yaml apps/driver/pubspec.yaml >/dev/null 2>&1; then
-            echo "found=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "found=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::No Flutter packages yet — see BLOCKED.md (T036-T039)."
+          PACKAGES=$(find packages apps -maxdepth 2 -name pubspec.yaml | xargs -n1 dirname | sort)
+
+          if [ -z "$PACKAGES" ]; then
+            echo "FAIL: no pubspec.yaml anywhere under packages/ or apps/."
+            echo "This job exists to analyse and test Dart. Finding none means"
+            echo "the checkout is wrong or the packages were removed. Passing"
+            echo "silently is how a test suite disappears without anyone"
+            echo "noticing. Refusing to pass."
+            exit 1
           fi
 
+          echo "Found:"
+          echo "$PACKAGES"
+          {
+            echo "packages<<EOF"
+            echo "$PACKAGES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - uses: subosito/flutter-action@v2
-        if: steps.detect.outputs.found == 'true'
         with:
           channel: stable
 
+      # Whatever the detect step found, not a hardcoded list. apps/rider and
+      # apps/driver are still built while they still ship - the merge into
+      # apps/aly is additive until the owner cuts over, and a package nobody
+      # builds is a package that silently rots.
       - name: Analyze and test
-        if: steps.detect.outputs.found == 'true'
         run: |
-          # apps/aly is the merged app (CLAUDE.md §1.1). apps/rider and
-          # apps/driver are still built because they still ship - the merge is
-          # additive until the owner cuts over, and a package that is not built
-          # is a package that silently rots.
-          for dir in packages/core apps/aly apps/rider apps/driver; do
-            [ -f "$dir/pubspec.yaml" ] || continue
+          echo "${{ steps.detect.outputs.packages }}" | while read -r dir; do
+            [ -n "$dir" ] || continue
+            echo "::group::$dir"
             (cd "$dir" && flutter pub get && flutter analyze && flutter test)
+            echo "::endgroup::"
           done
