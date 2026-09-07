@@ -35,7 +35,10 @@ class _RideOffersScreenState extends State<RideOffersScreen> {
   RideBidsPage? _page;
   String? _error;
   String? _acceptingBidId;
-  bool _negotiationOff = false;
+
+  /// True once a replacement to tracking has been scheduled. Without it a
+  /// second 404 from an in-flight poll pushes tracking twice.
+  bool _leaving = false;
 
   Timer? _poll;
 
@@ -76,12 +79,14 @@ class _RideOffersScreenState extends State<RideOffersScreen> {
 
       if (error.problem == ApiProblem.notFound) {
         // Negotiation is disabled platform-wide. Not a failure — see the class
-        // comment. Stop polling and hand the rider back to tracking.
+        // comment.
+        //
+        // Navigating HERE rather than from `build`: build runs whenever the
+        // framework decides to, and a `postFrameCallback` scheduled from it
+        // would queue one replacement per rebuild. This runs once, on the
+        // response that discovered it.
         _poll?.cancel();
-        setState(() {
-          _negotiationOff = true;
-          _loading = false;
-        });
+        _leaveForTracking(widget.ride);
         return;
       }
 
@@ -90,6 +95,29 @@ class _RideOffersScreenState extends State<RideOffersScreen> {
         _error = _messageFor(error);
       });
     }
+  }
+
+  /// Replace this screen with tracking.
+  ///
+  /// Replace, not pop. The ride EXISTS — it was created a moment ago — so
+  /// popping would return the rider to the request screen with a live ride
+  /// behind it. Dispatch is already running; tracking is the screen that shows
+  /// it.
+  ///
+  /// Guarded, because both callers can fire more than once: the poll may land
+  /// a second 404 before the route change settles, and an accept can race a
+  /// refresh.
+  void _leaveForTracking(Ride ride) {
+    if (_leaving || !mounted) return;
+    _leaving = true;
+
+    unawaited(
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (_) => TrackRideScreen(api: widget.api, ride: ride),
+        ),
+      ),
+    );
   }
 
   Future<void> _accept(AlyDriverOffer offer) async {
@@ -103,11 +131,7 @@ class _RideOffersScreenState extends State<RideOffersScreen> {
       if (!mounted) return;
 
       _poll?.cancel();
-      await Navigator.of(context).pushReplacement(
-        MaterialPageRoute<void>(
-          builder: (_) => TrackRideScreen(api: widget.api, ride: ride),
-        ),
-      );
+      _leaveForTracking(ride);
     } on ApiException catch (error) {
       if (!mounted) return;
       setState(() {
@@ -139,23 +163,6 @@ class _RideOffersScreenState extends State<RideOffersScreen> {
   Widget build(BuildContext context) {
     final strings = AppStrings.of(context);
     final page = _page;
-
-    if (_negotiationOff) {
-      // Replace, not pop. The ride EXISTS — it was created a moment ago — so
-      // popping would return the rider to the request screen with a live ride
-      // behind it. Metered dispatch is already running; tracking is the screen
-      // that shows it.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        unawaited(
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute<void>(
-              builder: (_) => TrackRideScreen(api: widget.api, ride: widget.ride),
-            ),
-          ),
-        );
-      });
-    }
 
     return Scaffold(
       appBar: AppBar(title: Text(strings.searchingForDriver)),

@@ -19,9 +19,22 @@ worth reading, and none is authoritative any more.
 | Backend types | `pnpm typecheck` | clean |
 | Backend lint | `pnpm lint` | clean |
 | Flutter analyze | `flutter analyze` | clean, both packages |
+| Backend integration | `pnpm test:integration` | **163 / 163** on REAL Postgres + Redis |
+| Backend e2e | `pnpm test:e2e` | **106 / 106** |
 
-Backend integration and e2e need Docker, which is **not installed on this
-host**. They are unverified here — not failing, unrun. See BLOCKED below.
+**1,407 tests pass in total.**
+
+Integration and e2e were reported for weeks as blocked on Docker. Docker is
+indeed not installed — and it was never needed. PostgreSQL 17 and Redis 8.0.5
+are running under WSL on this host and answer on 5432 and 6379. The suites
+were gated behind `REAL_INFRA=1`, which nobody had set:
+
+```
+REAL_INFRA=1 TEST_REDIS_URL=redis://127.0.0.1:6379 TEST_DATABASE_URL=postgresql://rideapp:rideapp@127.0.0.1:5432/rideapp_test pnpm test:integration && pnpm test:e2e
+```
+
+The harness prints what it actually touched, and it printed
+`[REAL_INFRA=on] postgres=REAL redis=REAL`.
 
 ## Code
 
@@ -50,7 +63,6 @@ last one, and it is closed.
 
 | What | Why | Decision needed |
 |---|---|---|
-| Integration + e2e suites | Docker not installed on this host | Install Docker, or run them in CI |
 | Real routing and ETAs | No provider chosen | **Yours**: which provider |
 | Reverse geocoding | Same | **Yours**: same choice |
 | Maps rendering in-app | No `MAPS_API_KEY` in the build | **Yours**: obtain and inject |
@@ -62,9 +74,19 @@ last one, and it is closed.
 `DEFECTS.md` is authoritative. The open ones at this date are D-4, D-7, D-6b,
 S-3, S-4, D-10, D-12.
 
-## The one unresolved P0-class risk
+## D-2 is closed
 
-`DEFECTS.md` D-2: the in-memory Redis fake has never been checked against a
-real Redis, so the double-accept guarantee is designed and unit-tested rather
-than verified under contention. This is the single thing most worth proving
-before real money moves through the system.
+The double-accept guarantee (CLAUDE.md §5.1) is no longer designed-and-fake-
+tested. `test/integration/real-redis-claim.test.ts` ran against Redis 8.0.5:
+
+- twenty simultaneous drivers, one winner
+- never two drivers inside the critical section at once
+- a claim released when the work throws, so the next driver can take it
+- a driver cannot release a claim they do not hold
+- the claim survives for its TTL rather than expiring immediately
+
+`real-negotiation.test.ts` repeats the accept under a stampede on the same
+server — its own words: "because once is luck".
+
+What remains unproven is scale, not correctness: this is contention on one
+host, not 500 concurrent users on a 4-core VPS.

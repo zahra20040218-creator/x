@@ -62,7 +62,11 @@ this file, exactly as the checklist says.
 
 ## UNRESOLVED
 
-### D-2 — The in-memory Redis is unverified against real Redis · **P0-class RISK · UNRESOLVED**
+### D-2 — The in-memory Redis is unverified against real Redis · **P0-class · RESOLVED 2026-09-07**
+
+> **Closed.** The claim now has its proof on a real server. Everything below
+> this line is the original write-up, kept because the reasoning is still
+> correct about why a fake is not evidence; the resolution follows it.
 
 **Files:** `src/redis/in-memory-redis.ts`, `test/integration/ioredis-conformance.test.ts`
 
@@ -77,6 +81,34 @@ there is no Redis:
 ```
 ↓ integration test/integration/ioredis-conformance.test.ts (1 test | 1 skipped)
 ```
+
+---
+
+**Resolution, 2026-09-07.** Run against Redis 8.0.5 and PostgreSQL on this
+host:
+
+```
+REAL_INFRA=1 TEST_REDIS_URL=redis://127.0.0.1:6379 TEST_DATABASE_URL=postgresql://rideapp:rideapp@127.0.0.1:5432/rideapp_test pnpm test:integration   ->  163/163   [REAL_INFRA=on] postgres=REAL redis=REAL
+pnpm test:e2e           ->  106/106
+```
+
+`real-redis-claim.test.ts` (5/5) proves on the real server what the fake only
+suggested: twenty simultaneous drivers yield exactly one winner, two drivers
+are never inside the critical section at once, a claim is released when the
+work throws, a driver cannot release a claim they do not hold, and the claim
+survives its TTL. `real-negotiation.test.ts` repeats the accept under a
+stampede — "because once is luck".
+
+**Why this sat open for weeks is the part worth keeping.** It was written up
+as blocked on Docker. Docker is not installed, and it was never needed:
+Postgres and Redis have been running under WSL on this host, answering on 5432
+and 6379, the entire time. The suites are gated behind `REAL_INFRA=1` and
+nobody had set it. A missing environment variable was reported as missing
+infrastructure — the same shape of mistake as BLOCKED.md's Flutter correction,
+where one negative probe of `PATH` was written up as an absent toolchain.
+
+**What is still unproven is scale, not correctness.** This is contention on
+one developer host, not 500 concurrent users on a 4-core VPS.
 
 **Why P0-class:** if the fake diverges from Redis on `SET NX PX` semantics,
 double-accept protection does not work and *the tests are still green*. That is
