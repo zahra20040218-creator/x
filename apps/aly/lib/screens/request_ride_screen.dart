@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart' as gmap;
 import 'package:rideapp_aly/screens/profile_screen.dart';
 import 'package:rideapp_aly/screens/ride_history_screen.dart';
+import 'package:rideapp_aly/screens/ride_offers_screen.dart';
 import 'package:rideapp_aly/screens/track_ride_screen.dart';
 import 'package:rideapp_core/rideapp_core.dart';
 
@@ -72,6 +73,13 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
 
   /// Held across retries of ONE rider intent. See [RideIntent].
   final RideIntent _intent = RideIntent();
+
+  /// What the rider offered to pay, when they chose to name a price.
+  ///
+  /// Null means "take the meter", which is the default and the common case.
+  /// The server ignores this entirely unless `platform_config.negotiation_enabled`
+  /// is on, so sending it is safe on any platform.
+  int? _proposedFareIqd;
 
   /// Set with `--dart-define=MAPS_CONFIGURED=true` in any build that also
   /// injects `-PMAPS_API_KEY`. Defaults to false so an unconfigured build says
@@ -243,6 +251,62 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
     }
   }
 
+  /// Name a price instead of taking the meter's.
+  ///
+  /// The band is the design system's, anchored on the metered estimate: a
+  /// rider must not be able to anchor at 500 IQD and a driver must not hold
+  /// out for ten times the meter. The SERVER enforces the real bounds
+  /// (`negotiation_band_bps`) — this only keeps the slider inside them so a
+  /// rider is not offered a number that will be refused.
+  Future<void> _proposeFare() async {
+    final estimate = _estimate;
+    if (estimate == null) return;
+
+    final suggested = estimate.estimatedFareIqd.value;
+    var chosen = suggested;
+
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        final strings = AppStrings.of(sheetContext);
+
+        return SafeArea(
+          child: StatefulBuilder(
+            builder: (builderContext, setSheetState) => Padding(
+              padding: const EdgeInsetsDirectional.all(AlySpacing.lg),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AlyFareProposal(
+                    valueIqd: chosen,
+                    suggestedIqd: suggested,
+                    // ±40% around the meter. Wide enough to be a real
+                    // negotiation, narrow enough that the server's own band
+                    // rejects almost nothing the rider can reach here.
+                    minIqd: (suggested * 0.6).round(),
+                    maxIqd: (suggested * 1.4).round(),
+                    onChanged: (value) => setSheetState(() => chosen = value),
+                  ),
+                  const SizedBox(height: AlySpacing.lg),
+                  AlyButton(
+                    label: strings.requestRide,
+                    onPressed: () => Navigator.of(sheetContext).pop(true),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _proposedFareIqd = chosen);
+    await _request();
+  }
+
   Future<void> _request() async {
     final pickup = _pickup;
     final dropoff = _dropoff;
@@ -261,14 +325,20 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
         pickup: pickup,
         dropoff: dropoff,
         idempotencyKey: key,
+        proposedFareIqd: _proposedFareIqd,
       );
 
       if (!mounted) return;
       _intent.onSuccess();
 
+      // A named price opens the ride to bids, so the rider goes to the offer
+      // list. RideOffersScreen replaces itself with tracking if the platform
+      // turns out not to negotiate — the ride is real either way.
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
-          builder: (_) => TrackRideScreen(api: widget.api, ride: ride),
+          builder: (_) => _proposedFareIqd == null
+              ? TrackRideScreen(api: widget.api, ride: ride)
+              : RideOffersScreen(api: widget.api, ride: ride),
         ),
       );
 
@@ -298,6 +368,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
       _dropoffAddress = null;
       _estimate = null;
       _error = null;
+      _proposedFareIqd = null;
       _intent.abandon();
     });
     unawaited(_loadRecentPlaces());
@@ -385,6 +456,10 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
       ),
       onSearchDestination: () => unawaited(_pickDestination()),
       onRequestRide: () => unawaited(_request()),
+      // Rendered only when there is a fare to negotiate around. Null on every
+      // other stage, which is what keeps the meter the default.
+      onProposeFare:
+          _estimate == null ? null : () => unawaited(_proposeFare()),
       onCancel: _reset,
       onRetry: () => unawaited(
         _estimate == null ? _estimateFare() : _request(),

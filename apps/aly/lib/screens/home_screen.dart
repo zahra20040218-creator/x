@@ -7,6 +7,7 @@ import 'package:rideapp_aly/location/location_service.dart';
 import 'package:rideapp_aly/screens/design_logic.dart';
 import 'package:rideapp_aly/screens/earnings_screen.dart';
 import 'package:rideapp_aly/screens/offer_sheet.dart';
+import 'package:rideapp_aly/screens/open_requests_screen.dart';
 import 'package:rideapp_aly/screens/profile_screen.dart';
 import 'package:rideapp_aly/screens/subscription_screen.dart';
 import 'package:rideapp_aly/screens/trip_screen.dart';
@@ -508,6 +509,20 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             tooltip: strings.signOut,
             icon: const Icon(Icons.logout_rounded),
             onPressed: _signingOut ? null : _signOut,
+          ),
+          // Bidding lives beside the console rather than inside it: a driver
+          // either waits for a dispatched offer or goes looking for one, and
+          // the two are different intents. Opens for every driver — the screen
+          // itself reports 404 as "this platform does not negotiate", which is
+          // the only signal the contract gives.
+          IconButton(
+            tooltip: strings.openRequests,
+            icon: const Icon(Icons.gavel_rounded),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => OpenRequestsScreen(api: widget.api),
+              ),
+            ),
           ),
           IconButton(
             tooltip: strings.earnings,

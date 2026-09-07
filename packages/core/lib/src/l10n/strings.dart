@@ -151,6 +151,14 @@ abstract class AppStrings {
   String get supportOther;
   String get supportPickRide;
 
+  String get openRequests;
+  String get riderOffers;
+  String get distanceToPickup;
+  String get noOpenRequests;
+  String get noOpenRequestsBody;
+  String get negotiationOff;
+  String get negotiationOffBody;
+
   String get kilometreShort;
 
   String get recentDestinations;
@@ -557,6 +565,21 @@ class ArabicStrings implements AppStrings {
   String get supportOther => 'مشكلة أخرى';
   @override
   String get supportPickRide => 'اختر الرحلة التي تخص المشكلة';
+  @override
+  @override
+  String get openRequests => 'الطلبات المفتوحة';
+  @override
+  String get riderOffers => 'الراكب يعرض';
+  @override
+  String get distanceToPickup => 'المسافة إليك';
+  @override
+  String get noOpenRequests => 'لا توجد طلبات الآن';
+  @override
+  String get noOpenRequestsBody => 'لا يوجد راكب قريب يعرض سعراً حالياً. ابقَ متصلاً.';
+  @override
+  String get negotiationOff => 'المساومة غير مفعّلة';
+  @override
+  String get negotiationOffBody => 'هذه المنصة تعمل بالأجرة المحسوبة فقط.';
   @override
   String get kilometreShort => 'كم';
   @override
@@ -1065,6 +1088,21 @@ class EnglishStrings implements AppStrings {
   String get supportOther => 'Something else';
   @override
   String get supportPickRide => 'Choose the ride this is about';
+  @override
+  @override
+  String get openRequests => 'Open requests';
+  @override
+  String get riderOffers => 'Rider offers';
+  @override
+  String get distanceToPickup => 'Distance to you';
+  @override
+  String get noOpenRequests => 'No open requests';
+  @override
+  String get noOpenRequestsBody => 'No nearby rider is naming a price right now. Stay online.';
+  @override
+  String get negotiationOff => 'Negotiation is off';
+  @override
+  String get negotiationOffBody => 'This platform runs on metered fares only.';
   @override
   String get kilometreShort => 'km';
   @override

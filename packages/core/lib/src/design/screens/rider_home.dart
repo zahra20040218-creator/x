@@ -127,6 +127,7 @@ class AlyRiderHome extends StatelessWidget {
     required this.onOpenMenu,
     super.key,
     this.onPickRecent,
+    this.onProposeFare,
   });
 
   final RiderHomeState state;
@@ -141,6 +142,15 @@ class AlyRiderHome extends StatelessWidget {
 
   final VoidCallback onSearchDestination;
   final VoidCallback onRequestRide;
+
+  /// Offer a price instead of taking the meter's.
+  ///
+  /// Optional and null by default, because `platform_config.negotiation_enabled`
+  /// is seeded false and no endpoint reports it — a screen that always showed
+  /// this would offer a choice most platforms do not have. Null renders
+  /// nothing and changes no existing layout.
+  final VoidCallback? onProposeFare;
+
   final VoidCallback onCancel;
   final VoidCallback onRetry;
   final VoidCallback onEnableLocation;
@@ -197,6 +207,7 @@ class AlyRiderHome extends StatelessWidget {
                   state: state,
                   onSearchDestination: onSearchDestination,
                   onRequestRide: onRequestRide,
+                  onProposeFare: onProposeFare,
                   onCancel: onCancel,
                   onRetry: onRetry,
                   onEnableLocation: onEnableLocation,
@@ -261,11 +272,13 @@ class _HomeSheet extends StatelessWidget {
     required this.onRetry,
     required this.onEnableLocation,
     required this.onPickRecent,
+    this.onProposeFare,
   });
 
   final RiderHomeState state;
   final VoidCallback onSearchDestination;
   final VoidCallback onRequestRide;
+  final VoidCallback? onProposeFare;
   final VoidCallback onCancel;
   final VoidCallback onRetry;
   final VoidCallback onEnableLocation;
@@ -463,6 +476,17 @@ class _HomeSheet extends StatelessWidget {
       ],
       const SizedBox(height: AlySpacing.xl),
       AlyButton(label: 'اطلب الرحلة', onPressed: onRequestRide),
+      // Secondary, and only where the platform negotiates. The meter is the
+      // default because it is the answer for a rider who does not want to
+      // haggle, which is most of them.
+      if (onProposeFare != null) ...[
+        const SizedBox(height: AlySpacing.sm),
+        AlyButton(
+          label: 'اعرض سعرك',
+          onPressed: onProposeFare,
+          variant: AlyButtonVariant.tertiary,
+        ),
+      ],
     ];
   }
 

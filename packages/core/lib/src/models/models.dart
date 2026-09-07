@@ -782,3 +782,180 @@ class DriverSubscription {
     return remaining.inDays;
   }
 }
+
+/// A bid's life, as `docs/api-contract.yaml` defines it.
+///
+/// SUPERSEDED rather than "edited": bidding again writes a new row and marks
+/// the old one superseded, because the bid history is what a fare dispute is
+/// argued from and an UPDATE destroys it.
+enum RideBidStatus {
+  active('ACTIVE'),
+  superseded('SUPERSEDED'),
+  withdrawn('WITHDRAWN'),
+  accepted('ACCEPTED'),
+  rejected('REJECTED'),
+  expired('EXPIRED'),
+
+  /// A state this build has never seen.
+  ///
+  /// Deliberately NOT a throw, which is how [RideStatus] handles the same
+  /// situation — and the difference is intentional. An unknown ride status
+  /// means the app cannot reason about the trip it is showing. An unknown BID
+  /// status means one card in a list of offers is unfamiliar, and taking down
+  /// a rider's whole offer list over a string the server added last Tuesday is
+  /// the worse failure.
+  unknown('UNKNOWN');
+
+  const RideBidStatus(this.wire);
+
+  final String wire;
+
+  static RideBidStatus fromWire(String value) => RideBidStatus.values.firstWhere(
+        (status) => status.wire == value,
+        orElse: () => RideBidStatus.unknown,
+      );
+}
+
+/// One driver's binding commitment to carry a ride at a stated fare.
+///
+/// A bid IS the acceptance. When the rider selects one, the server takes the
+/// Redis claim on that driver's behalf and runs REQUESTED -> OFFERED ->
+/// ACCEPTED through `RideStateMachine` unchanged (CLAUDE.md §5.1) — there is no
+/// second commit path and no bypass of the claim.
+class RideBid extends Equatable {
+  const RideBid({
+    required this.id,
+    required this.rideId,
+    required this.driverId,
+    required this.amountIqd,
+    required this.status,
+    required this.createdAt,
+    required this.expiresAt,
+    this.driver,
+    this.deltaIqd,
+    this.etaToPickup,
+    this.distanceM,
+  });
+
+  factory RideBid.fromJson(Map<String, dynamic> json) {
+    final eta = json['etaSeconds'] as int?;
+
+    return RideBid(
+      id: json['id'] as String,
+      rideId: json['rideId'] as String,
+      driverId: json['driverId'] as String,
+      amountIqd: IqdAmount.fromJson(json['amountIqd']),
+      status: RideBidStatus.fromWire(json['status'] as String),
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      expiresAt: DateTime.parse(json['expiresAt'] as String),
+      driver: json['driver'] == null
+          ? null
+          : PublicUser.fromJson(json['driver'] as Map<String, dynamic>),
+      deltaIqd: json['deltaIqd'] == null
+          ? null
+          : IqdAmount.fromJson(json['deltaIqd']),
+      etaToPickup: eta == null ? null : Duration(seconds: eta),
+      distanceM: json['distanceM'] as int?,
+    );
+  }
+
+  final String id;
+  final String rideId;
+  final String driverId;
+
+  /// Whole Iraqi dinars (CLAUDE.md §6.1). Never a decimal.
+  final IqdAmount amountIqd;
+
+  /// [amountIqd] minus the rider's proposal; negative is cheaper than asked.
+  ///
+  /// Read from the server, never recomputed here. The contract is explicit
+  /// that two clients computing it separately is two chances to get the sign
+  /// wrong, and the sign is the entire meaning of the number.
+  final IqdAmount? deltaIqd;
+
+  final RideBidStatus status;
+
+  /// Present only when a RIDER reads their own bids. A driver reading back
+  /// their own bid receives no other user's profile.
+  final PublicUser? driver;
+
+  final Duration? etaToPickup;
+  final int? distanceM;
+
+  final DateTime createdAt;
+  final DateTime expiresAt;
+
+  @override
+  List<Object?> get props => [id, status, amountIqd];
+}
+
+/// The bids on one ride, with the number they are all compared against.
+///
+/// Paired rather than returned separately because a bid list without the
+/// rider's own proposal cannot be rendered: every card states its difference
+/// from that number, and fetching the two apart invites showing a delta
+/// against a stale proposal.
+class RideBidsPage extends Equatable {
+  const RideBidsPage({required this.proposedFareIqd, required this.bids});
+
+  final IqdAmount proposedFareIqd;
+  final List<RideBid> bids;
+
+  @override
+  List<Object?> get props => [proposedFareIqd, bids];
+}
+
+/// A ride a driver may bid on.
+///
+/// Carries NO rider identity, deliberately: a driver decides on the trip and
+/// the price, not on who is asking, and showing the rider before assignment
+/// invites exactly the discrimination a marketplace should not have.
+class OpenRideRequest extends Equatable {
+  const OpenRideRequest({
+    required this.rideId,
+    required this.pickup,
+    required this.dropoff,
+    required this.proposedFareIqd,
+    required this.distanceToPickupM,
+    required this.estimatedDistanceM,
+    required this.expiresAt,
+    this.pickupAddress,
+    this.dropoffAddress,
+    this.suggestedFareIqd,
+  });
+
+  factory OpenRideRequest.fromJson(Map<String, dynamic> json) => OpenRideRequest(
+        rideId: json['rideId'] as String,
+        pickup: LatLng.fromJson(json['pickup'] as Map<String, dynamic>),
+        dropoff: LatLng.fromJson(json['dropoff'] as Map<String, dynamic>),
+        proposedFareIqd: IqdAmount.fromJson(json['proposedFareIqd']),
+        distanceToPickupM: json['distanceToPickupM'] as int,
+        estimatedDistanceM: json['estimatedDistanceM'] as int,
+        expiresAt: DateTime.parse(json['expiresAt'] as String),
+        pickupAddress: json['pickupAddress'] as String?,
+        dropoffAddress: json['dropoffAddress'] as String?,
+        suggestedFareIqd: json['suggestedFareIqd'] == null
+            ? null
+            : IqdAmount.fromJson(json['suggestedFareIqd']),
+      );
+
+  final String rideId;
+  final LatLng pickup;
+  final LatLng dropoff;
+  final String? pickupAddress;
+  final String? dropoffAddress;
+
+  /// What the rider offered.
+  final IqdAmount proposedFareIqd;
+
+  /// The tariff's own estimate, shown beside the proposal so a driver can see
+  /// at a glance whether it is fair rather than having to know the tariff.
+  final IqdAmount? suggestedFareIqd;
+
+  final int distanceToPickupM;
+  final int estimatedDistanceM;
+  final DateTime expiresAt;
+
+  @override
+  List<Object?> get props => [rideId, proposedFareIqd, expiresAt];
+}

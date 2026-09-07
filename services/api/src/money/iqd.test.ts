@@ -119,14 +119,35 @@ describe('applyBps()', () => {
   });
 
   it('always returns a whole integer for a large sweep of inputs', () => {
+    // The assertion is OUTSIDE the loop on purpose.
+    //
+    // This sweep is 1,460 amounts x 7 rates = 10,220 cases, and asserting
+    // three times inside the loop meant ~30,660 `expect` calls. `expect` is
+    // not free — it builds a matcher and a diff context per call — and the
+    // test was timing out at 5s on a function that is three arithmetic
+    // operations. The input space below is unchanged; only the bookkeeping is.
+    //
+    // It also reports better. A bare `expect` inside the loop tells you a
+    // number was wrong; this tells you which (amount, bps) pair produced it.
+    const violations: string[] = [];
+
     for (let amount = 0; amount <= 200_000; amount += 137) {
       for (const bps of [0, 1, 250, 999, 1_500, 3_333, 10_000]) {
         const result = applyBps(iqd(amount), bps);
-        expect(Number.isInteger(result)).toBe(true);
-        expect(result).toBeGreaterThanOrEqual(0);
-        expect(result).toBeLessThanOrEqual(amount);
+
+        if (!Number.isInteger(result)) {
+          violations.push(`applyBps(${amount}, ${bps}) = ${result} is not an integer`);
+        }
+        if (result < 0) {
+          violations.push(`applyBps(${amount}, ${bps}) = ${result} is negative`);
+        }
+        if (result > amount) {
+          violations.push(`applyBps(${amount}, ${bps}) = ${result} exceeds ${amount}`);
+        }
       }
     }
+
+    expect(violations).toEqual([]);
   });
 
   it('100% commission returns the whole amount', () => {

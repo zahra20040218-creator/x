@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:rideapp_core/src/api/api_exception.dart';
 import 'package:rideapp_core/src/api/token_store.dart';
 import 'package:rideapp_core/src/models/models.dart';
+import 'package:rideapp_core/src/money/iqd.dart';
 import 'package:uuid/uuid.dart';
 
 /// The one way either app talks to the server.
@@ -155,6 +156,7 @@ class ApiClient {
     required String idempotencyKey,
     String? pickupAddress,
     String? dropoffAddress,
+    int? proposedFareIqd,
   }) async =>
       Ride.fromJson(
         await _send<Map<String, dynamic>>(
@@ -165,10 +167,93 @@ class ApiClient {
             'dropoff': dropoff.toJson(),
             if (pickupAddress != null) 'pickupAddress': pickupAddress,
             if (dropoffAddress != null) 'dropoffAddress': dropoffAddress,
+            // Supplying this is what opens the ride to driver bids. Ignored by
+            // the server unless `negotiation_enabled` is on, so sending it
+            // against a platform with negotiation off behaves exactly as a
+            // metered request does.
+            if (proposedFareIqd != null) 'proposedFareIqd': proposedFareIqd,
           },
           headers: {'Idempotency-Key': idempotencyKey},
         ),
       );
+
+  // ---------------------------------------------------------------------------
+  // Fare negotiation.
+  //
+  // These endpoints have existed since migration 0012 and no Dart client knew
+  // them, which is why the feature was unreachable from the app.
+  //
+  // All four answer 404 when `platform_config.negotiation_enabled` is off, and
+  // there is no endpoint that reports the flag. So a 404 here means "this
+  // platform does not negotiate", NOT "something is missing" — callers fall
+  // back to metered dispatch, which is what the contract describes.
+  // ---------------------------------------------------------------------------
+
+  /// The bids on the caller's own ride, cheapest first.
+  ///
+  /// Rider-only, and only their own ride: a driver reading this would learn
+  /// what their competitors offered.
+  Future<RideBidsPage> rideBids(String rideId) async {
+    final json = await _send<Map<String, dynamic>>(
+      'GET',
+      '/rides/$rideId/bids',
+    );
+
+    return RideBidsPage(
+      proposedFareIqd: IqdAmount.fromJson(json['proposedFareIqd']),
+      bids: (json['bids'] as List<dynamic>? ?? const [])
+          .map((e) => RideBid.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+
+  /// Bid on a ride, or replace this driver's existing bid.
+  ///
+  /// A driver has at most ONE active bid per ride, enforced by a partial
+  /// unique index. Bidding again supersedes the previous bid rather than
+  /// editing it.
+  Future<RideBid> placeBid(
+    String rideId, {
+    required int amountIqd,
+    int? etaSeconds,
+  }) async =>
+      RideBid.fromJson(
+        await _send<Map<String, dynamic>>(
+          'POST',
+          '/rides/$rideId/bids',
+          body: {
+            'amountIqd': amountIqd,
+            if (etaSeconds != null) 'etaSeconds': etaSeconds,
+          },
+        ),
+      );
+
+  /// The rider selects a bid; the ride is assigned at that fare.
+  ///
+  /// 409 when that driver has since taken another ride — the claim (§5.1) is
+  /// what decides, exactly as it does for metered dispatch.
+  Future<Ride> acceptBid(String rideId, String bidId) async => Ride.fromJson(
+        await _send<Map<String, dynamic>>(
+          'POST',
+          '/rides/$rideId/bids/$bidId/accept',
+        ),
+      );
+
+  /// Open ride requests this driver may bid on, nearest first.
+  ///
+  /// Scoped server-side by the driver's Redis position and the configured
+  /// radius. 403 — not an empty list — when the account may not drive, so the
+  /// app can say why (CLAUDE.md §1.1).
+  Future<List<OpenRideRequest>> openRideRequests() async {
+    final json = await _send<Map<String, dynamic>>(
+      'GET',
+      '/driver/ride-requests',
+    );
+
+    return (json['requests'] as List<dynamic>? ?? const [])
+        .map((e) => OpenRideRequest.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
 
   /// One key per user intent, not per attempt.
   static String newIdempotencyKey() => _uuid.v4();

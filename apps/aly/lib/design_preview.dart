@@ -14,6 +14,7 @@ import 'package:rideapp_aly/screens/battery_exemption_screen.dart';
 import 'package:rideapp_aly/screens/earnings_screen.dart';
 import 'package:rideapp_aly/screens/home_screen.dart';
 import 'package:rideapp_aly/screens/offer_sheet.dart';
+import 'package:rideapp_aly/screens/open_requests_screen.dart';
 import 'package:rideapp_aly/screens/profile_screen.dart';
 import 'package:rideapp_aly/screens/request_ride_screen.dart';
 import 'package:rideapp_aly/screens/ride_history_screen.dart';
@@ -301,6 +302,7 @@ class _Gallery extends StatelessWidget {
         ),
       ),
       MapEntry('الارباح والمحفظة', () => EarningsScreen(api: api)),
+      MapEntry('الطلبات المفتوحة - السائق', () => OpenRequestsScreen(api: api)),
       MapEntry('الدعم', () => SupportScreen(api: api)),
       MapEntry('الاشتراك', () => SubscriptionScreen(api: api)),
       MapEntry('سجل الرحلات', () => RideHistoryScreen(api: api)),
